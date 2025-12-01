@@ -40,10 +40,6 @@ type Trainer = {
     name: string;
 };
 
-type AdminPanelProps = {
-    onBackToCalendar?: () => void;
-};
-
 type Tab = "bookings" | "classes";
 
 // Lista fija de trainers
@@ -57,7 +53,6 @@ const TRAINERS: Trainer[] = [
     { id: 7, name: "Josias Mendez" },
     { id: 8, name: "Ricardo Sanchez" },
     { id: 9, name: "Giselle Cárdenas" },
-  
 ];
 
 // helper para CSRF
@@ -65,7 +60,7 @@ async function ensureCsrf() {
     await api.get("/sanctum/csrf-cookie");
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToCalendar }) => {
+const AdminPanel: React.FC = () => {
     const navigate = useNavigate();
 
     // ======== RESERVAS =========
@@ -124,12 +119,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToCalendar }) => {
         return d.toLocaleString("es-ES");
     };
 
-    // ======== BOOKING: EDITAR =========
-    const openEditBookingModal = (booking: Booking) => {
-        setEditBooking(booking);
-        setShowEditBookingModal(true);
-    };
-
+    // ======== BOOKING: GUARDAR CAMBIOS =========
     const saveBookingChanges = async () => {
         if (!editBooking) return;
 

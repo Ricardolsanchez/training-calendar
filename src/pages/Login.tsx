@@ -9,7 +9,7 @@ type LoginProps = {
 };
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState("admin@alonsoalonsolaw.com"); // <-- opcional, para probar directo
+  const [email, setEmail] = useState("admin@alonsoalonsolaw.com"); // opcional, para pruebas
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,33 +22,30 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsSubmitting(true);
 
     try {
-      // 1) Obtener cookie CSRF de Sanctum (IMPORTANTE usar withCredentials)
-      await api.get("/sanctum/csrf-cookie", { withCredentials: true });
+      // 🔹 1) Login por token (YA NO usamos /sanctum/csrf-cookie ni /login)
+      const res = await api.post("/api/admin/login", {
+        email,
+        password,
+      });
 
-      // 2) Login contra Breeze
-      await api.post(
-        "/login",
-        { email, password },
-        { withCredentials: true }
-      );
+      const { token, user } = res.data;
 
-      // 3) Preguntarle al backend quién soy
-      const userRes = await api.get("/api/user", { withCredentials: true });
-
-      console.log("Usuario logueado:", userRes.data);
-
-      if (!userRes.data.is_admin) {
+      if (!user.is_admin) {
         setError("Este usuario no es administrador.");
-        await api.post("/logout", {}, { withCredentials: true });
         return;
       }
+
+      // 🔹 2) Guardar token y configurarlo en axios
+      localStorage.setItem("admin_token", token);
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      console.log("Usuario admin logueado:", user);
 
       onLogin();
       navigate("/admin");
     } catch (err: any) {
       console.error("Error en login:", err);
 
-      // Si Laravel manda errores de validación, los mostramos
       const backendMsg =
         err?.response?.data?.message ||
         err?.response?.data?.errors?.email?.[0] ||

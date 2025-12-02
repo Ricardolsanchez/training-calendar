@@ -9,7 +9,7 @@ type LoginProps = {
 };
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState("admin@alonsoalonsolaw.com"); // opcional, para pruebas
+  const [email, setEmail] = useState("admin@alonsoalonsolaw.com"); // opcional para pruebas
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,7 +22,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsSubmitting(true);
 
     try {
-      // 🔹 1) Login por token (YA NO usamos /sanctum/csrf-cookie ni /login)
+      // 1) Login por token contra tu endpoint /api/admin/login
       const res = await api.post("/api/admin/login", {
         email,
         password,
@@ -30,17 +30,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       const { token, user } = res.data;
 
-      if (!user.is_admin) {
+      // Si por alguna razón no es admin, limpiamos cualquier token
+      if (!user?.is_admin) {
+        localStorage.removeItem("admin_token");
+        delete api.defaults.headers.common["Authorization"];
         setError("Este usuario no es administrador.");
         return;
       }
 
-      // 🔹 2) Guardar token y configurarlo en axios
+      // 2) Guardar token y configurarlo en axios
       localStorage.setItem("admin_token", token);
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
       console.log("Usuario admin logueado:", user);
 
+      // 3) Avisar al padre y navegar al panel
       onLogin();
       navigate("/admin");
     } catch (err: any) {

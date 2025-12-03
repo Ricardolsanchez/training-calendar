@@ -86,24 +86,17 @@ const BookingCalendar: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const token = localStorage.getItem("admin_token");
+    const checkAdmin = () => {
+      const token = localStorage.getItem("admin_token");
 
-        if (!token) {
-          setIsAdmin(false);
-          return;
-        }
-
-        // Aseguramos que axios mande el token
-        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-        const res = await api.get("/api/admin/me");
-
-        setIsAdmin(!!res.data?.is_admin);
-      } catch (err) {
+      if (!token) {
         setIsAdmin(false);
+        return;
       }
+
+      // Solo asumimos que si hay token, es admin
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      setIsAdmin(true);
     };
 
     checkAdmin();
@@ -138,6 +131,8 @@ const BookingCalendar: React.FC = () => {
     }
 
     const payload = {
+      class_id: selectedClass.id, // 👈 NUEVO
+
       name: selectedClass.title,
       email,
       notes: `Reserva para la clase "${selectedClass.title}" el ${selectedClass.dateLabel} (${selectedClass.timeRange})`,
@@ -149,7 +144,6 @@ const BookingCalendar: React.FC = () => {
       original_training_days: 1,
       new_training_days: 1,
     };
-
     try {
       setStatus("loading");
       setErrorMessage("");

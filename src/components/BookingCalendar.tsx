@@ -17,6 +17,75 @@ type AvailableClass = {
 };
 
 type Status = "idle" | "loading" | "success" | "error";
+type Lang = "en" | "es";
+
+// 🔤 Diccionario de traducciones
+const translations: Record<Lang, Record<string, string>> = {
+  en: {
+    badge: "Available Classes",
+    headerTitle: "Book Your Next Class",
+    headerSubtitle:
+      "Select one of the available classes this month and reserve your spot using your corporate email.",
+    updatedTag: "Updated in Real Time",
+    adminPanel: "Admin Panel",
+    adminLogin: "Admin login",
+    availableClassesTitle: "Available Classes this Month",
+    availableClassesSubtitle:
+      "Click on a class to view the details and make a reservation.",
+    loadingClasses: "Loading Available Classes",
+    noClassesError: "Could not load available classes.",
+    noClasses: "No Available Classes this Month",
+    clickOnClassTitle: "Click on an Available Class!",
+    clickOnClassText:
+      "Choose a class from the list on the left to view the details and reserve your spot.",
+    selectedClassLabel: "Selected Class",
+    emailLabel: "Corporate Email for the Booking",
+    emailPlaceholder: "youremail@yourcompany.com",
+    errorNoClass: "You must select an available class.",
+    errorNoEmail: "Corporate email is required.",
+    genericError: "An error occurred while sending the booking.",
+    unexpectedError: "An unexpected error occurred.",
+    successBooked: "✅ Booked Successfully! We’ll contact you soon!",
+    submitLoading: "Sending booking...",
+    submitLabel: "Book this class",
+    privacyText: "We’ll use your corporate email to confirm your attendance.",
+    seats: "Seat",
+    seatsPlural: "Seats",
+    seatsAvailable: "Available",
+  },
+  es: {
+    badge: "Clases disponibles",
+    headerTitle: "Reserva tu próxima clase",
+    headerSubtitle:
+      "Selecciona una de las clases disponibles este mes y reserva tu cupo con tu correo corporativo.",
+    updatedTag: "Actualizado en tiempo real",
+    adminPanel: "Panel Admin",
+    adminLogin: "Inicio de sesión admin",
+    availableClassesTitle: "Clases disponibles este mes",
+    availableClassesSubtitle:
+      "Haz clic en una clase para ver el detalle y reservar.",
+    loadingClasses: "Cargando clases disponibles",
+    noClassesError: "No se pudieron cargar las clases disponibles.",
+    noClasses: "No hay clases disponibles este mes",
+    clickOnClassTitle: "¡Haz clic en una clase disponible!",
+    clickOnClassText:
+      "Elige una clase de la lista de la izquierda para ver el detalle y reservar tu cupo.",
+    selectedClassLabel: "Clase seleccionada",
+    emailLabel: "Correo corporativo para la reserva",
+    emailPlaceholder: "tucorreo@tuempresa.com",
+    errorNoClass: "Debes seleccionar una clase disponible.",
+    errorNoEmail: "El correo corporativo es obligatorio.",
+    genericError: "Ocurrió un error al enviar la reserva.",
+    unexpectedError: "Ocurrió un error inesperado.",
+    successBooked: "✅ ¡Reserva enviada! Nos pondremos en contacto contigo pronto.",
+    submitLoading: "Enviando reserva...",
+    submitLabel: "Reservar esta clase",
+    privacyText: "Usaremos tu correo corporativo para confirmar tu asistencia.",
+    seats: "cupo",
+    seatsPlural: "cupos",
+    seatsAvailable: "disponibles",
+  },
+};
 
 const BookingCalendar: React.FC = () => {
   const [availableClasses, setAvailableClasses] = useState<AvailableClass[]>(
@@ -27,6 +96,10 @@ const BookingCalendar: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const navigate = useNavigate();
 
+  // 🌍 idioma
+  const [lang, setLang] = useState<Lang>("en");
+  const t = (key: string) => translations[lang][key];
+
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -36,7 +109,6 @@ const BookingCalendar: React.FC = () => {
         const res = await api.get("/api/classes");
         const data = res.data;
 
-        // Tipo que viene del backend (Laravel)
         type BackendClass = {
           id: number;
           title: string;
@@ -48,12 +120,13 @@ const BookingCalendar: React.FC = () => {
           spots_left: number;
         };
 
-        // Puede venir como { classes: [...] } o directamente [...]
         const list = (data.classes ?? data) as BackendClass[];
 
         const mapped: AvailableClass[] = list.map((cls: BackendClass) => {
           const d = new Date(cls.date_iso);
-          const dateLabel = d.toLocaleDateString("en-US", {
+          const locale = lang === "en" ? "en-US" : "es-ES";
+
+          const dateLabel = d.toLocaleDateString(locale, {
             weekday: "long",
             day: "numeric",
             month: "long",
@@ -76,14 +149,15 @@ const BookingCalendar: React.FC = () => {
         setAvailableClasses(mapped);
       } catch (err) {
         console.error("Error cargando clases:", err);
-        setClassesError("No se pudieron cargar las clases disponibles.");
+        setClassesError(t("noClassesError"));
       } finally {
         setLoadingClasses(false);
       }
     };
 
     fetchClasses();
-  }, []);
+    // importante: recargar labels cuando cambia lang
+  }, [lang]);
 
   useEffect(() => {
     const checkAdmin = () => {
@@ -94,7 +168,6 @@ const BookingCalendar: React.FC = () => {
         return;
       }
 
-      // Solo asumimos que si hay token, es admin
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       setIsAdmin(true);
     };
@@ -120,19 +193,18 @@ const BookingCalendar: React.FC = () => {
 
     if (!selectedClass) {
       setStatus("error");
-      setErrorMessage("Debes seleccionar una clase disponible.");
+      setErrorMessage(t("errorNoClass"));
       return;
     }
 
     if (!email) {
       setStatus("error");
-      setErrorMessage("El correo corporativo es obligatorio.");
+      setErrorMessage(t("errorNoEmail"));
       return;
     }
 
     const payload = {
-      class_id: selectedClass.id, // 👈 NUEVO
-
+      class_id: selectedClass.id,
       name: selectedClass.title,
       email,
       notes: `Reserva para la clase "${selectedClass.title}" el ${selectedClass.dateLabel} (${selectedClass.timeRange})`,
@@ -144,6 +216,7 @@ const BookingCalendar: React.FC = () => {
       original_training_days: 1,
       new_training_days: 1,
     };
+
     try {
       setStatus("loading");
       setErrorMessage("");
@@ -157,10 +230,10 @@ const BookingCalendar: React.FC = () => {
       console.error("❌ Error:", err);
       if (err.response) {
         setErrorMessage(
-          err.response.data?.message ?? "Ocurrió un error al enviar la reserva."
+          err.response.data?.message ?? t("genericError")
         );
       } else {
-        setErrorMessage("Ocurrió un error inesperado.");
+        setErrorMessage(t("unexpectedError"));
       }
       setStatus("error");
     }
@@ -171,12 +244,9 @@ const BookingCalendar: React.FC = () => {
       <div className="booking-card">
         <header className="booking-header">
           <div>
-            <div className="booking-badge">Available Classes</div>
-            <h1>Book Your Next Class</h1>
-            <p className="booking-subtitle">
-              Select one of the available classes this month and reserve your
-              spot using your corporate email.
-            </p>
+            <div className="booking-badge">{t("badge")}</div>
+            <h1>{t("headerTitle")}</h1>
+            <p className="booking-subtitle">{t("headerSubtitle")}</p>
           </div>
 
           <div className="booking-header-logo">
@@ -190,22 +260,29 @@ const BookingCalendar: React.FC = () => {
           <div className="booking-header-right">
             <div className="booking-header-tag">
               <span className="dot" />
-              <span>Updated in Real Time</span>
+              <span>{t("updatedTag")}</span>
             </div>
 
+            {/* 🌍 Toggle idioma */}
+            <button
+              type="button"
+              className="booking-lang-toggle"
+              onClick={() => setLang(lang === "en" ? "es" : "en")}
+            >
+              {lang === "en" ? "ES" : "EN"}
+            </button>
+
             {isAdmin === null ? null : isAdmin ? (
-              // ✅ Ya está logueada como admin → botón directo al panel
               <button
                 type="button"
                 className="booking-login-btn"
                 onClick={() => navigate("/admin")}
               >
-                Admin Panel
+                {t("adminPanel")}
               </button>
             ) : (
-              // ❌ No está logueada → mostrar el login normal
               <Link to="/login" className="booking-login-btn">
-                Admin login
+                {t("adminLogin")}
               </Link>
             )}
           </div>
@@ -214,15 +291,13 @@ const BookingCalendar: React.FC = () => {
         <div className="booking-layout">
           <section className="class-list-section">
             <div className="class-list-header">
-              <h2>Available Classes this Month</h2>
-              <p>
-                Click on a class to view the details and make a reservation.
-              </p>
+              <h2>{t("availableClassesTitle")}</h2>
+              <p>{t("availableClassesSubtitle")}</p>
             </div>
 
             <div className="class-list">
               {loadingClasses && (
-                <p className="form-message">Loading Available Classes</p>
+                <p className="form-message">{t("loadingClasses")}</p>
               )}
 
               {classesError && (
@@ -232,9 +307,7 @@ const BookingCalendar: React.FC = () => {
               {!loadingClasses &&
                 !classesError &&
                 availableClasses.length === 0 && (
-                  <p className="form-message">
-                    No Available Classes this Month
-                  </p>
+                  <p className="form-message">{t("noClasses")}</p>
                 )}
 
               {!loadingClasses &&
@@ -275,8 +348,11 @@ const BookingCalendar: React.FC = () => {
                       </span>
                       <span className="class-level">{cls.level}</span>
                       <span className="class-spots">
-                        {cls.spotsLeft} Seat
-                        {cls.spotsLeft !== 1 && "s"} Available
+                        {cls.spotsLeft}{" "}
+                        {cls.spotsLeft === 1
+                          ? t("seats")
+                          : t("seatsPlural")}{" "}
+                        {t("seatsAvailable")}
                       </span>
                     </div>
                   </button>
@@ -287,36 +363,31 @@ const BookingCalendar: React.FC = () => {
           <section className="booking-detail-section">
             {!selectedClass ? (
               <div className="booking-detail-empty">
-                <h3>Click on a Available Class!</h3>
-                <p>
-                  Choose a class from the list on the left to view the details
-                  and reserve your spot.
-                </p>
+                <h3>{t("clickOnClassTitle")}</h3>
+                <p>{t("clickOnClassText")}</p>
               </div>
             ) : (
               <div className="booking-detail-card">
                 <div className="booking-detail-header">
                   <span className="booking-detail-label">
-                    Clase seleccionada
+                    {t("selectedClassLabel")}
                   </span>
                   <h3>{selectedClass.title}</h3>
                   <p className="booking-detail-meta">
                     {selectedClass.dateLabel} · {selectedClass.timeRange}
                     <br />
-                    Trainer: {selectedClass.trainerName} · {selectedClass.level}{" "}
-                    · {selectedClass.modality}
+                    Trainer: {selectedClass.trainerName} ·{" "}
+                    {selectedClass.level} · {selectedClass.modality}
                   </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="booking-detail-form">
                   <div className="form-group">
-                    <label htmlFor="email">
-                      Corporative Email for the Booking
-                    </label>
+                    <label htmlFor="email">{t("emailLabel")}</label>
                     <input
                       id="email"
                       type="email"
-                      placeholder="tucorreo@tuempresa.com"
+                      placeholder={t("emailPlaceholder")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
@@ -328,7 +399,7 @@ const BookingCalendar: React.FC = () => {
 
                   {status === "success" && (
                     <p className="form-message success">
-                      ✅ Booked Successfully! We’ll contact you soon!
+                      {t("successBooked")}
                     </p>
                   )}
 
@@ -338,13 +409,11 @@ const BookingCalendar: React.FC = () => {
                     disabled={status === "loading"}
                   >
                     {status === "loading"
-                      ? "Enviando reserva..."
-                      : "Reservar esta clase"}
+                      ? t("submitLoading")
+                      : t("submitLabel")}
                   </button>
 
-                  <p className="booking-privacy">
-                    We’ll use your corporate email to confirm your attendance.
-                  </p>
+                  <p className="booking-privacy">{t("privacyText")}</p>
                 </form>
               </div>
             )}

@@ -60,7 +60,8 @@ const translations: Record<Lang, Record<string, string>> = {
   en: {
     adminBadge: "Admin Panel",
     adminTitle: "Training Management",
-    adminSubtitle: "Review the reservations received and manage the available classes.",
+    adminSubtitle:
+      "Review the reservations received and manage the available classes.",
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabBookings: "Bookings",
@@ -125,7 +126,8 @@ const translations: Record<Lang, Record<string, string>> = {
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-    adminSubtitle: "Revisa las reservas recibidas y administra las clases disponibles.",
+    adminSubtitle:
+      "Revisa las reservas recibidas y administra las clases disponibles.",
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabBookings: "Reservas",
@@ -312,13 +314,10 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      const res = await api.put(
-        `/api/admin/bookings/${booking.id}/status`,
-        {
-          status: newStatus,
-          calendar_url: calendarUrl,
-        }
-      );
+      const res = await api.put(`/api/admin/bookings/${booking.id}/status`, {
+        status: newStatus,
+        calendar_url: calendarUrl,
+      });
 
       const updated: Booking = res.data.booking;
 
@@ -429,14 +428,15 @@ const AdminPanel: React.FC = () => {
   const handleLogout = async () => {
     try {
       await ensureCsrf();
-      await api.post("/api/logout"); // asegúrate que backend tenga /api/logout
+      await api.post("/api/logout");
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
     } finally {
+      // 🔹 borra el token local
+      localStorage.removeItem("admin_token");
       navigate("/");
     }
   };
-
   return (
     <div className="admin-page">
       <div className="admin-card">
@@ -480,9 +480,7 @@ const AdminPanel: React.FC = () => {
             type="button"
             className={
               "admin-tab-button" +
-              (activeTab === "bookings"
-                ? " admin-tab-button--active"
-                : "")
+              (activeTab === "bookings" ? " admin-tab-button--active" : "")
             }
             onClick={() => setActiveTab("bookings")}
           >
@@ -493,9 +491,7 @@ const AdminPanel: React.FC = () => {
             type="button"
             className={
               "admin-tab-button" +
-              (activeTab === "classes"
-                ? " admin-tab-button--active"
-                : "")
+              (activeTab === "classes" ? " admin-tab-button--active" : "")
             }
             onClick={() => setActiveTab("classes")}
           >
@@ -543,9 +539,7 @@ const AdminPanel: React.FC = () => {
                           <td>{formatDate(b.end_date)}</td>
                           <td>{Number.isNaN(days) ? "—" : days}</td>
                           <td>{b.trainer_name || "—"}</td>
-                          <td className="admin-notes-cell">
-                            {b.notes || "—"}
-                          </td>
+                          <td className="admin-notes-cell">{b.notes || "—"}</td>
                           <td>{formatDateTime(b.created_at)}</td>
                           <td>
                             <span
@@ -722,9 +716,7 @@ const AdminPanel: React.FC = () => {
       {showClassModal && editClass && (
         <div className="admin-modal-backdrop">
           <div className="admin-modal-dark">
-            <h3>
-              {isNewClass ? t("modalNewClass") : t("modalEditClass")}
-            </h3>
+            <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
 
             <label>{t("labelClassTitle")}</label>
             <input
@@ -743,8 +735,7 @@ const AdminPanel: React.FC = () => {
               value={editClass.trainer_id ?? ""}
               onChange={(e) => {
                 const id = e.target.value ? Number(e.target.value) : null;
-                const trainer =
-                  TRAINERS.find((t) => t.id === id) || null;
+                const trainer = TRAINERS.find((t) => t.id === id) || null;
 
                 setEditClass({
                   ...editClass,
@@ -843,10 +834,7 @@ const AdminPanel: React.FC = () => {
               >
                 {t("modalCancelDark")}
               </button>
-              <button
-                className="admin-save-dark"
-                onClick={saveClassChanges}
-              >
+              <button className="admin-save-dark" onClick={saveClassChanges}>
                 {t("modalSaveDark")}
               </button>
             </div>

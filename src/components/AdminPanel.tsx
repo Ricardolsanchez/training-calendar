@@ -212,6 +212,9 @@ const AdminPanel: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<Tab>("bookings");
 
+  // =======================
+  // CARGAR RESERVAS + CLASES
+  // =======================
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -228,7 +231,17 @@ const AdminPanel: React.FC = () => {
       try {
         const res = await api.get("/api/admin/classes");
         const data = res.data;
-        const list: AvailableClass[] = data.classes ?? data;
+        const listRaw: AvailableClass[] = (data.classes ?? data) as any;
+
+        // 🔹 Aquí mapeamos trainer_id → trainer_name usando TRAINERS
+        const list = listRaw.map((cls) => {
+          const trainer = TRAINERS.find((t) => t.id === cls.trainer_id);
+          return {
+            ...cls,
+            trainer_name: trainer ? trainer.name : cls.trainer_name || "",
+          };
+        });
+
         setClasses(list);
       } catch (err) {
         console.error("Error cargando clases:", err);
@@ -254,15 +267,28 @@ const AdminPanel: React.FC = () => {
     return d.toLocaleString(locale);
   };
 
+  // =======================
+  // EDIT BOOKING
+  // =======================
+  const openEditBookingModal = (booking: Booking) => {
+    setEditBooking(booking);
+    setShowEditBookingModal(true);
+  };
+
   const saveBookingChanges = async () => {
     if (!editBooking) return;
 
     try {
       await ensureCsrf();
-      await api.put(`/api/admin/bookings/${editBooking.id}`, editBooking);
+      const res = await api.put(
+        `/api/admin/bookings/${editBooking.id}`,
+        editBooking
+      );
+
+      const updated: Booking = res.data.booking ?? editBooking;
 
       setBookings((prev) =>
-        prev.map((b) => (b.id === editBooking.id ? editBooking : b))
+        prev.map((b) => (b.id === updated.id ? updated : b))
       );
 
       setShowEditBookingModal(false);
@@ -330,6 +356,9 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  // =======================
+  // CLASES: NUEVA / EDITAR
+  // =======================
   const openNewClassModal = () => {
     setEditClass({
       id: 0,
@@ -363,38 +392,33 @@ const AdminPanel: React.FC = () => {
     if (!editClass) return;
 
     try {
-      await api.get("/sanctum/csrf-cookie");
+      await ensureCsrf();
 
       let saved: AvailableClass;
 
       if (isNewClass) {
         const res = await api.post("/api/admin/classes", editClass);
         saved = res.data.class ?? res.data;
-
-        const trainer = TRAINERS.find((t) => t.id === saved.trainer_id);
-        const savedWithName: AvailableClass = {
-          ...saved,
-          trainer_name: trainer ? trainer.name : "",
-        };
-
-        setClasses((prev) => [...prev, savedWithName]);
       } else {
         const res = await api.put(
           `/api/admin/classes/${editClass.id}`,
           editClass
         );
         saved = res.data.class ?? res.data;
-
-        const trainer = TRAINERS.find((t) => t.id === saved.trainer_id);
-        const savedWithName: AvailableClass = {
-          ...saved,
-          trainer_name: trainer ? trainer.name : "",
-        };
-
-        setClasses((prev) =>
-          prev.map((c) => (c.id === savedWithName.id ? savedWithName : c))
-        );
       }
+
+      const trainer = TRAINERS.find((t) => t.id === saved.trainer_id);
+      const savedWithName: AvailableClass = {
+        ...saved,
+        trainer_name: trainer ? trainer.name : "",
+      };
+
+      setClasses((prev) => {
+        if (isNewClass) {
+          return [...prev, savedWithName];
+        }
+        return prev.map((c) => (c.id === savedWithName.id ? savedWithName : c));
+      });
 
       setShowClassModal(false);
     } catch (err: any) {
@@ -445,11 +469,11 @@ const AdminPanel: React.FC = () => {
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
     } finally {
-      // 🔹 borra el token local
       localStorage.removeItem("admin_token");
       navigate("/");
     }
   };
+
   return (
     <div className="admin-page">
       <div className="admin-card">
@@ -512,6 +536,7 @@ const AdminPanel: React.FC = () => {
           </button>
         </div>
 
+        {/* ===================== BOOKINGS ===================== */}
         {activeTab === "bookings" && (
           <section className="admin-table-section">
             <h2 className="admin-table-title">{t("bookingListTitle")}</h2>
@@ -594,6 +619,14 @@ const AdminPanel: React.FC = () => {
                               </>
                             )}
 
+                            {/* 🔹 NUEVO BOTÓN EDITAR RESERVA */}
+                            <button
+                              className="admin-edit-button"
+                              onClick={() => openEditBookingModal(b)}
+                            >
+                              ✏️
+                            </button>
+
                             <button
                               className="admin-delete-button"
                               onClick={() => handleDeleteBooking(b.id)}
@@ -611,6 +644,7 @@ const AdminPanel: React.FC = () => {
           </section>
         )}
 
+        {/* ===================== CLASES ===================== */}
         {activeTab === "classes" && (
           <section className="admin-table-section">
             <div className="admin-table-header-row">
@@ -679,6 +713,7 @@ const AdminPanel: React.FC = () => {
         )}
       </div>
 
+      {/* =============== MODAL EDIT BOOKING =============== */}
       {showEditBookingModal && editBooking && (
         <div className="admin-modal-backdrop">
           <div className="admin-modal">
@@ -726,6 +761,7 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* =============== MODAL NEW / EDIT CLASS =============== */}
       {showClassModal && editClass && (
         <div className="admin-modal-backdrop">
           <div className="admin-modal-dark">

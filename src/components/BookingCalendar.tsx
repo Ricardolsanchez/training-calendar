@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import "./BookingCalendar.css";
 import Logo from "../assets/Logo.png";
 
+
 type AvailableClass = {
   id: number;
   title: string;
@@ -14,6 +15,9 @@ type AvailableClass = {
   modality: "Online" | "Presencial";
   level: string;
   spotsLeft: number;
+  // 🔹 Nuevo: rango real de la clase (start/end)
+  startDateISO: string;
+  endDateISO: string;
 };
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -25,7 +29,7 @@ const translations: Record<Lang, Record<string, string>> = {
     badge: "Available Classes",
     headerTitle: "Book Your Next Class",
     headerSubtitle:
-      "Select one of the available classes this month and reserve your spot using your corporate email.",
+      "Please reach out to our Training Team if you have questions or need further assistance",
     updatedTag: "Updated in Real Time",
     adminPanel: "Admin Panel",
     adminLogin: "Admin login",
@@ -39,7 +43,7 @@ const translations: Record<Lang, Record<string, string>> = {
     clickOnClassText:
       "Choose a class from the list on the left to view the details and reserve your spot.",
     selectedClassLabel: "Selected Class",
-    emailLabel: "Corporate Email for the Booking",
+    emailLabel: "Please provide your A&A Email Address",
     emailPlaceholder: "youremail@yourcompany.com",
     errorNoClass: "You must select an available class.",
     errorNoEmail: "Corporate email is required.",
@@ -77,7 +81,8 @@ const translations: Record<Lang, Record<string, string>> = {
     errorNoEmail: "El correo corporativo es obligatorio.",
     genericError: "Ocurrió un error al enviar la reserva.",
     unexpectedError: "Ocurrió un error inesperado.",
-    successBooked: "✅ ¡Reserva enviada! Nos pondremos en contacto contigo pronto.",
+    successBooked:
+      "✅ ¡Reserva enviada! Nos pondremos en contacto contigo pronto.",
     submitLoading: "Enviando reserva...",
     submitLabel: "Reservar esta clase",
     privacyText: "Usaremos tu correo corporativo para confirmar tu asistencia.",
@@ -85,6 +90,112 @@ const translations: Record<Lang, Record<string, string>> = {
     seatsPlural: "cupos",
     seatsAvailable: "disponibles",
   },
+};
+
+// 🔹 Mini calendario de rango (start–end) con días resaltados
+type MiniCalendarProps = {
+  startDate: string;
+  endDate: string;
+  lang: Lang;
+};
+
+const MiniCalendar: React.FC<MiniCalendarProps> = ({
+  startDate,
+  endDate,
+  lang,
+}) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  // Usamos el mes del startDate
+  const year = start.getFullYear();
+  const month = start.getMonth(); // 0–11
+
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+
+  // Día de la semana del primer día (0=Domingo...6=Sábado)
+  const firstWeekday = monthStart.getDay();
+
+  // Generar todos los días de ese mes
+  const days: Date[] = [];
+  for (
+    let d = new Date(monthStart);
+    d <= monthEnd;
+    d.setDate(d.getDate() + 1)
+  ) {
+    days.push(new Date(d));
+  }
+
+  // Comparar solo Y-M-D (ignoramos hora)
+  const isWithinRange = (d: Date) => {
+    const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const s0 = new Date(
+      start.getFullYear(),
+      start.getMonth(),
+      start.getDate()
+    );
+    const e0 = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+    return d0 >= s0 && d0 <= e0;
+  };
+
+  const locale = lang === "en" ? "en-US" : "es-ES";
+  const monthLabel = monthStart.toLocaleDateString(locale, {
+    month: "long",
+    year: "numeric",
+  });
+
+  const weekdayLabels =
+    lang === "en"
+      ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+      : ["L", "M", "X", "J", "V", "S", "D"];
+
+  return (
+    <div className="booking-mini-calendar">
+      <div className="mini-calendar-header">
+        <span className="mini-calendar-title">{monthLabel}</span>
+        <span className="mini-calendar-range">
+          {start.toLocaleDateString(locale)} – {end.toLocaleDateString(locale)}
+        </span>
+      </div>
+
+      <div className="mini-calendar-grid">
+        {weekdayLabels.map((w) => (
+          <div key={w} className="mini-calendar-weekday">
+            {w}
+          </div>
+        ))}
+
+        {/* espacios en blanco antes del primer día */}
+        {Array.from({ length: firstWeekday }).map((_, idx) => (
+          <div key={`blank-${idx}`} className="mini-calendar-day empty" />
+        ))}
+
+        {/* días del mes */}
+        {days.map((d) => {
+          const dayNumber = d.getDate();
+          const inRange = isWithinRange(d);
+
+          return (
+            <div
+              key={d.toISOString()}
+              className={
+                "mini-calendar-day" +
+                (inRange ? " mini-calendar-day--highlight" : "")
+              }
+            >
+              {dayNumber}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 const BookingCalendar: React.FC = () => {
@@ -118,12 +229,19 @@ const BookingCalendar: React.FC = () => {
           modality: "Online" | "Presencial";
           level: string;
           spots_left: number;
+          // 🔹 nuevos, opcionales por ahora
+          start_date?: string;
+          end_date?: string;
         };
 
         const list = (data.classes ?? data) as BackendClass[];
 
         const mapped: AvailableClass[] = list.map((cls: BackendClass) => {
-          const d = new Date(cls.date_iso);
+          // usamos start/end si vienen; si no, solo date_iso
+          const startDateISO = cls.start_date ?? cls.date_iso;
+          const endDateISO = cls.end_date ?? cls.date_iso;
+
+          const d = new Date(startDateISO);
           const locale = lang === "en" ? "en-US" : "es-ES";
 
           const dateLabel = d.toLocaleDateString(locale, {
@@ -143,6 +261,8 @@ const BookingCalendar: React.FC = () => {
             modality: cls.modality,
             level: cls.level,
             spotsLeft: cls.spots_left,
+            startDateISO,
+            endDateISO,
           };
         });
 
@@ -156,7 +276,6 @@ const BookingCalendar: React.FC = () => {
     };
 
     fetchClasses();
-    // importante: recargar labels cuando cambia lang
   }, [lang]);
 
   useEffect(() => {
@@ -208,6 +327,7 @@ const BookingCalendar: React.FC = () => {
       name: selectedClass.title,
       email,
       notes: `Reserva para la clase "${selectedClass.title}" el ${selectedClass.dateLabel} (${selectedClass.timeRange})`,
+      // 🔹 mantenemos lo que ya tenías para no romper backend
       start_date: selectedClass.dateISO,
       end_date: selectedClass.dateISO,
       trainer_name: selectedClass.trainerName,
@@ -229,9 +349,7 @@ const BookingCalendar: React.FC = () => {
     } catch (err: any) {
       console.error("❌ Error:", err);
       if (err.response) {
-        setErrorMessage(
-          err.response.data?.message ?? t("genericError")
-        );
+        setErrorMessage(err.response.data?.message ?? t("genericError"));
       } else {
         setErrorMessage(t("unexpectedError"));
       }
@@ -349,9 +467,7 @@ const BookingCalendar: React.FC = () => {
                       <span className="class-level">{cls.level}</span>
                       <span className="class-spots">
                         {cls.spotsLeft}{" "}
-                        {cls.spotsLeft === 1
-                          ? t("seats")
-                          : t("seatsPlural")}{" "}
+                        {cls.spotsLeft === 1 ? t("seats") : t("seatsPlural")}{" "}
                         {t("seatsAvailable")}
                       </span>
                     </div>
@@ -376,10 +492,17 @@ const BookingCalendar: React.FC = () => {
                   <p className="booking-detail-meta">
                     {selectedClass.dateLabel} · {selectedClass.timeRange}
                     <br />
-                    Trainer: {selectedClass.trainerName} ·{" "}
-                    {selectedClass.level} · {selectedClass.modality}
+                    Trainer: {selectedClass.trainerName} · {selectedClass.level}{" "}
+                    · {selectedClass.modality}
                   </p>
                 </div>
+
+                {/* 🗓️ Mini calendario con días resaltados entre start–end */}
+                <MiniCalendar
+                  startDate={selectedClass.startDateISO}
+                  endDate={selectedClass.endDateISO}
+                  lang={lang}
+                />
 
                 <form onSubmit={handleSubmit} className="booking-detail-form">
                   <div className="form-group">

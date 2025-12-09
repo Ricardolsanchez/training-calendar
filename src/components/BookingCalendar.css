@@ -44,7 +44,7 @@
   display: flex;
   justify-content: space-between;
   gap: 2rem;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 2.5rem;
 }
 
@@ -109,6 +109,31 @@
   gap: 1rem;
 }
 
+/* Botón idioma */
+.booking-lang-toggle {
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.booking-lang-toggle:hover {
+  background: #e5e7eb;
+  color: #020617;
+  border-color: #e5e7eb;
+  transform: translateY(-1px);
+}
+
 .booking-login-btn {
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
@@ -116,7 +141,10 @@
   color: #f97316;
   font-size: 0.85rem;
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
 }
 
 .booking-login-btn:hover {
@@ -125,20 +153,12 @@
   transform: translateY(-1px);
 }
 
-.booking-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 2rem;
-  align-items: center; /* antes tenías flex-start, así se centra verticalmente todo */
-  margin-bottom: 2.5rem;
-}
-
-/* nuevo: bloque izquierdo con ancho máximo cómodo */
+/* bloque izquierdo opcional si lo usas */
 .booking-header-left {
   max-width: 32rem;
 }
 
-/* nuevo: contenedor del logo */
+/* Logo */
 .booking-header-logo {
   flex-shrink: 0;
   display: flex;
@@ -146,9 +166,8 @@
   justify-content: center;
 }
 
-/* imagen del logo */
 .booking-logo {
-  height: 86px;        /* ajusta a tu gusto: 40–64px suele verse bien */
+  height: 86px;
   object-fit: contain;
 }
 
@@ -354,6 +373,75 @@
 }
 
 /* =========================== */
+/* 🗓️ MINI CALENDARIO        */
+/* =========================== */
+
+.booking-mini-calendar {
+  margin-top: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: radial-gradient(circle at top left, #020617 0, #111827 80%);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.mini-calendar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.7rem;
+}
+
+.mini-calendar-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.mini-calendar-range {
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.mini-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  font-size: 0.7rem;
+}
+
+.mini-calendar-weekday {
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.mini-calendar-day {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5f5;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+}
+
+.mini-calendar-day.empty {
+  background: transparent;
+  border: none;
+}
+
+.mini-calendar-day--highlight {
+  background: linear-gradient(135deg, #d10000, #e6be52);
+  color: #020617;
+  font-weight: 600;
+  border-color: transparent;
+  box-shadow: 0 0 0 1px rgba(230, 190, 82, 0.9);
+}
+
+/* =========================== */
 /* 📝   INPUTS / TEXTAREAS     */
 /* =========================== */
 
@@ -441,20 +529,24 @@
   cursor: default;
 }
 
+/* =========================== */
+/* DOTS (MODALIDAD)           */
+/* =========================== */
+
 .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
 }
 
 .dot.online {
-    background-color: #28d878;
+  background-color: #22c55e;
 }
 
 .dot.presencial {
-    background-color: #f44336; /* rojo si quieres */
+  background-color: #f97316;
 }
 
 /* =========================== */
@@ -493,7 +585,7 @@
     align-items: flex-start;
   }
 
-  .booking-header-tag {
+  .booking-header-right {
     margin-top: 1rem;
   }
 
@@ -503,7 +595,7 @@
   }
 
   .booking-detail-section {
-    order: -1; /* opcional: panel de detalle primero en mobile */
+    order: -1; /* panel de detalle primero en mobile */
   }
 }
 

@@ -370,7 +370,14 @@ const AdminPanel: React.FC = () => {
       if (isNewClass) {
         const res = await api.post("/api/admin/classes", editClass);
         saved = res.data.class ?? res.data;
-        setClasses((prev) => [...prev, saved]);
+
+        const trainer = TRAINERS.find((t) => t.id === saved.trainer_id);
+        const savedWithName: AvailableClass = {
+          ...saved,
+          trainer_name: trainer ? trainer.name : "",
+        };
+
+        setClasses((prev) => [...prev, savedWithName]);
       } else {
         const res = await api.put(
           `/api/admin/classes/${editClass.id}`,
@@ -378,8 +385,14 @@ const AdminPanel: React.FC = () => {
         );
         saved = res.data.class ?? res.data;
 
+        const trainer = TRAINERS.find((t) => t.id === saved.trainer_id);
+        const savedWithName: AvailableClass = {
+          ...saved,
+          trainer_name: trainer ? trainer.name : "",
+        };
+
         setClasses((prev) =>
-          prev.map((c) => (c.id === editClass.id ? saved : c))
+          prev.map((c) => (c.id === savedWithName.id ? savedWithName : c))
         );
       }
 

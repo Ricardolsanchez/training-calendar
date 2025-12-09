@@ -141,10 +141,7 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
     const cur = new Date(start);
     while (cur <= end) {
       // solo añadimos si está en el mismo mes que el calendario
-      if (
-        cur.getFullYear() === year &&
-        cur.getMonth() === month
-      ) {
+      if (cur.getFullYear() === year && cur.getMonth() === month) {
         highlighted.add(makeKey(cur));
       }
       cur.setDate(cur.getDate() + 1);
@@ -209,7 +206,9 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
 };
 
 const BookingCalendar: React.FC = () => {
-  const [availableClasses, setAvailableClasses] = useState<AvailableClass[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<AvailableClass[]>(
+    []
+  );
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -219,6 +218,7 @@ const BookingCalendar: React.FC = () => {
   const [lang, setLang] = useState<Lang>("en");
   const t = (key: string) => translations[lang][key];
 
+  // 🔹 Cargar clases públicas para el calendario/landing
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -243,7 +243,7 @@ const BookingCalendar: React.FC = () => {
 
         const list = (data.classes ?? data) as BackendClass[];
 
-        const mapped: AvailableClass[] = list.map((cls: BackendClass) => {
+        const mapped: AvailableClass[] = list.map((cls) => {
           const startDateISO = cls.start_date ?? cls.date_iso;
           const endDateISO = cls.end_date ?? cls.date_iso;
 
@@ -284,6 +284,7 @@ const BookingCalendar: React.FC = () => {
     fetchClasses();
   }, [lang]);
 
+  // 🔹 Verificar si hay admin logueado
   useEffect(() => {
     const checkAdmin = () => {
       const token = localStorage.getItem("admin_token");
@@ -506,10 +507,7 @@ const BookingCalendar: React.FC = () => {
                     </p>
                   </div>
 
-                  <form
-                    onSubmit={handleSubmit}
-                    className="booking-detail-form"
-                  >
+                  <form onSubmit={handleSubmit} className="booking-detail-form">
                     <div className="form-group">
                       <label htmlFor="email">{t("emailLabel")}</label>
                       <input

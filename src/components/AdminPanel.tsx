@@ -25,8 +25,8 @@ type Booking = {
 type AvailableClass = {
   id: number;
   title: string;
-  trainer_id: number | null;
-  trainer_name: string;
+  trainer_id: number | null; // solo para el select
+  trainer_name: string | null; // viene de la BD
   start_date: string;
   end_date: string;
   start_time: string;
@@ -34,7 +34,6 @@ type AvailableClass = {
   modality: "Online" | "Presencial";
   spots_left: number;
 };
-
 type Trainer = {
   id: number;
   name: string;
@@ -231,14 +230,22 @@ const AdminPanel: React.FC = () => {
       try {
         const res = await api.get("/api/admin/classes");
         const data = res.data;
-        const listRaw: AvailableClass[] = (data.classes ?? data) as any;
+        const listRaw: any[] = data.classes ?? data;
 
-        // 🔹 Aquí mapeamos trainer_id → trainer_name usando TRAINERS
-        const list = listRaw.map((cls) => {
-          const trainer = TRAINERS.find((t) => t.id === cls.trainer_id);
+        const list: AvailableClass[] = listRaw.map((cls) => {
+          const trainer = TRAINERS.find((t) => t.name === cls.trainer_name);
+
           return {
-            ...cls,
-            trainer_name: trainer ? trainer.name : cls.trainer_name || "",
+            id: cls.id,
+            title: cls.title,
+            trainer_id: trainer ? trainer.id : null,
+            trainer_name: cls.trainer_name ?? (trainer ? trainer.name : null),
+            start_date: cls.start_date,
+            end_date: cls.end_date,
+            start_time: cls.start_time,
+            end_time: cls.end_time,
+            modality: cls.modality,
+            spots_left: cls.spots_left,
           };
         });
 
@@ -364,7 +371,7 @@ const AdminPanel: React.FC = () => {
       id: 0,
       title: "",
       trainer_id: null,
-      trainer_name: "",
+      trainer_name: null,
       start_date: "",
       end_date: "",
       start_time: "",
@@ -394,10 +401,9 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      // 👇 Solo lo que el backend valida
       const payload = {
         title: editClass.title,
-        trainer_id: editClass.trainer_id,
+        trainer_name: editClass.trainer_name, // 👈 solo esto va al backend
         start_date: editClass.start_date,
         end_date: editClass.end_date,
         start_time: editClass.start_time,
@@ -406,7 +412,7 @@ const AdminPanel: React.FC = () => {
         spots_left: editClass.spots_left,
       };
 
-      let saved: AvailableClass;
+      let saved: any;
 
       if (isNewClass) {
         const res = await api.post("/api/admin/classes", payload);
@@ -419,10 +425,19 @@ const AdminPanel: React.FC = () => {
         saved = res.data.class ?? res.data;
       }
 
-      const trainer = TRAINERS.find((t) => t.id === saved.trainer_id);
+      const trainer = TRAINERS.find((t) => t.name === saved.trainer_name);
+
       const savedWithName: AvailableClass = {
-        ...saved,
-        trainer_name: trainer ? trainer.name : "",
+        id: saved.id,
+        title: saved.title,
+        trainer_id: trainer ? trainer.id : null,
+        trainer_name: saved.trainer_name ?? (trainer ? trainer.name : null),
+        start_date: saved.start_date,
+        end_date: saved.end_date,
+        start_time: saved.start_time,
+        end_time: saved.end_time,
+        modality: saved.modality,
+        spots_left: saved.spots_left,
       };
 
       setClasses((prev) => {
@@ -435,8 +450,6 @@ const AdminPanel: React.FC = () => {
       setShowClassModal(false);
     } catch (err: any) {
       console.error("Error guardando clase:", err);
-
-      // 👇 Esto te va a decir EXACTAMENTE qué se queja Laravel
       if (err.response?.data) {
         console.log("VALIDATION:", err.response.data);
         alert(JSON.stringify(err.response.data, null, 2));
@@ -803,7 +816,7 @@ const AdminPanel: React.FC = () => {
                 setEditClass({
                   ...editClass,
                   trainer_id: id,
-                  trainer_name: trainer ? trainer.name : "",
+                  trainer_name: trainer ? trainer.name : null,
                 });
               }}
             >

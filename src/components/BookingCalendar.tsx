@@ -4,7 +4,6 @@ import { api } from "../lib/api";
 import "./BookingCalendar.css";
 import Logo from "../assets/Logo.png";
 
-
 type AvailableClass = {
   id: number;
   title: string;
@@ -15,7 +14,7 @@ type AvailableClass = {
   modality: "Online" | "Presencial";
   level: string;
   spotsLeft: number;
-  // 🔹 Nuevo: rango real de la clase (start/end)
+  // 🔹 rango real de la clase (start/end)
   startDateISO: string;
   endDateISO: string;
 };
@@ -92,57 +91,65 @@ const translations: Record<Lang, Record<string, string>> = {
   },
 };
 
-// 🔹 Mini calendario de rango (start–end) con días resaltados
+// ==========================
+// 🗓️ MINI CALENDARIO GLOBAL
+// ==========================
 type MiniCalendarProps = {
-  startDate: string;
-  endDate: string;
+  classes: AvailableClass[];
   lang: Lang;
 };
 
-const MiniCalendar: React.FC<MiniCalendarProps> = ({
-  startDate,
-  endDate,
-  lang,
-}) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
+  if (!classes || classes.length === 0) {
     return null;
   }
 
-  // Usamos el mes del startDate
-  const year = start.getFullYear();
-  const month = start.getMonth(); // 0–11
+  // Tomamos el mes del startDate de la primera clase
+  const ref = new Date(classes[0].startDateISO || classes[0].dateISO);
+  if (Number.isNaN(ref.getTime())) return null;
+
+  const year = ref.getFullYear();
+  const month = ref.getMonth(); // 0–11
 
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);
 
-  // Día de la semana del primer día (0=Domingo...6=Sábado)
+  // Día de la semana del primer día (0=Dom, 1=Lun, etc.)
   const firstWeekday = monthStart.getDay();
 
   // Generar todos los días de ese mes
   const days: Date[] = [];
-  for (
-    let d = new Date(monthStart);
-    d <= monthEnd;
-    d.setDate(d.getDate() + 1)
-  ) {
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
 
-  // Comparar solo Y-M-D (ignoramos hora)
-  const isWithinRange = (d: Date) => {
-    const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const s0 = new Date(
-      start.getFullYear(),
-      start.getMonth(),
-      start.getDate()
-    );
-    const e0 = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  // 🔹 Set con todas las fechas (YYYY-MM-DD) que tengan al menos una clase
+  const highlighted = new Set<string>();
 
-    return d0 >= s0 && d0 <= e0;
+  const makeKey = (d: Date) => {
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, "0");
+    const day = d.getDate().toString().padStart(2, "0");
+    return `${y}-${m}-${day}`;
   };
+
+  classes.forEach((cls) => {
+    const start = new Date(cls.startDateISO);
+    const end = new Date(cls.endDateISO);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+
+    const cur = new Date(start);
+    while (cur <= end) {
+      // solo añadimos si está en el mismo mes que el calendario
+      if (
+        cur.getFullYear() === year &&
+        cur.getMonth() === month
+      ) {
+        highlighted.add(makeKey(cur));
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
 
   const locale = lang === "en" ? "en-US" : "es-ES";
   const monthLabel = monthStart.toLocaleDateString(locale, {
@@ -159,8 +166,10 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
     <div className="booking-mini-calendar">
       <div className="mini-calendar-header">
         <span className="mini-calendar-title">{monthLabel}</span>
-        <span className="mini-calendar-range">
-          {start.toLocaleDateString(locale)} – {end.toLocaleDateString(locale)}
+        <span className="mini-calendar-hint">
+          {lang === "en"
+            ? "Highlighted: days with classes"
+            : "Resaltado: días con clases"}
         </span>
       </div>
 
@@ -178,12 +187,13 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
 
         {/* días del mes */}
         {days.map((d) => {
+          const key = makeKey(d);
+          const inRange = highlighted.has(key);
           const dayNumber = d.getDate();
-          const inRange = isWithinRange(d);
 
           return (
             <div
-              key={d.toISOString()}
+              key={key}
               className={
                 "mini-calendar-day" +
                 (inRange ? " mini-calendar-day--highlight" : "")
@@ -199,9 +209,7 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
 };
 
 const BookingCalendar: React.FC = () => {
-  const [availableClasses, setAvailableClasses] = useState<AvailableClass[]>(
-    []
-  );
+  const [availableClasses, setAvailableClasses] = useState<AvailableClass[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -229,7 +237,6 @@ const BookingCalendar: React.FC = () => {
           modality: "Online" | "Presencial";
           level: string;
           spots_left: number;
-          // 🔹 nuevos, opcionales por ahora
           start_date?: string;
           end_date?: string;
         };
@@ -237,7 +244,6 @@ const BookingCalendar: React.FC = () => {
         const list = (data.classes ?? data) as BackendClass[];
 
         const mapped: AvailableClass[] = list.map((cls: BackendClass) => {
-          // usamos start/end si vienen; si no, solo date_iso
           const startDateISO = cls.start_date ?? cls.date_iso;
           const endDateISO = cls.end_date ?? cls.date_iso;
 
@@ -327,7 +333,6 @@ const BookingCalendar: React.FC = () => {
       name: selectedClass.title,
       email,
       notes: `Reserva para la clase "${selectedClass.title}" el ${selectedClass.dateLabel} (${selectedClass.timeRange})`,
-      // 🔹 mantenemos lo que ya tenías para no romper backend
       start_date: selectedClass.dateISO,
       end_date: selectedClass.dateISO,
       trainer_name: selectedClass.trainerName,
@@ -477,69 +482,70 @@ const BookingCalendar: React.FC = () => {
           </section>
 
           <section className="booking-detail-section">
-            {!selectedClass ? (
-              <div className="booking-detail-empty">
-                <h3>{t("clickOnClassTitle")}</h3>
-                <p>{t("clickOnClassText")}</p>
-              </div>
-            ) : (
-              <div className="booking-detail-card">
-                <div className="booking-detail-header">
-                  <span className="booking-detail-label">
-                    {t("selectedClassLabel")}
-                  </span>
-                  <h3>{selectedClass.title}</h3>
-                  <p className="booking-detail-meta">
-                    {selectedClass.dateLabel} · {selectedClass.timeRange}
-                    <br />
-                    Trainer: {selectedClass.trainerName} · {selectedClass.level}{" "}
-                    · {selectedClass.modality}
-                  </p>
+            <div className="booking-detail-card">
+              {/* 🗓️ Calendario SIEMPRE visible con todas las clases */}
+              <MiniCalendar classes={availableClasses} lang={lang} />
+
+              {!selectedClass ? (
+                <div className="booking-detail-empty">
+                  <h3>{t("clickOnClassTitle")}</h3>
+                  <p>{t("clickOnClassText")}</p>
                 </div>
-
-                {/* 🗓️ Mini calendario con días resaltados entre start–end */}
-                <MiniCalendar
-                  startDate={selectedClass.startDateISO}
-                  endDate={selectedClass.endDateISO}
-                  lang={lang}
-                />
-
-                <form onSubmit={handleSubmit} className="booking-detail-form">
-                  <div className="form-group">
-                    <label htmlFor="email">{t("emailLabel")}</label>
-                    <input
-                      id="email"
-                      type="email"
-                      placeholder={t("emailPlaceholder")}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
+              ) : (
+                <>
+                  <div className="booking-detail-header">
+                    <span className="booking-detail-label">
+                      {t("selectedClassLabel")}
+                    </span>
+                    <h3>{selectedClass.title}</h3>
+                    <p className="booking-detail-meta">
+                      {selectedClass.dateLabel} · {selectedClass.timeRange}
+                      <br />
+                      Trainer: {selectedClass.trainerName} ·{" "}
+                      {selectedClass.level} · {selectedClass.modality}
+                    </p>
                   </div>
 
-                  {status === "error" && (
-                    <p className="form-message error">⚠️ {errorMessage}</p>
-                  )}
-
-                  {status === "success" && (
-                    <p className="form-message success">
-                      {t("successBooked")}
-                    </p>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="booking-button"
-                    disabled={status === "loading"}
+                  <form
+                    onSubmit={handleSubmit}
+                    className="booking-detail-form"
                   >
-                    {status === "loading"
-                      ? t("submitLoading")
-                      : t("submitLabel")}
-                  </button>
+                    <div className="form-group">
+                      <label htmlFor="email">{t("emailLabel")}</label>
+                      <input
+                        id="email"
+                        type="email"
+                        placeholder={t("emailPlaceholder")}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                    </div>
 
-                  <p className="booking-privacy">{t("privacyText")}</p>
-                </form>
-              </div>
-            )}
+                    {status === "error" && (
+                      <p className="form-message error">⚠️ {errorMessage}</p>
+                    )}
+
+                    {status === "success" && (
+                      <p className="form-message success">
+                        {t("successBooked")}
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="booking-button"
+                      disabled={status === "loading"}
+                    >
+                      {status === "loading"
+                        ? t("submitLoading")
+                        : t("submitLabel")}
+                    </button>
+
+                    <p className="booking-privacy">{t("privacyText")}</p>
+                  </form>
+                </>
+              )}
+            </div>
           </section>
         </div>
       </div>

@@ -394,15 +394,27 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
+      // 👇 Solo lo que el backend valida
+      const payload = {
+        title: editClass.title,
+        trainer_id: editClass.trainer_id,
+        start_date: editClass.start_date,
+        end_date: editClass.end_date,
+        start_time: editClass.start_time,
+        end_time: editClass.end_time,
+        modality: editClass.modality,
+        spots_left: editClass.spots_left,
+      };
+
       let saved: AvailableClass;
 
       if (isNewClass) {
-        const res = await api.post("/api/admin/classes", editClass);
+        const res = await api.post("/api/admin/classes", payload);
         saved = res.data.class ?? res.data;
       } else {
         const res = await api.put(
           `/api/admin/classes/${editClass.id}`,
-          editClass
+          payload
         );
         saved = res.data.class ?? res.data;
       }
@@ -424,11 +436,13 @@ const AdminPanel: React.FC = () => {
     } catch (err: any) {
       console.error("Error guardando clase:", err);
 
+      // 👇 Esto te va a decir EXACTAMENTE qué se queja Laravel
       if (err.response?.data) {
         console.log("VALIDATION:", err.response.data);
+        alert(JSON.stringify(err.response.data, null, 2));
+      } else {
+        alert(t("errorSaveClass"));
       }
-
-      alert(t("errorSaveClass"));
     }
   };
 

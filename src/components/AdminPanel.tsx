@@ -261,10 +261,23 @@ const AdminPanel: React.FC = () => {
 
   const formatDate = (value: string | null) => {
     if (!value) return "—";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    const locale = lang === "en" ? "en-US" : "es-ES";
-    return d.toLocaleDateString(locale);
+
+    // Esperamos 'YYYY-MM-DD'
+    const parts = value.split("-");
+    if (parts.length !== 3) {
+      // por si algún día viene en otro formato
+      return value;
+    }
+
+    const [year, month, day] = parts;
+
+    if (lang === "en") {
+      // MM/DD/YYYY
+      return `${month}/${day}/${year}`;
+    } else {
+      // DD/MM/YYYY
+      return `${day}/${month}/${year}`;
+    }
   };
 
   const formatDateTime = (value: string) => {

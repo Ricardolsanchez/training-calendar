@@ -33,6 +33,7 @@ type AvailableClass = {
   end_time: string;
   modality: "Online" | "Presencial";
   spots_left: number;
+  description: string | null;
 };
 type Trainer = {
   id: number;
@@ -113,6 +114,7 @@ const translations: Record<Lang, Record<string, string>> = {
     labelEndTime: "End Time",
     labelType: "Type",
     labelSeats: "Available Seats",
+    labelDescription: "Short description",
     optionSelectTrainer: "Select a Trainer",
     typeInPerson: "In Person",
     typeOnline: "Online",
@@ -179,6 +181,7 @@ const translations: Record<Lang, Record<string, string>> = {
     labelEndTime: "Hora fin",
     labelType: "Tipo",
     labelSeats: "Cupos disponibles",
+    labelDescription: "Descripción breve",
     optionSelectTrainer: "Selecciona un trainer",
     typeInPerson: "Presencial",
     typeOnline: "Online",
@@ -246,9 +249,9 @@ const AdminPanel: React.FC = () => {
             end_time: cls.end_time,
             modality: cls.modality,
             spots_left: cls.spots_left,
+            description: cls.description ?? null, // 👈 añadido
           };
         });
-
         setClasses(list);
       } catch (err) {
         console.error("Error cargando clases:", err);
@@ -391,6 +394,7 @@ const AdminPanel: React.FC = () => {
       end_time: "",
       modality: "Presencial",
       spots_left: 1,
+      description: "",
     });
     setIsNewClass(true);
     setShowClassModal(true);
@@ -423,6 +427,7 @@ const AdminPanel: React.FC = () => {
         end_time: editClass.end_time,
         modality: editClass.modality,
         spots_left: editClass.spots_left,
+        description: editClass.description,
       };
 
       if (isNewClass) {
@@ -430,21 +435,25 @@ const AdminPanel: React.FC = () => {
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data.class ?? res.data;
 
-        setClasses((prev) => [
-          ...prev,
-          {
-            id: saved.id, // el id real de la BD
-            title: editClass.title,
-            trainer_id: editClass.trainer_id,
-            trainer_name: editClass.trainer_name,
-            start_date: editClass.start_date,
-            end_date: editClass.end_date,
-            start_time: editClass.start_time,
-            end_time: editClass.end_time,
-            modality: editClass.modality,
-            spots_left: editClass.spots_left,
-          },
-        ]);
+        setClasses((prev) =>
+          prev.map((c) =>
+            c.id === editClass.id
+              ? {
+                  ...c,
+                  title: editClass.title,
+                  trainer_id: editClass.trainer_id,
+                  trainer_name: editClass.trainer_name,
+                  start_date: editClass.start_date,
+                  end_date: editClass.end_date,
+                  start_time: editClass.start_time,
+                  end_time: editClass.end_time,
+                  modality: editClass.modality,
+                  spots_left: editClass.spots_left,
+                  description: editClass.description ?? null, // 👈 aquí también
+                }
+              : c
+          )
+        );
       } else {
         // 👉 Editar clase existente
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
@@ -922,6 +931,17 @@ const AdminPanel: React.FC = () => {
                 setEditClass({
                   ...editClass,
                   spots_left: Number(e.target.value),
+                })
+              }
+            />
+
+            <label>{t("labelDescription")}</label>
+            <textarea
+              value={editClass.description ?? ""}
+              onChange={(e) =>
+                setEditClass({
+                  ...editClass,
+                  description: e.target.value,
                 })
               }
             />

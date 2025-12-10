@@ -17,6 +17,7 @@ type AvailableClass = {
   // 🔹 rango real de la clase (start/end)
   startDateISO: string;
   endDateISO: string;
+  description?: string | null;
 };
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -239,6 +240,7 @@ const BookingCalendar: React.FC = () => {
           spots_left: number;
           start_date?: string;
           end_date?: string;
+          description?: string | null;
         };
 
         const list = (data.classes ?? data) as BackendClass[];
@@ -269,6 +271,7 @@ const BookingCalendar: React.FC = () => {
             spotsLeft: cls.spots_left,
             startDateISO,
             endDateISO,
+            description: cls.description ?? null, // 👈 SOLO una vez
           };
         });
 
@@ -505,6 +508,12 @@ const BookingCalendar: React.FC = () => {
                       Trainer: {selectedClass.trainerName} ·{" "}
                       {selectedClass.level} · {selectedClass.modality}
                     </p>
+
+                    {selectedClass.description && (
+                      <p className="booking-detail-description">
+                        {selectedClass.description}
+                      </p>
+                    )}
                   </div>
 
                   <form onSubmit={handleSubmit} className="booking-detail-form">

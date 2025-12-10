@@ -403,7 +403,7 @@ const AdminPanel: React.FC = () => {
 
       const payload = {
         title: editClass.title,
-        trainer_name: editClass.trainer_name, // 👈 solo esto va al backend
+        trainer_name: editClass.trainer_name,
         start_date: editClass.start_date,
         end_date: editClass.end_date,
         start_time: editClass.start_time,
@@ -412,40 +412,50 @@ const AdminPanel: React.FC = () => {
         spots_left: editClass.spots_left,
       };
 
-      let saved: any;
-
       if (isNewClass) {
+        // 👉 Crear nueva clase
         const res = await api.post("/api/admin/classes", payload);
-        saved = res.data.class ?? res.data;
+        const saved = res.data.class ?? res.data;
+
+        setClasses((prev) => [
+          ...prev,
+          {
+            id: saved.id, // el id real de la BD
+            title: editClass.title,
+            trainer_id: editClass.trainer_id,
+            trainer_name: editClass.trainer_name,
+            start_date: editClass.start_date,
+            end_date: editClass.end_date,
+            start_time: editClass.start_time,
+            end_time: editClass.end_time,
+            modality: editClass.modality,
+            spots_left: editClass.spots_left,
+          },
+        ]);
       } else {
-        const res = await api.put(
-          `/api/admin/classes/${editClass.id}`,
-          payload
+        // 👉 Editar clase existente
+        await api.put(`/api/admin/classes/${editClass.id}`, payload);
+
+        setClasses((prev) =>
+          prev.map((c) =>
+            c.id === editClass.id
+              ? {
+                  ...c,
+                  // aplicamos lo que el usuario editó
+                  title: editClass.title,
+                  trainer_id: editClass.trainer_id,
+                  trainer_name: editClass.trainer_name,
+                  start_date: editClass.start_date,
+                  end_date: editClass.end_date,
+                  start_time: editClass.start_time,
+                  end_time: editClass.end_time,
+                  modality: editClass.modality,
+                  spots_left: editClass.spots_left,
+                }
+              : c
+          )
         );
-        saved = res.data.class ?? res.data;
       }
-
-      const trainer = TRAINERS.find((t) => t.name === saved.trainer_name);
-
-      const savedWithName: AvailableClass = {
-        id: saved.id,
-        title: saved.title,
-        trainer_id: trainer ? trainer.id : null,
-        trainer_name: saved.trainer_name ?? (trainer ? trainer.name : null),
-        start_date: saved.start_date,
-        end_date: saved.end_date,
-        start_time: saved.start_time,
-        end_time: saved.end_time,
-        modality: saved.modality,
-        spots_left: saved.spots_left,
-      };
-
-      setClasses((prev) => {
-        if (isNewClass) {
-          return [...prev, savedWithName];
-        }
-        return prev.map((c) => (c.id === savedWithName.id ? savedWithName : c));
-      });
 
       setShowClassModal(false);
     } catch (err: any) {

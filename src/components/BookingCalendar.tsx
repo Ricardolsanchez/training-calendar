@@ -56,6 +56,8 @@ const translations: Record<Lang, Record<string, string>> = {
     seats: "Seat",
     seatsPlural: "Seats",
     seatsAvailable: "Available",
+    colClassSeats: "Available Seats",
+    colClassDescription: "Description",
   },
   es: {
     badge: "Clases disponibles",
@@ -89,6 +91,8 @@ const translations: Record<Lang, Record<string, string>> = {
     seats: "cupo",
     seatsPlural: "cupos",
     seatsAvailable: "disponibles",
+    colClassSeats: "Cupos",
+    colClassDescription: "Descripción", 
   },
 };
 

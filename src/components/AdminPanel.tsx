@@ -249,7 +249,7 @@ const AdminPanel: React.FC = () => {
             end_time: cls.end_time,
             modality: cls.modality,
             spots_left: cls.spots_left,
-            description: cls.description ?? null, // 👈 añadido
+            description: cls.description ?? null, // 👈 IMPORTANTE
           };
         });
         setClasses(list);
@@ -733,6 +733,7 @@ const AdminPanel: React.FC = () => {
                       <th>{t("colClassTime")}</th>
                       <th>{t("colClassType")}</th>
                       <th>{t("colClassSeats")}</th>
+                      <th>{t("colClassDescription")}</th> {/* 👈 nueva */}
                       <th>{t("columnActions")}</th>
                     </tr>
                   </thead>
@@ -748,6 +749,10 @@ const AdminPanel: React.FC = () => {
                         </td>
                         <td>{cls.modality}</td>
                         <td>{cls.spots_left}</td>
+                        <td className="admin-description-cell">
+                          {cls.description || "—"}{" "}
+                          {/* 👈 muestra la descripción */}
+                        </td>
                         <td className="admin-actions">
                           <button
                             className="admin-edit-button"

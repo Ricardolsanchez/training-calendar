@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import "./AdminPanel.css";
@@ -35,12 +35,13 @@ type AvailableClass = {
   spots_left: number;
   description: string | null;
 };
+
 type Trainer = {
   id: number;
   name: string;
 };
 
-type Tab = "bookings" | "classes";
+type Tab = "bookings" | "classes" | "stats";
 type Lang = "en" | "es";
 
 const TRAINERS: Trainer[] = [
@@ -66,6 +67,7 @@ const translations: Record<Lang, Record<string, string>> = {
     logout: "Log out",
     tabBookings: "Bookings",
     tabClasses: "Available Classes",
+    tabStats: "Statistics",
     bookingListTitle: "Booking List",
     noBookings: "No Bookings at this time",
     confirmDeleteBooking: "Are you sure you want to delete this booking?",
@@ -124,6 +126,12 @@ const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteClass: "Are you sure you want to delete this class?",
     errorDeleteClass: "Could not delete class.",
     errorSaveClass: "Could not save class.",
+
+    // 🔹 Estadísticas
+    statsTitle: "Requests per class",
+    statsNoData: "There are no requests yet.",
+    statsNoTrainer: "No trainer assigned",
+    statsColumnRequestedAt: "Requested at",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -134,6 +142,7 @@ const translations: Record<Lang, Record<string, string>> = {
     logout: "Cerrar sesión",
     tabBookings: "Reservas",
     tabClasses: "Clases disponibles",
+    tabStats: "Estadísticas",
     bookingListTitle: "Listado de reservas",
     noBookings: "No hay reservas por el momento",
     confirmDeleteBooking: "¿Seguro que quieres eliminar esta reserva?",
@@ -192,12 +201,27 @@ const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteClass: "¿Seguro que quieres eliminar esta clase disponible?",
     errorDeleteClass: "No se pudo eliminar la clase.",
     errorSaveClass: "No se pudo guardar la clase.",
+
+    // 🔹 Estadísticas
+    statsTitle: "Solicitudes por clase",
+    statsNoData: "Aún no hay solicitudes.",
+    statsNoTrainer: "Sin trainer asignado",
+    statsColumnRequestedAt: "Solicitada el",
   },
 };
 
 async function ensureCsrf() {
   await api.get("/sanctum/csrf-cookie");
 }
+
+type BookingGroup = {
+  key: string;
+  classTitle: string;
+  start_date: string;
+  end_date: string;
+  trainer_name: string | null;
+  requests: Booking[];
+};
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
@@ -251,7 +275,7 @@ const AdminPanel: React.FC = () => {
             end_time: cls.end_time,
             modality: cls.modality,
             spots_left: cls.spots_left,
-            description: cls.description ?? null, // ✅ importante
+            description: cls.description ?? null,
           };
         });
         setClasses(list);
@@ -264,23 +288,45 @@ const AdminPanel: React.FC = () => {
     fetchClasses();
   }, []);
 
+  // =======================
+  // AGRUPAR RESERVAS POR CLASE
+  // =======================
+  const bookingGroups: BookingGroup[] = useMemo(() => {
+    const map = new Map<string, BookingGroup>();
+
+    for (const b of bookings) {
+      const key = `${b.name}__${b.start_date}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          classTitle: b.name,
+          start_date: b.start_date,
+          end_date: b.end_date,
+          trainer_name: b.trainer_name,
+          requests: [],
+        });
+      }
+      map.get(key)!.requests.push(b);
+    }
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.start_date.localeCompare(b.start_date)
+    );
+  }, [bookings]);
+
   const formatDate = (value: string | null) => {
     if (!value) return "—";
 
-    // Esperamos 'YYYY-MM-DD'
     const parts = value.split("-");
     if (parts.length !== 3) {
-      // por si algún día viene en otro formato
       return value;
     }
 
     const [year, month, day] = parts;
 
     if (lang === "en") {
-      // MM/DD/YYYY
       return `${month}/${day}/${year}`;
     } else {
-      // DD/MM/YYYY
       return `${day}/${month}/${year}`;
     }
   };
@@ -429,7 +475,7 @@ const AdminPanel: React.FC = () => {
         end_time: editClass.end_time,
         modality: editClass.modality,
         spots_left: editClass.spots_left,
-        description: editClass.description, // 👈
+        description: editClass.description,
       };
       if (isNewClass) {
         const res = await api.post("/api/admin/classes", payload);
@@ -452,7 +498,6 @@ const AdminPanel: React.FC = () => {
           },
         ]);
       } else {
-        // 👉 Editar clase existente
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
         setClasses((prev) =>
@@ -460,7 +505,6 @@ const AdminPanel: React.FC = () => {
             c.id === editClass.id
               ? {
                   ...c,
-                  // aplicamos lo que el usuario editó
                   title: editClass.title,
                   trainer_id: editClass.trainer_id,
                   trainer_name: editClass.trainer_name,
@@ -470,6 +514,7 @@ const AdminPanel: React.FC = () => {
                   end_time: editClass.end_time,
                   modality: editClass.modality,
                   spots_left: editClass.spots_left,
+                  description: editClass.description,
                 }
               : c
           )
@@ -541,7 +586,6 @@ const AdminPanel: React.FC = () => {
           </div>
 
           <div className="admin-header-actions">
-            {/* 🌍 toggle idioma */}
             <button
               type="button"
               className="admin-lang-toggle"
@@ -589,6 +633,17 @@ const AdminPanel: React.FC = () => {
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
+          </button>
+
+          <button
+            type="button"
+            className={
+              "admin-tab-button" +
+              (activeTab === "stats" ? " admin-tab-button--active" : "")
+            }
+            onClick={() => setActiveTab("stats")}
+          >
+            {t("tabStats")}
           </button>
         </div>
 
@@ -675,7 +730,6 @@ const AdminPanel: React.FC = () => {
                               </>
                             )}
 
-                            {/* 🔹 NUEVO BOTÓN EDITAR RESERVA */}
                             <button
                               className="admin-edit-button"
                               onClick={() => openEditBookingModal(b)}
@@ -730,7 +784,7 @@ const AdminPanel: React.FC = () => {
                       <th>{t("colClassTime")}</th>
                       <th>{t("colClassType")}</th>
                       <th>{t("colClassSeats")}</th>
-                      <th>{t("colClassDescription")}</th> {/* 👈 NUEVO */}
+                      <th>{t("colClassDescription")}</th>
                       <th>{t("columnActions")}</th>
                     </tr>
                   </thead>
@@ -767,6 +821,72 @@ const AdminPanel: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ===================== STATISTICS ===================== */}
+        {activeTab === "stats" && (
+          <section className="admin-table-section">
+            <h2 className="admin-table-title">{t("statsTitle")}</h2>
+
+            {bookingGroups.length === 0 && (
+              <p className="admin-message">{t("statsNoData")}</p>
+            )}
+
+            {bookingGroups.length > 0 && (
+              <div className="admin-table-wrapper">
+                {bookingGroups.map((group) => (
+                  <div key={group.key} className="admin-stats-group">
+                    <div className="admin-stats-group-header">
+                      <h3>{group.classTitle}</h3>
+                      <p>
+                        {formatDate(group.start_date)} –{" "}
+                        {formatDate(group.end_date)} ·{" "}
+                        {group.trainer_name || t("statsNoTrainer")}
+                      </p>
+                    </div>
+
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>{t("columnName")}</th>
+                          <th>{t("columnEmail")}</th>
+                          <th>{t("statsColumnRequestedAt")}</th>
+                          <th>{t("columnStatus")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.requests.map((b) => (
+                          <tr key={b.id}>
+                            <td>{b.name}</td>
+                            <td>{b.email}</td>
+                            <td>{formatDateTime(b.created_at)}</td>
+                            <td>
+                              <span
+                                className={
+                                  "status-pill " +
+                                  (b.status === "accepted"
+                                    ? "status-accepted"
+                                    : b.status === "denied"
+                                    ? "status-denied"
+                                    : "status-pending")
+                                }
+                              >
+                                {b.status === "accepted"
+                                  ? t("statusAccepted")
+                                  : b.status === "denied"
+                                  ? t("statusDenied")
+                                  : t("statusPending")}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
             )}
           </section>

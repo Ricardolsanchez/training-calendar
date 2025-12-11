@@ -92,7 +92,7 @@ const translations: Record<Lang, Record<string, string>> = {
     seatsPlural: "cupos",
     seatsAvailable: "disponibles",
     colClassSeats: "Cupos",
-    colClassDescription: "Descripción", 
+    colClassDescription: "Descripción",
   },
 };
 
@@ -124,7 +124,11 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
 
   // Generar todos los días de ese mes
   const days: Date[] = [];
-  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+  for (
+    let d = new Date(monthStart);
+    d <= monthEnd;
+    d.setDate(d.getDate() + 1)
+  ) {
     days.push(new Date(d));
   }
 
@@ -472,6 +476,10 @@ const BookingCalendar: React.FC = () => {
                       <span className="class-date">{cls.dateLabel}</span>
                       <span className="class-time">{cls.timeRange}</span>
                     </div>
+
+                    {cls.description && (
+                      <p className="class-description">{cls.description}</p>
+                    )}
 
                     <div className="class-footer">
                       <span className="class-trainer">

@@ -430,4 +430,38 @@
     margin-bottom: 0.65rem;
     font-size: 0.82rem;
   }
+  /* ===========================
+   TEXTAREA (MODAL OSCURO)
+=========================== */
+
+  .admin-modal-dark textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 0.75rem 0.9rem;
+    border-radius: 12px;
+
+    /* Fondo oscuro suave */
+    background: rgba(15, 23, 42, 0.92);
+
+    /* Borde sutil */
+    border: 1px solid rgba(255, 255, 255, 0.12);
+
+    /* Texto */
+    color: #f3f4f6;
+    font-size: 0.85rem;
+    line-height: 1.4;
+
+    /* Espaciado visual */
+    margin-bottom: 1rem;
+    resize: vertical;
+
+    /* Transición elegante */
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .admin-modal-dark textarea:focus {
+    outline: none;
+    border-color: #facc15;
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
+  }
 }

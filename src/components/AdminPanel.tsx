@@ -292,9 +292,10 @@ const AdminPanel: React.FC = () => {
   // AGRUPAR RESERVAS POR CLASE
   // =======================
   const bookingGroups: BookingGroup[] = useMemo(() => {
+    const acceptedBookings = bookings.filter((b) => b.status === "accepted");
     const map = new Map<string, BookingGroup>();
 
-    for (const b of bookings) {
+    for (const b of acceptedBookings) {
       const key = `${b.name}__${b.start_date}`;
       if (!map.has(key)) {
         map.set(key, {

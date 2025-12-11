@@ -97,6 +97,7 @@ const translations: Record<Lang, Record<string, string>> = {
     colClassTime: "Time",
     colClassType: "Type",
     colClassSeats: "Available Seats",
+    colClassDescription: "Description",
     btnEditClass: "✏️ Edit",
     btnDeleteClass: "🗑 Delete",
     modalEditBookingTitle: "Edit booking",
@@ -164,6 +165,7 @@ const translations: Record<Lang, Record<string, string>> = {
     colClassTime: "Horario",
     colClassType: "Modalidad",
     colClassSeats: "Cupos",
+    colClassDescription: "Descripción",
     btnEditClass: "✏️ Editar",
     btnDeleteClass: "🗑 Eliminar",
     modalEditBookingTitle: "Editar reserva",
@@ -249,7 +251,7 @@ const AdminPanel: React.FC = () => {
             end_time: cls.end_time,
             modality: cls.modality,
             spots_left: cls.spots_left,
-            description: cls.description ?? null, // 👈 IMPORTANTE
+            description: cls.description ?? null, // ✅ importante
           };
         });
         setClasses(list);
@@ -427,33 +429,28 @@ const AdminPanel: React.FC = () => {
         end_time: editClass.end_time,
         modality: editClass.modality,
         spots_left: editClass.spots_left,
-        description: editClass.description,
+        description: editClass.description, // 👈
       };
-
       if (isNewClass) {
-        // 👉 Crear nueva clase
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data.class ?? res.data;
 
-        setClasses((prev) =>
-          prev.map((c) =>
-            c.id === editClass.id
-              ? {
-                  ...c,
-                  title: editClass.title,
-                  trainer_id: editClass.trainer_id,
-                  trainer_name: editClass.trainer_name,
-                  start_date: editClass.start_date,
-                  end_date: editClass.end_date,
-                  start_time: editClass.start_time,
-                  end_time: editClass.end_time,
-                  modality: editClass.modality,
-                  spots_left: editClass.spots_left,
-                  description: editClass.description ?? null, // 👈 aquí también
-                }
-              : c
-          )
-        );
+        setClasses((prev) => [
+          ...prev,
+          {
+            id: saved.id,
+            title: saved.title,
+            trainer_id: editClass.trainer_id,
+            trainer_name: saved.trainer_name,
+            start_date: saved.start_date,
+            end_date: saved.end_date,
+            start_time: saved.start_time,
+            end_time: saved.end_time,
+            modality: saved.modality,
+            spots_left: saved.spots_left,
+            description: saved.description ?? null,
+          },
+        ]);
       } else {
         // 👉 Editar clase existente
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
@@ -733,7 +730,7 @@ const AdminPanel: React.FC = () => {
                       <th>{t("colClassTime")}</th>
                       <th>{t("colClassType")}</th>
                       <th>{t("colClassSeats")}</th>
-                      <th>{t("colClassDescription")}</th> {/* 👈 nueva */}
+                      <th>{t("colClassDescription")}</th> {/* 👈 NUEVO */}
                       <th>{t("columnActions")}</th>
                     </tr>
                   </thead>
@@ -750,8 +747,7 @@ const AdminPanel: React.FC = () => {
                         <td>{cls.modality}</td>
                         <td>{cls.spots_left}</td>
                         <td className="admin-description-cell">
-                          {cls.description || "—"}{" "}
-                          {/* 👈 muestra la descripción */}
+                          {cls.description || "—"}
                         </td>
                         <td className="admin-actions">
                           <button

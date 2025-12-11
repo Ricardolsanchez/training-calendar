@@ -273,8 +273,7 @@
   color: #111827;
   font-weight: 600;
   box-shadow: 0 8px 24px rgba(249, 115, 22, 0.35);
-  transition: transform 0.1s ease, box-shadow 0.1s ease,
-    filter 0.1s ease;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
 }
 
 .admin-primary-button:hover {
@@ -505,5 +504,58 @@
     padding: 0.5rem 0.65rem;
     margin-bottom: 0.65rem;
     font-size: 0.82rem;
+  }
+
+  .attendance-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .attendance-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    background: #111827;
+    color: #e5e7eb;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  .attendance-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .attendance-btn--active {
+    background: #16a34a; /* verde cuando está activo */
+  }
+
+  .attendance-btn--negative.attendance-btn--active {
+    background: #dc2626; /* rojo para Didn't attend */
+  }
+
+  .attendance-pill {
+    display: inline-block;
+    margin-top: 0.1rem;
+    font-size: 0.7rem;
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+  }
+
+  .attendance-pill--neutral {
+    background: rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+  }
+
+  .attendance-pill--yes {
+    background: rgba(22, 163, 74, 0.15);
+    color: #4ade80;
+  }
+
+  .attendance-pill--no {
+    background: rgba(220, 38, 38, 0.15);
+    color: #fca5a5;
   }
 }

@@ -20,6 +20,7 @@ type Booking = {
   created_at: string;
   status: BookingStatus;
   calendar_url?: string | null;
+  attendedbutton?: boolean | null;
 };
 
 type AvailableClass = {
@@ -207,6 +208,11 @@ const translations: Record<Lang, Record<string, string>> = {
     statsNoData: "Aún no hay solicitudes.",
     statsNoTrainer: "Sin trainer asignado",
     statsColumnRequestedAt: "Solicitada el",
+    btnMarkAttended: "Asistió",
+    btnMarkUnattended: "No asistió",
+    attendanceAttended: "Asistió",
+    attendanceUnattended: "No asistió",
+    attendanceNotMarked: "Sin marcar",
   },
 };
 
@@ -424,6 +430,33 @@ const AdminPanel: React.FC = () => {
       );
     } catch (err) {
       console.error("Error updating booking status:", err);
+      alert(t("errorUpdateBookingStatus"));
+    }
+  };
+
+  const handleAttendance = async (booking: Booking, attended: boolean) => {
+    try {
+      await ensureCsrf();
+
+      const res = await api.put(
+        `/api/admin/bookings/${booking.id}/attendance`,
+        { attendedbutton: attended } // 👈 mismo nombre que en Supabase
+      );
+
+      const updated: Booking = res.data.booking ?? {
+        ...booking,
+        attendedbutton: attended,
+      };
+
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === updated.id
+            ? { ...b, attendedbutton: updated.attendedbutton }
+            : b
+        )
+      );
+    } catch (err) {
+      console.error("Error updating attendance:", err);
       alert(t("errorUpdateBookingStatus"));
     }
   };
@@ -671,6 +704,7 @@ const AdminPanel: React.FC = () => {
                       <th>{t("columnNotes")}</th>
                       <th>{t("columnCreatedAt")}</th>
                       <th>{t("columnStatus")}</th>
+                      <th>{t("statsColumnAttendance")}</th>
                       <th>{t("columnActions")}</th>
                     </tr>
                   </thead>
@@ -864,6 +898,50 @@ const AdminPanel: React.FC = () => {
                             <td>{b.name}</td>
                             <td>{b.email}</td>
                             <td>{formatDateTime(b.created_at)}</td>
+
+                            {/* 👇 Columna Asistencia */}
+                            <td>
+                              <div className="attendance-buttons">
+                                <button
+                                  className={
+                                    "attendance-btn" +
+                                    (b.attendedbutton === true
+                                      ? " attendance-btn--active"
+                                      : "")
+                                  }
+                                  onClick={() => handleAttendance(b, true)}
+                                >
+                                  {t("btnMarkAttended")}
+                                </button>
+                                <button
+                                  className={
+                                    "attendance-btn" +
+                                    (b.attendedbutton === false
+                                      ? " attendance-btn--active attendance-btn--negative"
+                                      : "")
+                                  }
+                                  onClick={() => handleAttendance(b, false)}
+                                >
+                                  {t("btnMarkUnattended")}
+                                </button>
+                              </div>
+
+                              {b.attendedbutton === null ||
+                              b.attendedbutton === undefined ? (
+                                <span className="attendance-pill attendance-pill--neutral">
+                                  {t("attendanceNotMarked")}
+                                </span>
+                              ) : b.attendedbutton ? (
+                                <span className="attendance-pill attendance-pill--yes">
+                                  {t("attendanceAttended")}
+                                </span>
+                              ) : (
+                                <span className="attendance-pill attendance-pill--no">
+                                  {t("attendanceUnattended")}
+                                </span>
+                              )}
+                            </td>
+
                             <td>
                               <span
                                 className={

@@ -31,13 +31,123 @@
 .admin-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 1.5rem;
   margin-bottom: 2.5rem;
 }
 
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #f97316, #facc15);
+  color: #111827;
+  font-weight: 700;
+}
+
+.admin-title {
+  margin-top: 0.9rem;
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #f9fafb;
+}
+
+.admin-subtitle {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #9ca3af;
+  max-width: 560px;
+  line-height: 1.55;
+}
+
+/* ===== TOP RIGHT ACTIONS (FIX CUADROS ENORMES) ===== */
+
 .admin-header-actions {
   display: flex;
   gap: 0.75rem;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.admin-lang-toggle,
+.admin-back-button,
+.admin-logout-button {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  outline: none;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 38px;            /* 👈 clave */
+  padding: 0 14px;         /* 👈 clave */
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+
+  cursor: pointer;
+  user-select: none;
+
+  transition: transform 0.1s ease, filter 0.15s ease, background 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-lang-toggle {
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.admin-lang-toggle:hover {
+  border-color: rgba(191, 219, 254, 0.8);
+  transform: translateY(-1px);
+}
+
+.admin-back-button {
+  background: rgba(15, 23, 42, 0.55);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.admin-back-button:hover {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(249, 250, 251, 0.45);
+  transform: translateY(-1px);
+}
+
+.admin-logout-button {
+  background: #ef4444;
+  color: #f9fafb;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+}
+
+.admin-logout-button:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.admin-logout-button:active,
+.admin-lang-toggle:active,
+.admin-back-button:active {
+  transform: translateY(0);
+}
+
+/* Blindaje por si tienes CSS global que infla botones */
+.admin-header-actions button {
+  min-height: 0 !important;
+  min-width: 0 !important;
+  height: 38px !important;
+  padding: 0 14px !important;
 }
 
 /* ===========================
@@ -47,7 +157,7 @@
 .admin-tabs {
   display: inline-flex;
   gap: 0.25rem;
-  padding: 0.2rem;
+  padding: 0.25rem;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.9);
   border: 1px solid rgba(55, 65, 81, 0.8);
@@ -58,9 +168,16 @@
   background: transparent;
   border: none;
   color: #9ca3af;
-  padding: 0.4rem 1rem;
+  padding: 0.45rem 1rem;
   border-radius: 999px;
   cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.admin-tab-button:hover {
+  color: #e5e7eb;
 }
 
 .admin-tab-button--active {
@@ -69,11 +186,32 @@
 }
 
 /* ===========================
+   SECTION TITLES / TEXT
+=========================== */
+
+.admin-table-section {
+  margin-top: 0.5rem;
+}
+
+.admin-table-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #f3f4f6;
+  margin: 0 0 0.9rem;
+}
+
+.admin-message {
+  font-size: 0.95rem;
+  color: #9ca3af;
+  padding: 0.5rem 0;
+}
+
+/* ===========================
    TABLE
 =========================== */
 
 .admin-table-wrapper {
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid rgba(31, 41, 55, 0.9);
   background: radial-gradient(circle at top left, #020617 0%, #000 70%);
   overflow-x: auto;
@@ -82,20 +220,38 @@
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
-  min-width: 900px;
+  font-size: 0.9rem;
+  min-width: 980px;
 }
 
 .admin-table th,
 .admin-table td {
-  padding: 0.85rem 1rem;
+  padding: 0.9rem 1rem;
   border-bottom: 1px solid rgba(31, 41, 55, 0.85);
   vertical-align: middle;
 }
 
 .admin-table th {
   color: #9ca3af;
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 0.82rem;
+  text-transform: none;
+}
+
+.admin-notes-cell,
+.admin-description-cell {
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Acciones (si las usas en BOOKINGS / CLASSES) */
+.admin-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 /* ===========================
@@ -105,8 +261,11 @@
 .status-pill {
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .status-accepted {
@@ -125,16 +284,18 @@
 }
 
 /* ===========================
-   ATTENDANCE TOGGLE ⭐
+   ATTENDANCE TOGGLE ⭐ (grande, centrado)
 =========================== */
 
 .attendance-cell {
-  display: flex;
-  justify-content: center;
+  text-align: center;
 }
 
 .attendance-toggle {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
   background: rgba(15, 23, 42, 0.9);
   border-radius: 999px;
   padding: 0.3rem;
@@ -143,25 +304,56 @@
 }
 
 .attendance-option {
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
   border: none;
   cursor: pointer;
+  user-select: none;
+
+  padding: 0.55rem 0.95rem;   /* 👈 más grande */
+  border-radius: 999px;
+  font-size: 0.82rem;         /* 👈 más legible */
+  font-weight: 800;
+
   background: transparent;
   color: #9ca3af;
-  transition: all 0.15s ease;
+
+  transition: transform 0.1s ease, background 0.15s ease, color 0.15s ease,
+    filter 0.15s ease;
+}
+
+.attendance-option:hover {
+  transform: translateY(-1px);
+  color: #e5e7eb;
 }
 
 .attendance-option--yes.attendance-option--active {
   background: #16a34a;
-  color: #fff;
+  color: #ffffff;
 }
 
 .attendance-option--no.attendance-option--active {
   background: #dc2626;
-  color: #fff;
+  color: #ffffff;
+}
+
+/* ===========================
+   STATS GROUP (si lo usas)
+=========================== */
+
+.admin-stats-group {
+  padding: 1rem;
+}
+
+.admin-stats-group-header h3 {
+  margin: 0 0 0.25rem;
+  color: #f9fafb;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.admin-stats-group-header p {
+  margin: 0 0 0.9rem;
+  color: #9ca3af;
+  font-size: 0.95rem;
 }
 
 /* ===========================
@@ -173,7 +365,19 @@
     padding: 1.5rem;
   }
 
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .admin-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
   .admin-table {
-    min-width: 750px;
+    min-width: 760px;
   }
 }

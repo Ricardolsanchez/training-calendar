@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import "./AdminPanel.css";
@@ -126,11 +126,13 @@ const translations: Record<Lang, Record<string, string>> = {
     statsNoTrainer: "No trainer assigned",
     statsColumnRequestedAt: "Requested at",
     statsColumnAttendance: "Attended?",
-    kpiTotalClasses: "Total classes",
+    kpiTotalClasses: "Total courses",
+    kpiAccepted: "Accepted bookings",
     kpiAttended: "Attended",
     kpiNotAttended: "Not attended",
     kpiNotMarked: "Not marked",
     kpiTotalAttended: "Total attended (overall)",
+    kpiLoadError: "Could not load KPIs.",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -205,10 +207,12 @@ const translations: Record<Lang, Record<string, string>> = {
     statsColumnRequestedAt: "Solicitada el",
     statsColumnAttendance: "¿Asistió?",
     kpiTotalClasses: "Total cursos",
+    kpiAccepted: "Reservas aceptadas",
     kpiAttended: "Asistieron",
     kpiNotAttended: "No asistieron",
     kpiNotMarked: "Sin marcar",
     kpiTotalAttended: "Total asistentes (global)",
+    kpiLoadError: "No se pudieron cargar los KPIs.",
   },
 };
 
@@ -216,9 +220,8 @@ async function ensureCsrf() {
   await api.get("/sanctum/csrf-cookie");
 }
 
-/** ✅ Tipos para Stats (sin any) */
+/** ✅ KPIs */
 type Kpis = {
-  total_bookings: number;
   total_classes_created: number;
   accepted_total: number;
   attended_total: number;
@@ -238,16 +241,13 @@ type StatsPerClass = {
   not_marked: number;
 };
 
-type StatsResponse = {
+type WrappedStats = {
   ok: boolean;
   kpis: Kpis;
-  per_class: StatsPerClass[];
-  charts: {
-    pie_attendance: { label: string; value: number }[];
-    line_attendance_by_day: { day: string; attended: number; not_attended: number; not_marked: number }[];
-  };
-  filters?: { from?: string | null; to?: string | null };
+  per_class?: StatsPerClass[];
 };
+
+type StatsResponse = WrappedStats | Kpis;
 
 type BookingGroup = {
   key: string;
@@ -257,6 +257,25 @@ type BookingGroup = {
   trainer_name: string | null;
   requests: Booking[];
 };
+
+function isWrappedStats(data: unknown): data is WrappedStats {
+  if (!data || typeof data !== "object") return false;
+  const d = data as any;
+  return typeof d.ok === "boolean" && d.kpis && typeof d.kpis === "object";
+}
+
+function isKpis(data: unknown): data is Kpis {
+  if (!data || typeof data !== "object") return false;
+  const d = data as any;
+  return (
+    typeof d.total_classes_created === "number" &&
+    typeof d.accepted_total === "number" &&
+    typeof d.attended_total === "number" &&
+    typeof d.not_attended_total === "number" &&
+    typeof d.not_marked_total === "number" &&
+    typeof d.total_attended_overall === "number"
+  );
+}
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
@@ -275,11 +294,13 @@ const AdminPanel: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<Tab>("bookings");
 
-  /** ✅ KPIs tipados */
+  /** ✅ KPIs */
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [perClass, setPerClass] = useState<StatsPerClass[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
+  /** ✅ Fetch bookings + classes SOLO al montar */
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -326,32 +347,6 @@ const AdminPanel: React.FC = () => {
     fetchClasses();
   }, []);
 
-  /** ✅ Carga stats SOLO cuando entras al tab */
-  useEffect(() => {
-    if (activeTab !== "stats") return;
-
-    const fetchStats = async () => {
-      setStatsLoading(true);
-      try {
-        const res = await api.get<StatsResponse>("/api/admin/stats");
-        const data = res.data;
-
-        if (!data?.ok) throw new Error("Stats API returned ok=false");
-
-        setKpis(data.kpis);
-        setPerClass(data.per_class ?? []);
-      } catch (err) {
-        console.error("Error cargando stats:", err);
-        setKpis(null);
-        setPerClass([]);
-      } finally {
-        setStatsLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, [activeTab]);
-
   const bookingGroups: BookingGroup[] = useMemo(() => {
     const acceptedBookings = bookings.filter((b) => b.status === "accepted");
     const map = new Map<string, BookingGroup>();
@@ -394,16 +389,59 @@ const AdminPanel: React.FC = () => {
     setShowEditBookingModal(true);
   };
 
+  /** ✅ Stats: usa TU ruta real web.php */
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+
+    try {
+      const res = await api.get<StatsResponse>("/admin/stats/kpis");
+      const data = res.data as unknown;
+
+      if (isWrappedStats(data)) {
+        if (!data.ok) throw new Error("Stats API returned ok=false");
+        setKpis(data.kpis);
+        setPerClass(data.per_class ?? []);
+        return;
+      }
+
+      if (isKpis(data)) {
+        setKpis(data);
+        setPerClass([]);
+        return;
+      }
+
+      console.error("Respuesta inesperada stats:", data);
+      throw new Error("Unexpected stats response shape");
+    } catch (err) {
+      console.error("Error cargando stats:", err);
+      setKpis(null);
+      setPerClass([]);
+      setStatsError(t("kpiLoadError"));
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [t]);
+
+  /** ✅ Cargar stats SOLO al entrar en tab */
+  useEffect(() => {
+    if (activeTab !== "stats") return;
+    fetchStats();
+  }, [activeTab, fetchStats]);
+
   const saveBookingChanges = async () => {
     if (!editBooking) return;
 
     try {
       await ensureCsrf();
+      // OJO: si no tienes esta ruta en backend, comenta este PUT.
       const res = await api.put(`/api/admin/bookings/${editBooking.id}`, editBooking);
       const updated: Booking = res.data.booking ?? editBooking;
 
       setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
       setShowEditBookingModal(false);
+
+      if (activeTab === "stats") fetchStats();
     } catch (err) {
       console.error("Error guardando cambios:", err);
       alert(t("errorUpdateBookingStatus"));
@@ -417,6 +455,8 @@ const AdminPanel: React.FC = () => {
       await ensureCsrf();
       await api.delete(`/api/admin/bookings/${id}`);
       setBookings((prev) => prev.filter((b) => b.id !== id));
+
+      if (activeTab === "stats") fetchStats();
     } catch (err) {
       console.error("Error al eliminar reserva:", err);
       alert(t("errorDeleteBooking"));
@@ -446,8 +486,10 @@ const AdminPanel: React.FC = () => {
         calendar_url: calendarUrl,
       });
 
-      const updated: Booking = res.data.booking;
+      const updated: Booking = res.data.booking ?? res.data;
       setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+
+      if (activeTab === "stats") fetchStats();
     } catch (err) {
       console.error("Error updating booking status:", err);
       alert(t("errorUpdateBookingStatus"));
@@ -465,14 +507,7 @@ const AdminPanel: React.FC = () => {
         attendedbutton: next,
       });
 
-      // refrescar KPIs si estás en stats
-      if (activeTab === "stats") {
-        const res = await api.get<StatsResponse>("/api/admin/stats");
-        if (res.data?.ok) {
-          setKpis(res.data.kpis);
-          setPerClass(res.data.per_class ?? []);
-        }
-      }
+      if (activeTab === "stats") fetchStats();
     } catch (err) {
       console.error("Error updating attendance:", err);
 
@@ -552,23 +587,13 @@ const AdminPanel: React.FC = () => {
 
         setClasses((prev) =>
           prev.map((c) =>
-            c.id === editClass.id
-              ? { ...c, ...editClass, description: editClass.description ?? null }
-              : c
+            c.id === editClass.id ? { ...c, ...editClass, description: editClass.description ?? null } : c
           )
         );
       }
 
       setShowClassModal(false);
-
-      // refrescar KPIs si estás en stats
-      if (activeTab === "stats") {
-        const res = await api.get<StatsResponse>("/api/admin/stats");
-        if (res.data?.ok) {
-          setKpis(res.data.kpis);
-          setPerClass(res.data.per_class ?? []);
-        }
-      }
+      if (activeTab === "stats") fetchStats();
     } catch (err: any) {
       console.error("Error guardando clase:", err);
       if (err.response?.data) alert(JSON.stringify(err.response.data, null, 2));
@@ -581,24 +606,10 @@ const AdminPanel: React.FC = () => {
 
     try {
       await ensureCsrf();
-
-      const clsToDelete = classes.find((c) => c.id === id);
       await api.delete(`/api/admin/classes/${id}`);
       setClasses((prev) => prev.filter((c) => c.id !== id));
 
-      if (clsToDelete) {
-        setBookings((prev) =>
-          prev.filter((b) => !(b.name === clsToDelete.title && b.start_date === clsToDelete.start_date))
-        );
-      }
-
-      if (activeTab === "stats") {
-        const res = await api.get<StatsResponse>("/api/admin/stats");
-        if (res.data?.ok) {
-          setKpis(res.data.kpis);
-          setPerClass(res.data.per_class ?? []);
-        }
-      }
+      if (activeTab === "stats") fetchStats();
     } catch (err) {
       console.error("Error eliminando clase:", err);
       alert(t("errorDeleteClass"));
@@ -798,7 +809,9 @@ const AdminPanel: React.FC = () => {
                         <td>{cls.trainer_name}</td>
                         <td>{formatDate(cls.start_date)}</td>
                         <td>{formatDate(cls.end_date)}</td>
-                        <td>{cls.start_time} – {cls.end_time}</td>
+                        <td>
+                          {cls.start_time} – {cls.end_time}
+                        </td>
                         <td>{cls.modality}</td>
                         <td>{cls.spots_left}</td>
                         <td className="admin-description-cell">{cls.description || "—"}</td>
@@ -824,9 +837,16 @@ const AdminPanel: React.FC = () => {
         {/* STATS */}
         {activeTab === "stats" && (
           <section className="admin-table-section">
-            <h2 className="admin-table-title">{t("statsTitle")}</h2>
+            <div className="stats-title-row">
+              <h2 className="admin-table-title">{t("statsTitle")}</h2>
+
+              <button type="button" className="btn btn-secondary" onClick={fetchStats} disabled={statsLoading} title="Refresh KPIs">
+                🔄 Refresh
+              </button>
+            </div>
 
             {statsLoading && <p className="admin-message">Loading stats…</p>}
+            {!statsLoading && statsError && <p className="admin-message">{statsError}</p>}
 
             {!statsLoading && kpis && (
               <div className="kpi-grid">
@@ -834,18 +854,27 @@ const AdminPanel: React.FC = () => {
                   <div className="kpi-label">{t("kpiTotalClasses")}</div>
                   <div className="kpi-value">{kpis.total_classes_created}</div>
                 </div>
+
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiAccepted")}</div>
+                  <div className="kpi-value">{kpis.accepted_total}</div>
+                </div>
+
                 <div className="kpi-card">
                   <div className="kpi-label">{t("kpiAttended")}</div>
                   <div className="kpi-value">{kpis.attended_total}</div>
                 </div>
+
                 <div className="kpi-card">
                   <div className="kpi-label">{t("kpiNotAttended")}</div>
                   <div className="kpi-value">{kpis.not_attended_total}</div>
                 </div>
+
                 <div className="kpi-card">
                   <div className="kpi-label">{t("kpiNotMarked")}</div>
                   <div className="kpi-value">{kpis.not_marked_total}</div>
                 </div>
+
                 <div className="kpi-card">
                   <div className="kpi-label">{t("kpiTotalAttended")}</div>
                   <div className="kpi-value">{kpis.total_attended_overall}</div>
@@ -853,11 +882,7 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {!statsLoading && perClass.length === 0 && (
-              <p className="admin-message">{t("statsNoData")}</p>
-            )}
-
-            {perClass.length > 0 && (
+            {!statsLoading && perClass.length > 0 && (
               <div className="admin-table-wrapper">
                 <table className="admin-table">
                   <thead>
@@ -890,77 +915,71 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {/* Si quieres, aquí debajo seguimos mostrando tu tabla detallada por bookingGroups (opcional).
-                La puedes dejar o eliminar. */}
+            {!statsLoading && bookingGroups.length === 0 && <p className="admin-message">{t("statsNoData")}</p>}
+
             {bookingGroups.length > 0 && (
-              <div style={{ marginTop: 18 }}>
-                <div className="admin-table-wrapper">
-                  {bookingGroups.map((group) => (
-                    <div key={group.key} className="admin-stats-group">
-                      <div className="admin-stats-group-header">
-                        <h3>{group.classTitle}</h3>
-                        <p>
-                          {formatDate(group.start_date)} – {formatDate(group.end_date)} ·{" "}
-                          {group.trainer_name || t("statsNoTrainer")}
-                        </p>
-                      </div>
-
-                      <table className="admin-table">
-                        <thead>
-                          <tr>
-                            <th>{t("columnName")}</th>
-                            <th>{t("columnEmail")}</th>
-                            <th>{t("statsColumnRequestedAt")}</th>
-                            <th className="th-center">{t("statsColumnAttendance")}</th>
-                            <th>{t("columnStatus")}</th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {group.requests.map((b) => (
-                            <tr key={b.id}>
-                              <td>{b.name}</td>
-                              <td>{b.email}</td>
-                              <td>{formatDateTime(b.created_at)}</td>
-
-                              <td className="attendance-cell">
-                                <button
-                                  type="button"
-                                  className={
-                                    "attendance-switch" +
-                                    (b.attendedbutton === true ? " attendance-switch--active" : "")
-                                  }
-                                  aria-label="Toggle attended"
-                                  onClick={() => toggleAttendance(b)}
-                                  title={b.attendedbutton === true ? "Attended" : "Not attended"}
-                                />
-                              </td>
-
-                              <td>
-                                <span
-                                  className={
-                                    "status-pill " +
-                                    (b.status === "accepted"
-                                      ? "status-accepted"
-                                      : b.status === "denied"
-                                      ? "status-denied"
-                                      : "status-pending")
-                                  }
-                                >
-                                  {b.status === "accepted"
-                                    ? t("statusAccepted")
-                                    : b.status === "denied"
-                                    ? t("statusDenied")
-                                    : t("statusPending")}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+              <div className="admin-table-wrapper">
+                {bookingGroups.map((group) => (
+                  <div key={group.key} className="admin-stats-group">
+                    <div className="admin-stats-group-header">
+                      <h3>{group.classTitle}</h3>
+                      <p>
+                        {formatDate(group.start_date)} – {formatDate(group.end_date)} · {group.trainer_name || t("statsNoTrainer")}
+                      </p>
                     </div>
-                  ))}
-                </div>
+
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>{t("columnName")}</th>
+                          <th>{t("columnEmail")}</th>
+                          <th>{t("statsColumnRequestedAt")}</th>
+                          <th className="th-center">{t("statsColumnAttendance")}</th>
+                          <th>{t("columnStatus")}</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {group.requests.map((b) => (
+                          <tr key={b.id}>
+                            <td>{b.name}</td>
+                            <td>{b.email}</td>
+                            <td>{formatDateTime(b.created_at)}</td>
+
+                            <td className="attendance-cell">
+                              <button
+                                type="button"
+                                className={"attendance-switch" + (b.attendedbutton === true ? " attendance-switch--active" : "")}
+                                aria-label="Toggle attended"
+                                onClick={() => toggleAttendance(b)}
+                                title={b.attendedbutton === true ? "Attended" : "Not attended"}
+                              />
+                            </td>
+
+                            <td>
+                              <span
+                                className={
+                                  "status-pill " +
+                                  (b.status === "accepted"
+                                    ? "status-accepted"
+                                    : b.status === "denied"
+                                    ? "status-denied"
+                                    : "status-pending")
+                                }
+                              >
+                                {b.status === "accepted"
+                                  ? t("statusAccepted")
+                                  : b.status === "denied"
+                                  ? t("statusDenied")
+                                  : t("statusPending")}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
             )}
           </section>
@@ -974,19 +993,10 @@ const AdminPanel: React.FC = () => {
             <h3>{t("modalEditBookingTitle")}</h3>
 
             <label>{t("modalNameLabel")}</label>
-            <input
-              className="form-input"
-              type="text"
-              value={editBooking.name}
-              onChange={(e) => setEditBooking({ ...editBooking, name: e.target.value })}
-            />
+            <input className="form-input" type="text" value={editBooking.name} onChange={(e) => setEditBooking({ ...editBooking, name: e.target.value })} />
 
             <label>{t("modalNotesLabel")}</label>
-            <textarea
-              className="form-textarea"
-              value={editBooking.notes ?? ""}
-              onChange={(e) => setEditBooking({ ...editBooking, notes: e.target.value })}
-            />
+            <textarea className="form-textarea" value={editBooking.notes ?? ""} onChange={(e) => setEditBooking({ ...editBooking, notes: e.target.value })} />
 
             <div className="admin-modal-actions">
               <button className="btn btn-secondary" onClick={() => setShowEditBookingModal(false)}>
@@ -1008,12 +1018,7 @@ const AdminPanel: React.FC = () => {
             <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
 
             <label>{t("labelClassTitle")}</label>
-            <input
-              className="form-input"
-              type="text"
-              value={editClass.title}
-              onChange={(e) => setEditClass({ ...editClass, title: e.target.value })}
-            />
+            <input className="form-input" type="text" value={editClass.title} onChange={(e) => setEditClass({ ...editClass, title: e.target.value })} />
 
             <label>{t("labelTrainer")}</label>
             <select
@@ -1022,11 +1027,7 @@ const AdminPanel: React.FC = () => {
               onChange={(e) => {
                 const id = e.target.value ? Number(e.target.value) : null;
                 const trainer = TRAINERS.find((tt) => tt.id === id) || null;
-                setEditClass({
-                  ...editClass,
-                  trainer_id: id,
-                  trainer_name: trainer ? trainer.name : null,
-                });
+                setEditClass({ ...editClass, trainer_id: id, trainer_name: trainer ? trainer.name : null });
               }}
             >
               <option value="">{t("optionSelectTrainer")}</option>
@@ -1040,69 +1041,33 @@ const AdminPanel: React.FC = () => {
             <div className="form-grid">
               <div>
                 <label>{t("labelStartDate")}</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={editClass.start_date}
-                  onChange={(e) => setEditClass({ ...editClass, start_date: e.target.value })}
-                />
+                <input className="form-input" type="date" value={editClass.start_date} onChange={(e) => setEditClass({ ...editClass, start_date: e.target.value })} />
               </div>
               <div>
                 <label>{t("labelEndDate")}</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={editClass.end_date}
-                  onChange={(e) => setEditClass({ ...editClass, end_date: e.target.value })}
-                />
+                <input className="form-input" type="date" value={editClass.end_date} onChange={(e) => setEditClass({ ...editClass, end_date: e.target.value })} />
               </div>
               <div>
                 <label>{t("labelStartTime")}</label>
-                <input
-                  className="form-input"
-                  type="time"
-                  value={editClass.start_time}
-                  onChange={(e) => setEditClass({ ...editClass, start_time: e.target.value })}
-                />
+                <input className="form-input" type="time" value={editClass.start_time} onChange={(e) => setEditClass({ ...editClass, start_time: e.target.value })} />
               </div>
               <div>
                 <label>{t("labelEndTime")}</label>
-                <input
-                  className="form-input"
-                  type="time"
-                  value={editClass.end_time}
-                  onChange={(e) => setEditClass({ ...editClass, end_time: e.target.value })}
-                />
+                <input className="form-input" type="time" value={editClass.end_time} onChange={(e) => setEditClass({ ...editClass, end_time: e.target.value })} />
               </div>
             </div>
 
             <label>{t("labelType")}</label>
-            <select
-              className="form-select"
-              value={editClass.modality}
-              onChange={(e) =>
-                setEditClass({ ...editClass, modality: e.target.value as "Online" | "Presencial" })
-              }
-            >
+            <select className="form-select" value={editClass.modality} onChange={(e) => setEditClass({ ...editClass, modality: e.target.value as "Online" | "Presencial" })}>
               <option value="Presencial">{t("typeInPerson")}</option>
               <option value="Online">{t("typeOnline")}</option>
             </select>
 
             <label>{t("labelSeats")}</label>
-            <input
-              className="form-input"
-              type="number"
-              min={0}
-              value={editClass.spots_left}
-              onChange={(e) => setEditClass({ ...editClass, spots_left: Number(e.target.value) })}
-            />
+            <input className="form-input" type="number" min={0} value={editClass.spots_left} onChange={(e) => setEditClass({ ...editClass, spots_left: Number(e.target.value) })} />
 
             <label>{t("labelDescription")}</label>
-            <textarea
-              className="form-textarea"
-              value={editClass.description ?? ""}
-              onChange={(e) => setEditClass({ ...editClass, description: e.target.value })}
-            />
+            <textarea className="form-textarea" value={editClass.description ?? ""} onChange={(e) => setEditClass({ ...editClass, description: e.target.value })} />
 
             <div className="admin-modal-actions">
               <button className="btn btn-secondary" onClick={() => setShowClassModal(false)}>

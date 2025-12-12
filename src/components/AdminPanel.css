@@ -4,19 +4,14 @@
 
 .admin-page {
   min-height: 100vh;
-  background: radial-gradient(
-    circle at top,
-    #111827 0%,
-    #020617 45%,
-    #000 100%
-  );
+  background: radial-gradient(circle at top, #111827 0%, #020617 45%, #000 100%);
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding: 3rem 1.5rem;
   color: #e5e7eb;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Segoe UI", sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    sans-serif;
 }
 
 .admin-card {
@@ -70,7 +65,7 @@
   line-height: 1.55;
 }
 
-/* ===== TOP RIGHT ACTIONS (FIX CUADROS ENORMES) ===== */
+/* ===== TOP RIGHT ACTIONS ===== */
 
 .admin-header-actions {
   display: flex;
@@ -218,6 +213,15 @@
   margin-bottom: 0.75rem;
 }
 
+/* ✅ Title row for Stats (title + refresh) */
+.stats-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0.6rem;
+}
+
 /* ===========================
    TABLE
 =========================== */
@@ -263,7 +267,7 @@
 }
 
 /* ===========================
-   BUTTON SYSTEM (UX/UI CONSISTENTE)
+   BUTTON SYSTEM
 =========================== */
 
 .btn {
@@ -295,6 +299,12 @@
 
 .btn:active {
   transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-primary {
@@ -336,17 +346,16 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: nowrap; /* ✅ NO apilar */
+  flex-wrap: nowrap;
   white-space: nowrap;
 }
 
-/* Dale espacio mínimo a la columna Actions para que quepan */
+/* espacio mínimo a la columna Actions */
 .admin-table th:last-child,
 .admin-table td:last-child {
-  min-width: 220px; /* ajusta: 200–260 según lo que uses */
+  min-width: 220px;
 }
 
-/* Por si algún botón ocupa 100% por CSS global */
 .admin-actions .btn {
   width: auto !important;
 }
@@ -381,7 +390,7 @@
 }
 
 /* ===========================
-   ATTENDANCE SWITCH (DEFAULT ROJO -> VERDE)
+   ATTENDANCE SWITCH
 =========================== */
 
 .attendance-cell {
@@ -395,15 +404,14 @@
   border-radius: 999px;
   cursor: pointer;
   border: none;
-  background: #7f1d1d; /* 🔴 default rojo */
+  background: #7f1d1d;
   transition: background 0.25s ease, transform 0.1s ease, box-shadow 0.2s ease;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
 .attendance-switch:hover {
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 10px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 .attendance-switch::after {
@@ -419,7 +427,7 @@
 }
 
 .attendance-switch--active {
-  background: #16a34a; /* 🟢 */
+  background: #16a34a;
 }
 
 .attendance-switch--active::after {
@@ -448,7 +456,41 @@
 }
 
 /* ===========================
-   MODALS + FORMS (para que no se vean raros)
+   ✅ KPI GRID (NUEVO)
+=========================== */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 10px 0 18px;
+}
+
+.kpi-card {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.55);
+  border-radius: 16px;
+  padding: 14px 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.kpi-label {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.kpi-value {
+  margin: 8px 0 0;
+  font-size: 1.4rem;
+  font-weight: 950;
+  color: #f9fafb;
+}
+
+/* ===========================
+   MODALS + FORMS
 =========================== */
 
 .admin-modal-backdrop {
@@ -525,6 +567,18 @@
 /* ===========================
    RESPONSIVE
 =========================== */
+
+@media (max-width: 1100px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 @media (max-width: 900px) {
   .admin-card {

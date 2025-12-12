@@ -902,47 +902,34 @@ const AdminPanel: React.FC = () => {
 
                             {/* 👇 Columna Asistencia */}
                             <td>
-                              <div className="attendance-buttons">
-                                <button
-                                  className={
-                                    "attendance-btn" +
-                                    (b.attendedbutton === true
-                                      ? " attendance-btn--active"
-                                      : "")
-                                  }
-                                  onClick={() => handleAttendance(b, true)}
-                                >
-                                  {t("btnMarkAttended")}
-                                </button>
-                                <button
-                                  className={
-                                    "attendance-btn" +
-                                    (b.attendedbutton === false
-                                      ? " attendance-btn--active attendance-btn--negative"
-                                      : "")
-                                  }
-                                  onClick={() => handleAttendance(b, false)}
-                                >
-                                  {t("btnMarkUnattended")}
-                                </button>
+                              <div className="attendance-cell">
+                                <div className="attendance-toggle">
+                                  <button
+                                    className={
+                                      "attendance-option attendance-option--yes" +
+                                      (b.attendedbutton === true
+                                        ? " attendance-option--active"
+                                        : "")
+                                    }
+                                    onClick={() => handleAttendance(b, true)}
+                                  >
+                                    {t("btnMarkAttended")}
+                                  </button>
+
+                                  <button
+                                    className={
+                                      "attendance-option attendance-option--no" +
+                                      (b.attendedbutton === false
+                                        ? " attendance-option--active"
+                                        : "")
+                                    }
+                                    onClick={() => handleAttendance(b, false)}
+                                  >
+                                    {t("btnMarkUnattended")}
+                                  </button>
+                                </div>
                               </div>
-
-                              {b.attendedbutton === null ||
-                              b.attendedbutton === undefined ? (
-                                <span className="attendance-pill attendance-pill--neutral">
-                                  {t("attendanceNotMarked")}
-                                </span>
-                              ) : b.attendedbutton ? (
-                                <span className="attendance-pill attendance-pill--yes">
-                                  {t("attendanceAttended")}
-                                </span>
-                              ) : (
-                                <span className="attendance-pill attendance-pill--no">
-                                  {t("attendanceUnattended")}
-                                </span>
-                              )}
                             </td>
-
                             <td>
                               <span
                                 className={

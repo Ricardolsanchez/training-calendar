@@ -20,14 +20,14 @@ type Booking = {
   created_at: string;
   status: BookingStatus;
   calendar_url?: string | null;
-  attendedbutton?: boolean | null; // Supabase column
+  attendedbutton?: boolean | null;
 };
 
 type AvailableClass = {
   id: number;
   title: string;
-  trainer_id: number | null; // solo para el select
-  trainer_name: string | null; // viene de la BD
+  trainer_id: number | null;
+  trainer_name: string | null;
   start_date: string;
   end_date: string;
   start_time: string;
@@ -57,8 +57,7 @@ const translations: Record<Lang, Record<string, string>> = {
   en: {
     adminBadge: "Admin Panel",
     adminTitle: "Training Management",
-    adminSubtitle:
-      "Review the reservations received and manage the available classes.",
+    adminSubtitle: "Review the reservations received and manage the available classes.",
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabBookings: "Bookings",
@@ -127,12 +126,16 @@ const translations: Record<Lang, Record<string, string>> = {
     statsNoTrainer: "No trainer assigned",
     statsColumnRequestedAt: "Requested at",
     statsColumnAttendance: "Attended?",
+    kpiTotalClasses: "Total classes",
+    kpiAttended: "Attended",
+    kpiNotAttended: "Not attended",
+    kpiNotMarked: "Not marked",
+    kpiTotalAttended: "Total attended (overall)",
   },
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-    adminSubtitle:
-      "Revisa las reservas recibidas y administra las clases disponibles.",
+    adminSubtitle: "Revisa las reservas recibidas y administra las clases disponibles.",
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabBookings: "Reservas",
@@ -201,12 +204,50 @@ const translations: Record<Lang, Record<string, string>> = {
     statsNoTrainer: "Sin trainer asignado",
     statsColumnRequestedAt: "Solicitada el",
     statsColumnAttendance: "¿Asistió?",
+    kpiTotalClasses: "Total cursos",
+    kpiAttended: "Asistieron",
+    kpiNotAttended: "No asistieron",
+    kpiNotMarked: "Sin marcar",
+    kpiTotalAttended: "Total asistentes (global)",
   },
 };
 
 async function ensureCsrf() {
   await api.get("/sanctum/csrf-cookie");
 }
+
+/** ✅ Tipos para Stats (sin any) */
+type Kpis = {
+  total_bookings: number;
+  total_classes_created: number;
+  accepted_total: number;
+  attended_total: number;
+  not_attended_total: number;
+  not_marked_total: number;
+  total_attended_overall: number;
+};
+
+type StatsPerClass = {
+  classTitle: string;
+  start_date: string;
+  end_date: string;
+  trainer_name: string | null;
+  requests: number;
+  attended: number;
+  not_attended: number;
+  not_marked: number;
+};
+
+type StatsResponse = {
+  ok: boolean;
+  kpis: Kpis;
+  per_class: StatsPerClass[];
+  charts: {
+    pie_attendance: { label: string; value: number }[];
+    line_attendance_by_day: { day: string; attended: number; not_attended: number; not_marked: number }[];
+  };
+  filters?: { from?: string | null; to?: string | null };
+};
 
 type BookingGroup = {
   key: string;
@@ -233,6 +274,11 @@ const AdminPanel: React.FC = () => {
   const [isNewClass, setIsNewClass] = useState(false);
 
   const [activeTab, setActiveTab] = useState<Tab>("bookings");
+
+  /** ✅ KPIs tipados */
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [perClass, setPerClass] = useState<StatsPerClass[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
     const fetchBookings = async () => {
@@ -280,6 +326,32 @@ const AdminPanel: React.FC = () => {
     fetchClasses();
   }, []);
 
+  /** ✅ Carga stats SOLO cuando entras al tab */
+  useEffect(() => {
+    if (activeTab !== "stats") return;
+
+    const fetchStats = async () => {
+      setStatsLoading(true);
+      try {
+        const res = await api.get<StatsResponse>("/api/admin/stats");
+        const data = res.data;
+
+        if (!data?.ok) throw new Error("Stats API returned ok=false");
+
+        setKpis(data.kpis);
+        setPerClass(data.per_class ?? []);
+      } catch (err) {
+        console.error("Error cargando stats:", err);
+        setKpis(null);
+        setPerClass([]);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [activeTab]);
+
   const bookingGroups: BookingGroup[] = useMemo(() => {
     const acceptedBookings = bookings.filter((b) => b.status === "accepted");
     const map = new Map<string, BookingGroup>();
@@ -299,9 +371,7 @@ const AdminPanel: React.FC = () => {
       map.get(key)!.requests.push(b);
     }
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.start_date.localeCompare(b.start_date)
-    );
+    return Array.from(map.values()).sort((a, b) => a.start_date.localeCompare(b.start_date));
   }, [bookings]);
 
   const formatDate = (value: string | null) => {
@@ -357,9 +427,7 @@ const AdminPanel: React.FC = () => {
     let calendarUrl: string | null = booking.calendar_url ?? null;
 
     if (newStatus === "accepted" && !calendarUrl) {
-      const input = window.prompt(
-        "Paste the Google Calendar link for this class (you can leave it empty)."
-      );
+      const input = window.prompt("Paste the Google Calendar link for this class (you can leave it empty).");
       if (input === null) return;
       calendarUrl = input.trim() || null;
     }
@@ -386,28 +454,32 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // ✅ Switch: default rojo (false/null), click => verde (true). Click de nuevo => rojo (false)
   const toggleAttendance = async (booking: Booking) => {
     const next = booking.attendedbutton === true ? false : true;
 
-    // Optimistic UI
-    setBookings((prev) =>
-      prev.map((b) => (b.id === booking.id ? { ...b, attendedbutton: next } : b))
-    );
+    setBookings((prev) => prev.map((b) => (b.id === booking.id ? { ...b, attendedbutton: next } : b)));
 
     try {
       await ensureCsrf();
       await api.put(`/api/admin/bookings/${booking.id}/attendance`, {
         attendedbutton: next,
       });
+
+      // refrescar KPIs si estás en stats
+      if (activeTab === "stats") {
+        const res = await api.get<StatsResponse>("/api/admin/stats");
+        if (res.data?.ok) {
+          setKpis(res.data.kpis);
+          setPerClass(res.data.per_class ?? []);
+        }
+      }
     } catch (err) {
       console.error("Error updating attendance:", err);
-      // rollback
+
       setBookings((prev) =>
-        prev.map((b) =>
-          b.id === booking.id ? { ...b, attendedbutton: booking.attendedbutton ?? null } : b
-        )
+        prev.map((b) => (b.id === booking.id ? { ...b, attendedbutton: booking.attendedbutton ?? null } : b))
       );
+
       alert(t("errorUpdateBookingStatus"));
     }
   };
@@ -481,25 +553,22 @@ const AdminPanel: React.FC = () => {
         setClasses((prev) =>
           prev.map((c) =>
             c.id === editClass.id
-              ? {
-                  ...c,
-                  title: editClass.title,
-                  trainer_id: editClass.trainer_id,
-                  trainer_name: editClass.trainer_name,
-                  start_date: editClass.start_date,
-                  end_date: editClass.end_date,
-                  start_time: editClass.start_time,
-                  end_time: editClass.end_time,
-                  modality: editClass.modality,
-                  spots_left: editClass.spots_left,
-                  description: editClass.description,
-                }
+              ? { ...c, ...editClass, description: editClass.description ?? null }
               : c
           )
         );
       }
 
       setShowClassModal(false);
+
+      // refrescar KPIs si estás en stats
+      if (activeTab === "stats") {
+        const res = await api.get<StatsResponse>("/api/admin/stats");
+        if (res.data?.ok) {
+          setKpis(res.data.kpis);
+          setPerClass(res.data.per_class ?? []);
+        }
+      }
     } catch (err: any) {
       console.error("Error guardando clase:", err);
       if (err.response?.data) alert(JSON.stringify(err.response.data, null, 2));
@@ -519,11 +588,16 @@ const AdminPanel: React.FC = () => {
 
       if (clsToDelete) {
         setBookings((prev) =>
-          prev.filter(
-            (b) =>
-              !(b.name === clsToDelete.title && b.start_date === clsToDelete.start_date)
-          )
+          prev.filter((b) => !(b.name === clsToDelete.title && b.start_date === clsToDelete.start_date))
         );
+      }
+
+      if (activeTab === "stats") {
+        const res = await api.get<StatsResponse>("/api/admin/stats");
+        if (res.data?.ok) {
+          setKpis(res.data.kpis);
+          setPerClass(res.data.per_class ?? []);
+        }
       }
     } catch (err) {
       console.error("Error eliminando clase:", err);
@@ -554,19 +628,11 @@ const AdminPanel: React.FC = () => {
           </div>
 
           <div className="admin-header-actions">
-            <button
-              type="button"
-              className="admin-lang-toggle"
-              onClick={() => setLang(lang === "en" ? "es" : "en")}
-            >
+            <button type="button" className="admin-lang-toggle" onClick={() => setLang(lang === "en" ? "es" : "en")}>
               {lang === "en" ? "ES" : "EN"}
             </button>
 
-            <button
-              type="button"
-              className="admin-back-button"
-              onClick={() => navigate("/")}
-            >
+            <button type="button" className="admin-back-button" onClick={() => navigate("/")}>
               {t("backToCalendar")}
             </button>
 
@@ -579,10 +645,7 @@ const AdminPanel: React.FC = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "bookings" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "bookings" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("bookings")}
           >
             {t("tabBookings")}
@@ -590,10 +653,7 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "classes" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
@@ -601,16 +661,14 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={
-              "admin-tab-button" + (activeTab === "stats" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "stats" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("stats")}
           >
             {t("tabStats")}
           </button>
         </div>
 
-        {/* ===================== BOOKINGS ===================== */}
+        {/* BOOKINGS */}
         {activeTab === "bookings" && (
           <section className="admin-table-section">
             <h2 className="admin-table-title">{t("bookingListTitle")}</h2>
@@ -676,37 +734,20 @@ const AdminPanel: React.FC = () => {
                             <div className="admin-actions">
                               {b.status === "pending" && (
                                 <>
-                                  <button
-                                    type="button"
-                                    className="btn btn-success"
-                                    onClick={() => handleBookingStatus(b, "accepted")}
-                                  >
+                                  <button type="button" className="btn btn-success" onClick={() => handleBookingStatus(b, "accepted")}>
                                     ✅ {t("btnAccept")}
                                   </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-danger"
-                                    onClick={() => handleBookingStatus(b, "denied")}
-                                  >
+                                  <button type="button" className="btn btn-danger" onClick={() => handleBookingStatus(b, "denied")}>
                                     ❌ {t("btnDeny")}
                                   </button>
                                 </>
                               )}
 
-                              <button
-                                type="button"
-                                className="btn btn-icon"
-                                aria-label="Edit"
-                                onClick={() => openEditBookingModal(b)}
-                              >
+                              <button type="button" className="btn btn-icon" aria-label="Edit" onClick={() => openEditBookingModal(b)}>
                                 ✏️
                               </button>
 
-                              <button
-                                type="button"
-                                className="btn btn-danger btn-outline"
-                                onClick={() => handleDeleteBooking(b.id)}
-                              >
+                              <button type="button" className="btn btn-danger btn-outline" onClick={() => handleDeleteBooking(b.id)}>
                                 🗑 {t("btnDelete")}
                               </button>
                             </div>
@@ -721,7 +762,7 @@ const AdminPanel: React.FC = () => {
           </section>
         )}
 
-        {/* ===================== CLASSES ===================== */}
+        {/* CLASSES */}
         {activeTab === "classes" && (
           <section className="admin-table-section">
             <div className="admin-table-header-row">
@@ -757,26 +798,16 @@ const AdminPanel: React.FC = () => {
                         <td>{cls.trainer_name}</td>
                         <td>{formatDate(cls.start_date)}</td>
                         <td>{formatDate(cls.end_date)}</td>
-                        <td>
-                          {cls.start_time} – {cls.end_time}
-                        </td>
+                        <td>{cls.start_time} – {cls.end_time}</td>
                         <td>{cls.modality}</td>
                         <td>{cls.spots_left}</td>
                         <td className="admin-description-cell">{cls.description || "—"}</td>
                         <td>
                           <div className="admin-actions">
-                            <button
-                              type="button"
-                              className="btn btn-secondary"
-                              onClick={() => openEditClassModal(cls)}
-                            >
+                            <button type="button" className="btn btn-secondary" onClick={() => openEditClassModal(cls)}>
                               ✏️ {t("btnEditClass")}
                             </button>
-                            <button
-                              type="button"
-                              className="btn btn-danger btn-outline"
-                              onClick={() => handleDeleteClass(cls.id)}
-                            >
+                            <button type="button" className="btn btn-danger btn-outline" onClick={() => handleDeleteClass(cls.id)}>
                               🗑 {t("btnDeleteClass")}
                             </button>
                           </div>
@@ -790,87 +821,153 @@ const AdminPanel: React.FC = () => {
           </section>
         )}
 
-        {/* ===================== STATS ===================== */}
+        {/* STATS */}
         {activeTab === "stats" && (
           <section className="admin-table-section">
             <h2 className="admin-table-title">{t("statsTitle")}</h2>
 
-            {bookingGroups.length === 0 && <p className="admin-message">{t("statsNoData")}</p>}
+            {statsLoading && <p className="admin-message">Loading stats…</p>}
 
-            {bookingGroups.length > 0 && (
+            {!statsLoading && kpis && (
+              <div className="kpi-grid">
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiTotalClasses")}</div>
+                  <div className="kpi-value">{kpis.total_classes_created}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiAttended")}</div>
+                  <div className="kpi-value">{kpis.attended_total}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiNotAttended")}</div>
+                  <div className="kpi-value">{kpis.not_attended_total}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiNotMarked")}</div>
+                  <div className="kpi-value">{kpis.not_marked_total}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiTotalAttended")}</div>
+                  <div className="kpi-value">{kpis.total_attended_overall}</div>
+                </div>
+              </div>
+            )}
+
+            {!statsLoading && perClass.length === 0 && (
+              <p className="admin-message">{t("statsNoData")}</p>
+            )}
+
+            {perClass.length > 0 && (
               <div className="admin-table-wrapper">
-                {bookingGroups.map((group) => (
-                  <div key={group.key} className="admin-stats-group">
-                    <div className="admin-stats-group-header">
-                      <h3>{group.classTitle}</h3>
-                      <p>
-                        {formatDate(group.start_date)} – {formatDate(group.end_date)} ·{" "}
-                        {group.trainer_name || t("statsNoTrainer")}
-                      </p>
-                    </div>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Class</th>
+                      <th>Dates</th>
+                      <th>Trainer</th>
+                      <th>Requests</th>
+                      <th>Attended</th>
+                      <th>Not attended</th>
+                      <th>Not marked</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {perClass.map((row, idx) => (
+                      <tr key={`${row.classTitle}-${row.start_date}-${idx}`}>
+                        <td>{row.classTitle}</td>
+                        <td>
+                          {formatDate(row.start_date)} – {formatDate(row.end_date)}
+                        </td>
+                        <td>{row.trainer_name || t("statsNoTrainer")}</td>
+                        <td>{row.requests}</td>
+                        <td>{row.attended}</td>
+                        <td>{row.not_attended}</td>
+                        <td>{row.not_marked}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>{t("columnName")}</th>
-                          <th>{t("columnEmail")}</th>
-                          <th>{t("statsColumnRequestedAt")}</th>
-                          <th className="th-center">{t("statsColumnAttendance")}</th>
-                          <th>{t("columnStatus")}</th>
-                        </tr>
-                      </thead>
+            {/* Si quieres, aquí debajo seguimos mostrando tu tabla detallada por bookingGroups (opcional).
+                La puedes dejar o eliminar. */}
+            {bookingGroups.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <div className="admin-table-wrapper">
+                  {bookingGroups.map((group) => (
+                    <div key={group.key} className="admin-stats-group">
+                      <div className="admin-stats-group-header">
+                        <h3>{group.classTitle}</h3>
+                        <p>
+                          {formatDate(group.start_date)} – {formatDate(group.end_date)} ·{" "}
+                          {group.trainer_name || t("statsNoTrainer")}
+                        </p>
+                      </div>
 
-                      <tbody>
-                        {group.requests.map((b) => (
-                          <tr key={b.id}>
-                            <td>{b.name}</td>
-                            <td>{b.email}</td>
-                            <td>{formatDateTime(b.created_at)}</td>
-
-                            <td className="attendance-cell">
-                              <button
-                                type="button"
-                                className={
-                                  "attendance-switch" +
-                                  (b.attendedbutton === true ? " attendance-switch--active" : "")
-                                }
-                                aria-label="Toggle attended"
-                                onClick={() => toggleAttendance(b)}
-                                title={b.attendedbutton === true ? "Attended" : "Not attended"}
-                              />
-                            </td>
-
-                            <td>
-                              <span
-                                className={
-                                  "status-pill " +
-                                  (b.status === "accepted"
-                                    ? "status-accepted"
-                                    : b.status === "denied"
-                                    ? "status-denied"
-                                    : "status-pending")
-                                }
-                              >
-                                {b.status === "accepted"
-                                  ? t("statusAccepted")
-                                  : b.status === "denied"
-                                  ? t("statusDenied")
-                                  : t("statusPending")}
-                              </span>
-                            </td>
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>{t("columnName")}</th>
+                            <th>{t("columnEmail")}</th>
+                            <th>{t("statsColumnRequestedAt")}</th>
+                            <th className="th-center">{t("statsColumnAttendance")}</th>
+                            <th>{t("columnStatus")}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
+                        </thead>
+
+                        <tbody>
+                          {group.requests.map((b) => (
+                            <tr key={b.id}>
+                              <td>{b.name}</td>
+                              <td>{b.email}</td>
+                              <td>{formatDateTime(b.created_at)}</td>
+
+                              <td className="attendance-cell">
+                                <button
+                                  type="button"
+                                  className={
+                                    "attendance-switch" +
+                                    (b.attendedbutton === true ? " attendance-switch--active" : "")
+                                  }
+                                  aria-label="Toggle attended"
+                                  onClick={() => toggleAttendance(b)}
+                                  title={b.attendedbutton === true ? "Attended" : "Not attended"}
+                                />
+                              </td>
+
+                              <td>
+                                <span
+                                  className={
+                                    "status-pill " +
+                                    (b.status === "accepted"
+                                      ? "status-accepted"
+                                      : b.status === "denied"
+                                      ? "status-denied"
+                                      : "status-pending")
+                                  }
+                                >
+                                  {b.status === "accepted"
+                                    ? t("statusAccepted")
+                                    : b.status === "denied"
+                                    ? t("statusDenied")
+                                    : t("statusPending")}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </section>
         )}
       </div>
 
-      {/* =============== MODAL EDIT BOOKING =============== */}
+      {/* MODAL EDIT BOOKING */}
       {showEditBookingModal && editBooking && (
         <div className="admin-modal-backdrop" onMouseDown={() => setShowEditBookingModal(false)}>
           <div className="admin-modal" onMouseDown={(e) => e.stopPropagation()}>
@@ -904,7 +1001,7 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* =============== MODAL NEW / EDIT CLASS =============== */}
+      {/* MODAL NEW / EDIT CLASS */}
       {showClassModal && editClass && (
         <div className="admin-modal-backdrop" onMouseDown={() => setShowClassModal(false)}>
           <div className="admin-modal admin-modal-dark" onMouseDown={(e) => e.stopPropagation()}>

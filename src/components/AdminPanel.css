@@ -4,7 +4,12 @@
 
 .admin-page {
   min-height: 100vh;
-  background: radial-gradient(circle at top, #111827 0%, #020617 45%, #000 100%);
+  background: radial-gradient(
+    circle at top,
+    #111827 0%,
+    #020617 45%,
+    #000 100%
+  );
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -331,7 +336,19 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* ✅ NO apilar */
+  white-space: nowrap;
+}
+
+/* Dale espacio mínimo a la columna Actions para que quepan */
+.admin-table th:last-child,
+.admin-table td:last-child {
+  min-width: 220px; /* ajusta: 200–260 según lo que uses */
+}
+
+/* Por si algún botón ocupa 100% por CSS global */
+.admin-actions .btn {
+  width: auto !important;
 }
 
 /* ===========================

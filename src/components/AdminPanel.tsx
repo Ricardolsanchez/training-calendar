@@ -133,6 +133,7 @@ const translations: Record<Lang, Record<string, string>> = {
     statsNoData: "There are no requests yet.",
     statsNoTrainer: "No trainer assigned",
     statsColumnRequestedAt: "Requested at",
+    statsColumnAttendance: "Attended?"
   },
   es: {
     adminBadge: "Panel Admin",
@@ -213,6 +214,7 @@ const translations: Record<Lang, Record<string, string>> = {
     attendanceAttended: "Asistió",
     attendanceUnattended: "No asistió",
     attendanceNotMarked: "Sin marcar",
+    statsColumnAttendance: "¿Asistió?"
   },
 };
 

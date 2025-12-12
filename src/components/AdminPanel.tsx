@@ -57,7 +57,8 @@ const translations: Record<Lang, Record<string, string>> = {
   en: {
     adminBadge: "Admin Panel",
     adminTitle: "Training Management",
-    adminSubtitle: "Review the reservations received and manage the available classes.",
+    adminSubtitle:
+      "Review the reservations received and manage the available classes.",
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabBookings: "Bookings",
@@ -137,7 +138,8 @@ const translations: Record<Lang, Record<string, string>> = {
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-    adminSubtitle: "Revisa las reservas recibidas y administra las clases disponibles.",
+    adminSubtitle:
+      "Revisa las reservas recibidas y administra las clases disponibles.",
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabBookings: "Reservas",
@@ -281,7 +283,10 @@ const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang>("en");
-  const t = (key: string) => translations[lang][key] ?? key;
+  const t = useCallback(
+    (key: string) => translations[lang][key] ?? key,
+    [lang]
+  );
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
@@ -366,7 +371,9 @@ const AdminPanel: React.FC = () => {
       map.get(key)!.requests.push(b);
     }
 
-    return Array.from(map.values()).sort((a, b) => a.start_date.localeCompare(b.start_date));
+    return Array.from(map.values()).sort((a, b) =>
+      a.start_date.localeCompare(b.start_date)
+    );
   }, [bookings]);
 
   const formatDate = (value: string | null) => {
@@ -374,7 +381,9 @@ const AdminPanel: React.FC = () => {
     const parts = value.split("-");
     if (parts.length !== 3) return value;
     const [year, month, day] = parts;
-    return lang === "en" ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
+    return lang === "en"
+      ? `${month}/${day}/${year}`
+      : `${day}/${month}/${year}`;
   };
 
   const formatDateTime = (value: string) => {
@@ -395,33 +404,25 @@ const AdminPanel: React.FC = () => {
     setStatsError(null);
 
     try {
-      const res = await api.get<StatsResponse>("/admin/stats/kpis");
-      const data = res.data as unknown;
+      const res = await api.get("/api/admin/stats/kpis");
+      const data = res.data;
 
-      if (isWrappedStats(data)) {
-        if (!data.ok) throw new Error("Stats API returned ok=false");
+      if (data?.ok && data?.kpis) {
         setKpis(data.kpis);
         setPerClass(data.per_class ?? []);
-        return;
-      }
-
-      if (isKpis(data)) {
+      } else {
         setKpis(data);
         setPerClass([]);
-        return;
       }
-
-      console.error("Respuesta inesperada stats:", data);
-      throw new Error("Unexpected stats response shape");
     } catch (err) {
       console.error("Error cargando stats:", err);
       setKpis(null);
       setPerClass([]);
-      setStatsError(t("kpiLoadError"));
+      setStatsError(translations[lang].kpiLoadError);
     } finally {
       setStatsLoading(false);
     }
-  }, [t]);
+  }, [lang]);
 
   /** ✅ Cargar stats SOLO al entrar en tab */
   useEffect(() => {
@@ -435,10 +436,15 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
       // OJO: si no tienes esta ruta en backend, comenta este PUT.
-      const res = await api.put(`/api/admin/bookings/${editBooking.id}`, editBooking);
+      const res = await api.put(
+        `/api/admin/bookings/${editBooking.id}`,
+        editBooking
+      );
       const updated: Booking = res.data.booking ?? editBooking;
 
-      setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      setBookings((prev) =>
+        prev.map((b) => (b.id === updated.id ? updated : b))
+      );
       setShowEditBookingModal(false);
 
       if (activeTab === "stats") fetchStats();
@@ -463,11 +469,16 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleBookingStatus = async (booking: Booking, newStatus: "accepted" | "denied") => {
+  const handleBookingStatus = async (
+    booking: Booking,
+    newStatus: "accepted" | "denied"
+  ) => {
     let calendarUrl: string | null = booking.calendar_url ?? null;
 
     if (newStatus === "accepted" && !calendarUrl) {
-      const input = window.prompt("Paste the Google Calendar link for this class (you can leave it empty).");
+      const input = window.prompt(
+        "Paste the Google Calendar link for this class (you can leave it empty)."
+      );
       if (input === null) return;
       calendarUrl = input.trim() || null;
     }
@@ -487,7 +498,9 @@ const AdminPanel: React.FC = () => {
       });
 
       const updated: Booking = res.data.booking ?? res.data;
-      setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      setBookings((prev) =>
+        prev.map((b) => (b.id === updated.id ? updated : b))
+      );
 
       if (activeTab === "stats") fetchStats();
     } catch (err) {
@@ -499,7 +512,11 @@ const AdminPanel: React.FC = () => {
   const toggleAttendance = async (booking: Booking) => {
     const next = booking.attendedbutton === true ? false : true;
 
-    setBookings((prev) => prev.map((b) => (b.id === booking.id ? { ...b, attendedbutton: next } : b)));
+    setBookings((prev) =>
+      prev.map((b) =>
+        b.id === booking.id ? { ...b, attendedbutton: next } : b
+      )
+    );
 
     try {
       await ensureCsrf();
@@ -512,7 +529,11 @@ const AdminPanel: React.FC = () => {
       console.error("Error updating attendance:", err);
 
       setBookings((prev) =>
-        prev.map((b) => (b.id === booking.id ? { ...b, attendedbutton: booking.attendedbutton ?? null } : b))
+        prev.map((b) =>
+          b.id === booking.id
+            ? { ...b, attendedbutton: booking.attendedbutton ?? null }
+            : b
+        )
       );
 
       alert(t("errorUpdateBookingStatus"));
@@ -539,7 +560,10 @@ const AdminPanel: React.FC = () => {
 
   const openEditClassModal = (cls: AvailableClass) => {
     const foundTrainer = TRAINERS.find((tt) => tt.name === cls.trainer_name);
-    setEditClass({ ...cls, trainer_id: foundTrainer ? foundTrainer.id : cls.trainer_id });
+    setEditClass({
+      ...cls,
+      trainer_id: foundTrainer ? foundTrainer.id : cls.trainer_id,
+    });
     setIsNewClass(false);
     setShowClassModal(true);
   };
@@ -587,7 +611,13 @@ const AdminPanel: React.FC = () => {
 
         setClasses((prev) =>
           prev.map((c) =>
-            c.id === editClass.id ? { ...c, ...editClass, description: editClass.description ?? null } : c
+            c.id === editClass.id
+              ? {
+                  ...c,
+                  ...editClass,
+                  description: editClass.description ?? null,
+                }
+              : c
           )
         );
       }
@@ -639,15 +669,27 @@ const AdminPanel: React.FC = () => {
           </div>
 
           <div className="admin-header-actions">
-            <button type="button" className="admin-lang-toggle" onClick={() => setLang(lang === "en" ? "es" : "en")}>
+            <button
+              type="button"
+              className="admin-lang-toggle"
+              onClick={() => setLang(lang === "en" ? "es" : "en")}
+            >
               {lang === "en" ? "ES" : "EN"}
             </button>
 
-            <button type="button" className="admin-back-button" onClick={() => navigate("/")}>
+            <button
+              type="button"
+              className="admin-back-button"
+              onClick={() => navigate("/")}
+            >
               {t("backToCalendar")}
             </button>
 
-            <button type="button" className="admin-logout-button" onClick={handleLogout}>
+            <button
+              type="button"
+              className="admin-logout-button"
+              onClick={handleLogout}
+            >
               {t("logout")}
             </button>
           </div>
@@ -656,7 +698,10 @@ const AdminPanel: React.FC = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={"admin-tab-button" + (activeTab === "bookings" ? " admin-tab-button--active" : "")}
+            className={
+              "admin-tab-button" +
+              (activeTab === "bookings" ? " admin-tab-button--active" : "")
+            }
             onClick={() => setActiveTab("bookings")}
           >
             {t("tabBookings")}
@@ -664,7 +709,10 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={"admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")}
+            className={
+              "admin-tab-button" +
+              (activeTab === "classes" ? " admin-tab-button--active" : "")
+            }
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
@@ -672,7 +720,10 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={"admin-tab-button" + (activeTab === "stats" ? " admin-tab-button--active" : "")}
+            className={
+              "admin-tab-button" +
+              (activeTab === "stats" ? " admin-tab-button--active" : "")
+            }
             onClick={() => setActiveTab("stats")}
           >
             {t("tabStats")}
@@ -684,7 +735,9 @@ const AdminPanel: React.FC = () => {
           <section className="admin-table-section">
             <h2 className="admin-table-title">{t("bookingListTitle")}</h2>
 
-            {bookings.length === 0 && <p className="admin-message">{t("noBookings")}</p>}
+            {bookings.length === 0 && (
+              <p className="admin-message">{t("noBookings")}</p>
+            )}
 
             {bookings.length > 0 && (
               <div className="admin-table-wrapper">
@@ -745,20 +798,41 @@ const AdminPanel: React.FC = () => {
                             <div className="admin-actions">
                               {b.status === "pending" && (
                                 <>
-                                  <button type="button" className="btn btn-success" onClick={() => handleBookingStatus(b, "accepted")}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-success"
+                                    onClick={() =>
+                                      handleBookingStatus(b, "accepted")
+                                    }
+                                  >
                                     ✅ {t("btnAccept")}
                                   </button>
-                                  <button type="button" className="btn btn-danger" onClick={() => handleBookingStatus(b, "denied")}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    onClick={() =>
+                                      handleBookingStatus(b, "denied")
+                                    }
+                                  >
                                     ❌ {t("btnDeny")}
                                   </button>
                                 </>
                               )}
 
-                              <button type="button" className="btn btn-icon" aria-label="Edit" onClick={() => openEditBookingModal(b)}>
+                              <button
+                                type="button"
+                                className="btn btn-icon"
+                                aria-label="Edit"
+                                onClick={() => openEditBookingModal(b)}
+                              >
                                 ✏️
                               </button>
 
-                              <button type="button" className="btn btn-danger btn-outline" onClick={() => handleDeleteBooking(b.id)}>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-outline"
+                                onClick={() => handleDeleteBooking(b.id)}
+                              >
                                 🗑 {t("btnDelete")}
                               </button>
                             </div>
@@ -778,12 +852,18 @@ const AdminPanel: React.FC = () => {
           <section className="admin-table-section">
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("classesTitle")}</h2>
-              <button type="button" className="btn btn-primary" onClick={openNewClassModal}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={openNewClassModal}
+              >
                 {t("addNewClass")}
               </button>
             </div>
 
-            {classes.length === 0 && <p className="admin-message">{t("noClasses")}</p>}
+            {classes.length === 0 && (
+              <p className="admin-message">{t("noClasses")}</p>
+            )}
 
             {classes.length > 0 && (
               <div className="admin-table-wrapper">
@@ -814,13 +894,23 @@ const AdminPanel: React.FC = () => {
                         </td>
                         <td>{cls.modality}</td>
                         <td>{cls.spots_left}</td>
-                        <td className="admin-description-cell">{cls.description || "—"}</td>
+                        <td className="admin-description-cell">
+                          {cls.description || "—"}
+                        </td>
                         <td>
                           <div className="admin-actions">
-                            <button type="button" className="btn btn-secondary" onClick={() => openEditClassModal(cls)}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => openEditClassModal(cls)}
+                            >
                               ✏️ {t("btnEditClass")}
                             </button>
-                            <button type="button" className="btn btn-danger btn-outline" onClick={() => handleDeleteClass(cls.id)}>
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-outline"
+                              onClick={() => handleDeleteClass(cls.id)}
+                            >
                               🗑 {t("btnDeleteClass")}
                             </button>
                           </div>
@@ -840,13 +930,21 @@ const AdminPanel: React.FC = () => {
             <div className="stats-title-row">
               <h2 className="admin-table-title">{t("statsTitle")}</h2>
 
-              <button type="button" className="btn btn-secondary" onClick={fetchStats} disabled={statsLoading} title="Refresh KPIs">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={fetchStats}
+                disabled={statsLoading}
+                title="Refresh KPIs"
+              >
                 🔄 Refresh
               </button>
             </div>
 
             {statsLoading && <p className="admin-message">Loading stats…</p>}
-            {!statsLoading && statsError && <p className="admin-message">{statsError}</p>}
+            {!statsLoading && !kpis && !statsError && (
+              <p className="admin-message">No stats yet.</p>
+            )}
 
             {!statsLoading && kpis && (
               <div className="kpi-grid">
@@ -901,7 +999,8 @@ const AdminPanel: React.FC = () => {
                       <tr key={`${row.classTitle}-${row.start_date}-${idx}`}>
                         <td>{row.classTitle}</td>
                         <td>
-                          {formatDate(row.start_date)} – {formatDate(row.end_date)}
+                          {formatDate(row.start_date)} –{" "}
+                          {formatDate(row.end_date)}
                         </td>
                         <td>{row.trainer_name || t("statsNoTrainer")}</td>
                         <td>{row.requests}</td>
@@ -915,7 +1014,9 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {!statsLoading && bookingGroups.length === 0 && <p className="admin-message">{t("statsNoData")}</p>}
+            {!statsLoading && bookingGroups.length === 0 && (
+              <p className="admin-message">{t("statsNoData")}</p>
+            )}
 
             {bookingGroups.length > 0 && (
               <div className="admin-table-wrapper">
@@ -924,7 +1025,9 @@ const AdminPanel: React.FC = () => {
                     <div className="admin-stats-group-header">
                       <h3>{group.classTitle}</h3>
                       <p>
-                        {formatDate(group.start_date)} – {formatDate(group.end_date)} · {group.trainer_name || t("statsNoTrainer")}
+                        {formatDate(group.start_date)} –{" "}
+                        {formatDate(group.end_date)} ·{" "}
+                        {group.trainer_name || t("statsNoTrainer")}
                       </p>
                     </div>
 
@@ -934,7 +1037,9 @@ const AdminPanel: React.FC = () => {
                           <th>{t("columnName")}</th>
                           <th>{t("columnEmail")}</th>
                           <th>{t("statsColumnRequestedAt")}</th>
-                          <th className="th-center">{t("statsColumnAttendance")}</th>
+                          <th className="th-center">
+                            {t("statsColumnAttendance")}
+                          </th>
                           <th>{t("columnStatus")}</th>
                         </tr>
                       </thead>
@@ -949,10 +1054,19 @@ const AdminPanel: React.FC = () => {
                             <td className="attendance-cell">
                               <button
                                 type="button"
-                                className={"attendance-switch" + (b.attendedbutton === true ? " attendance-switch--active" : "")}
+                                className={
+                                  "attendance-switch" +
+                                  (b.attendedbutton === true
+                                    ? " attendance-switch--active"
+                                    : "")
+                                }
                                 aria-label="Toggle attended"
                                 onClick={() => toggleAttendance(b)}
-                                title={b.attendedbutton === true ? "Attended" : "Not attended"}
+                                title={
+                                  b.attendedbutton === true
+                                    ? "Attended"
+                                    : "Not attended"
+                                }
                               />
                             </td>
 
@@ -988,18 +1102,37 @@ const AdminPanel: React.FC = () => {
 
       {/* MODAL EDIT BOOKING */}
       {showEditBookingModal && editBooking && (
-        <div className="admin-modal-backdrop" onMouseDown={() => setShowEditBookingModal(false)}>
+        <div
+          className="admin-modal-backdrop"
+          onMouseDown={() => setShowEditBookingModal(false)}
+        >
           <div className="admin-modal" onMouseDown={(e) => e.stopPropagation()}>
             <h3>{t("modalEditBookingTitle")}</h3>
 
             <label>{t("modalNameLabel")}</label>
-            <input className="form-input" type="text" value={editBooking.name} onChange={(e) => setEditBooking({ ...editBooking, name: e.target.value })} />
+            <input
+              className="form-input"
+              type="text"
+              value={editBooking.name}
+              onChange={(e) =>
+                setEditBooking({ ...editBooking, name: e.target.value })
+              }
+            />
 
             <label>{t("modalNotesLabel")}</label>
-            <textarea className="form-textarea" value={editBooking.notes ?? ""} onChange={(e) => setEditBooking({ ...editBooking, notes: e.target.value })} />
+            <textarea
+              className="form-textarea"
+              value={editBooking.notes ?? ""}
+              onChange={(e) =>
+                setEditBooking({ ...editBooking, notes: e.target.value })
+              }
+            />
 
             <div className="admin-modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowEditBookingModal(false)}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowEditBookingModal(false)}
+              >
                 {t("modalCancel")}
               </button>
 
@@ -1013,12 +1146,25 @@ const AdminPanel: React.FC = () => {
 
       {/* MODAL NEW / EDIT CLASS */}
       {showClassModal && editClass && (
-        <div className="admin-modal-backdrop" onMouseDown={() => setShowClassModal(false)}>
-          <div className="admin-modal admin-modal-dark" onMouseDown={(e) => e.stopPropagation()}>
+        <div
+          className="admin-modal-backdrop"
+          onMouseDown={() => setShowClassModal(false)}
+        >
+          <div
+            className="admin-modal admin-modal-dark"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
 
             <label>{t("labelClassTitle")}</label>
-            <input className="form-input" type="text" value={editClass.title} onChange={(e) => setEditClass({ ...editClass, title: e.target.value })} />
+            <input
+              className="form-input"
+              type="text"
+              value={editClass.title}
+              onChange={(e) =>
+                setEditClass({ ...editClass, title: e.target.value })
+              }
+            />
 
             <label>{t("labelTrainer")}</label>
             <select
@@ -1027,7 +1173,11 @@ const AdminPanel: React.FC = () => {
               onChange={(e) => {
                 const id = e.target.value ? Number(e.target.value) : null;
                 const trainer = TRAINERS.find((tt) => tt.id === id) || null;
-                setEditClass({ ...editClass, trainer_id: id, trainer_name: trainer ? trainer.name : null });
+                setEditClass({
+                  ...editClass,
+                  trainer_id: id,
+                  trainer_name: trainer ? trainer.name : null,
+                });
               }}
             >
               <option value="">{t("optionSelectTrainer")}</option>
@@ -1041,36 +1191,93 @@ const AdminPanel: React.FC = () => {
             <div className="form-grid">
               <div>
                 <label>{t("labelStartDate")}</label>
-                <input className="form-input" type="date" value={editClass.start_date} onChange={(e) => setEditClass({ ...editClass, start_date: e.target.value })} />
+                <input
+                  className="form-input"
+                  type="date"
+                  value={editClass.start_date}
+                  onChange={(e) =>
+                    setEditClass({ ...editClass, start_date: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <label>{t("labelEndDate")}</label>
-                <input className="form-input" type="date" value={editClass.end_date} onChange={(e) => setEditClass({ ...editClass, end_date: e.target.value })} />
+                <input
+                  className="form-input"
+                  type="date"
+                  value={editClass.end_date}
+                  onChange={(e) =>
+                    setEditClass({ ...editClass, end_date: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <label>{t("labelStartTime")}</label>
-                <input className="form-input" type="time" value={editClass.start_time} onChange={(e) => setEditClass({ ...editClass, start_time: e.target.value })} />
+                <input
+                  className="form-input"
+                  type="time"
+                  value={editClass.start_time}
+                  onChange={(e) =>
+                    setEditClass({ ...editClass, start_time: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <label>{t("labelEndTime")}</label>
-                <input className="form-input" type="time" value={editClass.end_time} onChange={(e) => setEditClass({ ...editClass, end_time: e.target.value })} />
+                <input
+                  className="form-input"
+                  type="time"
+                  value={editClass.end_time}
+                  onChange={(e) =>
+                    setEditClass({ ...editClass, end_time: e.target.value })
+                  }
+                />
               </div>
             </div>
 
             <label>{t("labelType")}</label>
-            <select className="form-select" value={editClass.modality} onChange={(e) => setEditClass({ ...editClass, modality: e.target.value as "Online" | "Presencial" })}>
+            <select
+              className="form-select"
+              value={editClass.modality}
+              onChange={(e) =>
+                setEditClass({
+                  ...editClass,
+                  modality: e.target.value as "Online" | "Presencial",
+                })
+              }
+            >
               <option value="Presencial">{t("typeInPerson")}</option>
               <option value="Online">{t("typeOnline")}</option>
             </select>
 
             <label>{t("labelSeats")}</label>
-            <input className="form-input" type="number" min={0} value={editClass.spots_left} onChange={(e) => setEditClass({ ...editClass, spots_left: Number(e.target.value) })} />
+            <input
+              className="form-input"
+              type="number"
+              min={0}
+              value={editClass.spots_left}
+              onChange={(e) =>
+                setEditClass({
+                  ...editClass,
+                  spots_left: Number(e.target.value),
+                })
+              }
+            />
 
             <label>{t("labelDescription")}</label>
-            <textarea className="form-textarea" value={editClass.description ?? ""} onChange={(e) => setEditClass({ ...editClass, description: e.target.value })} />
+            <textarea
+              className="form-textarea"
+              value={editClass.description ?? ""}
+              onChange={(e) =>
+                setEditClass({ ...editClass, description: e.target.value })
+              }
+            />
 
             <div className="admin-modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowClassModal(false)}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowClassModal(false)}
+              >
                 {t("modalCancelDark")}
               </button>
               <button className="btn btn-primary" onClick={saveClassChanges}>

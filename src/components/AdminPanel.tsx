@@ -889,6 +889,7 @@ const AdminPanel: React.FC = () => {
                           <th>{t("columnName")}</th>
                           <th>{t("columnEmail")}</th>
                           <th>{t("statsColumnRequestedAt")}</th>
+                          <th>{t("statsColumnAttendance")}</th>
                           <th>{t("columnStatus")}</th>
                         </tr>
                       </thead>

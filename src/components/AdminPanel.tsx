@@ -134,6 +134,14 @@ const translations: Record<Lang, Record<string, string>> = {
     kpiNotMarked: "Not marked",
     kpiTotalAttended: "Total attended (overall)",
     kpiLoadError: "Could not load KPIs.",
+
+    // ✅ NEW (sessions)
+    addSessionsTitle: "Add sessions",
+    sessionsCountLabel: "Number of sessions to add",
+    addSessionsBtn: "Add sessions",
+    addSessionsHint:
+      "Add extra time slots for this class (same title/date/trainer).",
+    errorAddSessions: "Could not add sessions.",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -215,6 +223,14 @@ const translations: Record<Lang, Record<string, string>> = {
     kpiNotMarked: "Sin marcar",
     kpiTotalAttended: "Total asistentes (global)",
     kpiLoadError: "No se pudieron cargar los KPIs.",
+
+    // ✅ NEW (sessions)
+    addSessionsTitle: "Agregar sesiones",
+    sessionsCountLabel: "Número de sesiones a agregar",
+    addSessionsBtn: "Agregar sesiones",
+    addSessionsHint:
+      "Agrega nuevos horarios para esta clase (mismo título/fecha/trainer).",
+    errorAddSessions: "No se pudieron agregar las sesiones.",
   },
 };
 
@@ -279,6 +295,9 @@ function isKpis(data: unknown): data is Kpis {
   );
 }
 
+// ✅ NEW: sessions inputs
+type SessionInput = { start_time: string; end_time: string };
+
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
@@ -304,6 +323,30 @@ const AdminPanel: React.FC = () => {
   const [perClass, setPerClass] = useState<StatsPerClass[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
+
+  // ✅ NEW: Add sessions state
+  const [sessionsCount, setSessionsCount] = useState<number>(1);
+  const [sessions, setSessions] = useState<SessionInput[]>([
+    { start_time: "", end_time: "" },
+  ]);
+  const [addingSessions, setAddingSessions] = useState(false);
+
+  const setCount = (n: number) => {
+    const safe = Math.max(1, Math.min(20, n));
+    setSessionsCount(safe);
+
+    setSessions((prev) => {
+      const next = [...prev];
+      while (next.length < safe) next.push({ start_time: "", end_time: "" });
+      return next.slice(0, safe);
+    });
+  };
+
+  const resetSessionsUi = () => {
+    setSessionsCount(1);
+    setSessions([{ start_time: "", end_time: "" }]);
+    setAddingSessions(false);
+  };
 
   const downloadKpisCsv = async () => {
     try {
@@ -333,52 +376,52 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const fetchBookings = useCallback(async () => {
+    try {
+      const res = await api.get("/api/admin/bookings");
+      const data = res.data;
+      const list: Booking[] = data.bookings ?? data;
+      setBookings(list);
+    } catch (err) {
+      console.error("Error cargando reservas:", err);
+    }
+  }, []);
+
+  const fetchClasses = useCallback(async () => {
+    try {
+      const res = await api.get("/api/admin/classes");
+      const data = res.data;
+      const listRaw: any[] = data.classes ?? data;
+
+      const list: AvailableClass[] = listRaw.map((cls) => {
+        const trainer = TRAINERS.find((tt) => tt.name === cls.trainer_name);
+
+        return {
+          id: cls.id,
+          title: cls.title,
+          trainer_id: trainer ? trainer.id : null,
+          trainer_name: cls.trainer_name ?? (trainer ? trainer.name : null),
+          start_date: cls.start_date,
+          end_date: cls.end_date,
+          start_time: cls.start_time,
+          end_time: cls.end_time,
+          modality: cls.modality,
+          spots_left: cls.spots_left,
+          description: cls.description ?? null,
+        };
+      });
+
+      setClasses(list);
+    } catch (err) {
+      console.error("Error cargando clases:", err);
+    }
+  }, []);
+
   /** ✅ Fetch bookings + classes SOLO al montar */
   useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const res = await api.get("/api/admin/bookings");
-        const data = res.data;
-        const list: Booking[] = data.bookings ?? data;
-        setBookings(list);
-      } catch (err) {
-        console.error("Error cargando reservas:", err);
-      }
-    };
-
-    const fetchClasses = async () => {
-      try {
-        const res = await api.get("/api/admin/classes");
-        const data = res.data;
-        const listRaw: any[] = data.classes ?? data;
-
-        const list: AvailableClass[] = listRaw.map((cls) => {
-          const trainer = TRAINERS.find((tt) => tt.name === cls.trainer_name);
-
-          return {
-            id: cls.id,
-            title: cls.title,
-            trainer_id: trainer ? trainer.id : null,
-            trainer_name: cls.trainer_name ?? (trainer ? trainer.name : null),
-            start_date: cls.start_date,
-            end_date: cls.end_date,
-            start_time: cls.start_time,
-            end_time: cls.end_time,
-            modality: cls.modality,
-            spots_left: cls.spots_left,
-            description: cls.description ?? null,
-          };
-        });
-
-        setClasses(list);
-      } catch (err) {
-        console.error("Error cargando clases:", err);
-      }
-    };
-
     fetchBookings();
     fetchClasses();
-  }, []);
+  }, [fetchBookings, fetchClasses]);
 
   const bookingGroups: BookingGroup[] = useMemo(() => {
     const acceptedBookings = bookings.filter((b) => b.status === "accepted");
@@ -426,7 +469,7 @@ const AdminPanel: React.FC = () => {
     setShowEditBookingModal(true);
   };
 
-  /** ✅ Stats: usa TU ruta real web.php */
+  /** ✅ Stats */
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     setStatsError(null);
@@ -465,7 +508,6 @@ const AdminPanel: React.FC = () => {
 
     try {
       await ensureCsrf();
-      // OJO: si no tienes esta ruta en backend, comenta este PUT.
       const res = await api.put(
         `/api/admin/bookings/${editBooking.id}`,
         editBooking
@@ -571,6 +613,7 @@ const AdminPanel: React.FC = () => {
   };
 
   const openNewClassModal = () => {
+    resetSessionsUi();
     setEditClass({
       id: 0,
       title: "",
@@ -589,6 +632,7 @@ const AdminPanel: React.FC = () => {
   };
 
   const openEditClassModal = (cls: AvailableClass) => {
+    resetSessionsUi();
     const foundTrainer = TRAINERS.find((tt) => tt.name === cls.trainer_name);
     setEditClass({
       ...cls,
@@ -658,6 +702,50 @@ const AdminPanel: React.FC = () => {
       console.error("Error guardando clase:", err);
       if (err.response?.data) alert(JSON.stringify(err.response.data, null, 2));
       else alert(t("errorSaveClass"));
+    }
+  };
+
+  // ✅ NEW: add sessions to existing class
+  const addSessionsToClass = async () => {
+    if (!editClass) return;
+    if (isNewClass) return;
+
+    // Validación simple
+    const clean = sessions
+      .map((s) => ({
+        start_time: s.start_time.trim(),
+        end_time: s.end_time.trim(),
+      }))
+      .filter((s) => s.start_time && s.end_time);
+
+    if (clean.length === 0) {
+      alert("Please add at least one valid session time.");
+      return;
+    }
+
+    setAddingSessions(true);
+    try {
+      await ensureCsrf();
+      await api.post(`/api/admin/classes/${editClass.id}/sessions`, {
+        sessions: clean,
+      });
+
+      alert("Sessions added ✅");
+
+      // Refresca clases (para ver las nuevas filas)
+      await fetchClasses();
+
+      // Limpia UI
+      resetSessionsUi();
+      setShowClassModal(false);
+
+      if (activeTab === "stats") fetchStats();
+    } catch (err: any) {
+      console.error("Error adding sessions:", err);
+      if (err.response?.data) alert(JSON.stringify(err.response.data, null, 2));
+      else alert(t("errorAddSessions"));
+    } finally {
+      setAddingSessions(false);
     }
   };
 
@@ -969,6 +1057,7 @@ const AdminPanel: React.FC = () => {
               >
                 🔄 Refresh
               </button>
+
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -1311,6 +1400,79 @@ const AdminPanel: React.FC = () => {
                 setEditClass({ ...editClass, description: e.target.value })
               }
             />
+
+            {/* ✅ NEW: Add sessions section (only when editing an existing class) */}
+            {!isNewClass && (
+              <>
+                <hr style={{ opacity: 0.2, margin: "16px 0" }} />
+
+                <h4 style={{ margin: "0 0 8px 0" }}>{t("addSessionsTitle")}</h4>
+                <p style={{ margin: "0 0 12px 0", opacity: 0.8 }}>
+                  {t("addSessionsHint")}
+                </p>
+
+                <label>{t("sessionsCountLabel")}</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={sessionsCount}
+                  onChange={(e) => setCount(Number(e.target.value))}
+                />
+
+                {sessions.map((s, idx) => (
+                  <div
+                    key={idx}
+                    className="form-grid"
+                    style={{ marginTop: 10 }}
+                  >
+                    <div>
+                      <label>Session {idx + 1} start</label>
+                      <input
+                        className="form-input"
+                        type="time"
+                        value={s.start_time}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSessions((prev) =>
+                            prev.map((x, i) =>
+                              i === idx ? { ...x, start_time: v } : x
+                            )
+                          );
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label>Session {idx + 1} end</label>
+                      <input
+                        className="form-input"
+                        type="time"
+                        value={s.end_time}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSessions((prev) =>
+                            prev.map((x, i) =>
+                              i === idx ? { ...x, end_time: v } : x
+                            )
+                          );
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={addSessionsToClass}
+                  disabled={addingSessions}
+                  style={{ marginTop: 12 }}
+                >
+                  ➕ {addingSessions ? "Saving…" : t("addSessionsBtn")}
+                </button>
+              </>
+            )}
 
             <div className="admin-modal-actions">
               <button

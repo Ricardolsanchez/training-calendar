@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+const baseURL =   import.meta.env.VITE_API_BASE_URL || "https://training-calendar-backend.onrender.com";
 
 console.log("API baseURL en runtime:", baseURL);
 

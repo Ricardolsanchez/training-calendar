@@ -5,7 +5,7 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 console.log("API baseURL en runtime:", baseURL);
 
 export const api = axios.create({
-  baseURL,
+  baseURL: "https://training-calendar-backend.onrender.com",
   withCredentials: true, // 👈 importante para Sanctum
 });
 

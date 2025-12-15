@@ -1,11 +1,11 @@
 import axios from "axios";
 
-const baseURL =   "https://training-calendar-backend.onrender.com";
-
+const baseURL = 
+  import.meta.env.VITE_API_BASE_URL || "https://training-calendar-backend.onrender.com";
 console.log("API baseURL en runtime:", baseURL);
 
 export const api = axios.create({
-  baseURL: "https://training-calendar-backend.onrender.com",
+  baseURL,
   withCredentials: true, // 👈 importante para Sanctum
 });
 

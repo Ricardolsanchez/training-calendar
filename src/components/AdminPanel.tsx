@@ -404,15 +404,17 @@ const AdminPanel: React.FC = () => {
     setStatsError(null);
 
     try {
-      const res = await api.get("/api/admin/stats/kpis");
+      const res = await api.get<StatsResponse>("/api/admin/stats/kpis");
       const data = res.data;
 
-      if (data?.ok && data?.kpis) {
+      if (isWrappedStats(data)) {
         setKpis(data.kpis);
         setPerClass(data.per_class ?? []);
-      } else {
+      } else if (isKpis(data)) {
         setKpis(data);
         setPerClass([]);
+      } else {
+        throw new Error("Unexpected stats response shape");
       }
     } catch (err) {
       console.error("Error cargando stats:", err);

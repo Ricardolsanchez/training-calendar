@@ -305,6 +305,34 @@ const AdminPanel: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
 
+  const downloadKpisCsv = async () => {
+    try {
+      await ensureCsrf();
+
+      const res = await api.get("/api/admin/stats/kpis.csv", {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kpis_${new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/[:T]/g, "-")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error downloading KPIs CSV:", err);
+      alert("Could not download KPIs CSV");
+    }
+  };
+
   /** ✅ Fetch bookings + classes SOLO al montar */
   useEffect(() => {
     const fetchBookings = async () => {
@@ -940,6 +968,15 @@ const AdminPanel: React.FC = () => {
                 title="Refresh KPIs"
               >
                 🔄 Refresh
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={downloadKpisCsv}
+                disabled={statsLoading}
+                title="Download KPIs CSV"
+              >
+                ⬇️ Download KPIs (CSV)
               </button>
             </div>
 

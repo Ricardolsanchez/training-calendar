@@ -282,10 +282,16 @@ const BookingCalendar: React.FC = () => {
     setErrorMessage("");
 
     try {
+      // ✅ FIX: tu backend exige start_date y end_date (y end_date >= start_date)
       const payload = {
-        class_id: session.id,
+        class_id: session.id,                 // id REAL de la sesión
         name: selectedGroup.title,
         email,
+        trainer_name: selectedGroup.trainer_name ?? null,
+
+        start_date: session.date_iso,         // REQUIRED
+        end_date: session.date_iso,           // REQUIRED (mismo día)
+
         notes: `Booking for "${selectedGroup.title}" on ${session.date_iso} (${session.time_range})`,
       };
 
@@ -294,11 +300,18 @@ const BookingCalendar: React.FC = () => {
     } catch (err: any) {
       console.error("Error creando booking:", err);
       setStatus("error");
-      const msg =
+
+      // ✅ muestra mensaje de validación completo si viene
+      const backendMsg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         "Error sending booking.";
-      setErrorMessage(String(msg));
+
+      const fieldErrors = err?.response?.data?.errors
+        ? Object.values(err.response.data.errors).flat().join(" ")
+        : "";
+
+      setErrorMessage(fieldErrors ? `${backendMsg} ${fieldErrors}` : String(backendMsg));
     }
   };
 
@@ -307,7 +320,6 @@ const BookingCalendar: React.FC = () => {
       <div className="booking-card">
         <header className="booking-header">
           <div className="booking-header-left booking-header-logo">
-            {/* ✅ Logo desde /public/logo.png */}
             <img src="/logo.png" alt="Alonso & Alonso Academy" className="booking-logo" />
           </div>
 
@@ -370,7 +382,6 @@ const BookingCalendar: React.FC = () => {
                         <div className="class-card-top">
                           <span className="class-title">{g.title}</span>
 
-                          {/* ✅ Badge pill con dot */}
                           <span className="class-badge">
                             <span className={`dot ${modalityDotClass}`} />
                             {g.modality.toUpperCase()}
@@ -391,7 +402,6 @@ const BookingCalendar: React.FC = () => {
                         </div>
                       </button>
 
-                      {/* ✅ sesiones debajo */}
                       {isSelected && (
                         <div className="class-sessions">
                           <div className="class-sessions-title">

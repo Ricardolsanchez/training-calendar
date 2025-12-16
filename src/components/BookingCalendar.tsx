@@ -1,139 +1,134 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import "./BookingCalendar.css";
-import Logo from "../assets/Logo.png";
 
-type AvailableClass = {
+/** =========================
+ *  Types
+ *  ========================= */
+type Lang = "en" | "es";
+type Status = "idle" | "loading" | "success" | "error";
+
+type AvailableSession = {
   id: number;
-  title: string;
-  trainerName: string;
-  dateLabel: string;
-  dateISO: string;
-  timeRange: string;
-  modality: "Online" | "Presencial";
-  level: string;
-  spotsLeft: number;
-  // 🔹 rango real de la clase (start/end)
-  startDateISO: string;
-  endDateISO: string;
-  description?: string | null;
+  date_iso: string; // YYYY-MM-DD
+  time_range: string; // "10:00 - 10:30"
+  spots_left: number;
 };
 
-type Status = "idle" | "loading" | "success" | "error";
-type Lang = "en" | "es";
+type AvailableClassGroup = {
+  group_code: string;
+  title: string;
+  trainer_name: string;
+  modality: "Online" | "Presencial";
+  level: string;
+  description?: string | null;
+  sessions_count: number;
+  sessions: AvailableSession[];
+};
 
-// 🔤 Diccionario de traducciones
-const translations: Record<Lang, Record<string, string>> = {
+/** =========================
+ *  i18n (usa el tuyo si ya lo tienes)
+ *  ========================= */
+const translations: Record<
+  Lang,
+  Record<string, string>
+> = {
   en: {
-    badge: "Available Classes",
-    headerTitle: "Book Your Next Class",
-    headerSubtitle:
-      "Please reach out to our Training Team if you have questions or need further assistance",
-    updatedTag: "Updated in Real Time",
+    updatedTag: "Updated",
     adminPanel: "Admin Panel",
-    adminLogin: "Admin login",
-    availableClassesTitle: "Available Classes this Month",
-    availableClassesSubtitle:
-      "Click on a class to view the details and make a reservation.",
-    loadingClasses: "Loading Available Classes",
-    noClassesError: "Could not load available classes.",
-    noClasses: "No Available Classes this Month",
-    clickOnClassTitle: "Click on an Available Class!",
-    clickOnClassText:
-      "Choose a class from the list on the left to view the details and reserve your spot.",
-    selectedClassLabel: "Selected Class",
+    adminLogin: "Admin Login",
+    availableClassesTitle: "AVAILABLE CLASSES THIS MONTH",
+    availableClassesSubtitle: "Click on a class to view the details and make a reservation.",
+    loadingClasses: "Loading classes...",
+    noClassesError: "Could not load classes. Please try again later.",
+    clickOnClassTitle: "Select a class",
+    clickOnClassText: "Click on a class on the left to see details and sessions.",
+    selectedClassLabel: "SELECTED CLASS",
     emailLabel: "Please provide your A&A Email Address",
     emailPlaceholder: "youremail@yourcompany.com",
-    errorNoClass: "You must select an available class.",
-    errorNoEmail: "Corporate email is required.",
-    genericError: "An error occurred while sending the booking.",
-    unexpectedError: "An unexpected error occurred.",
-    successBooked: "✅ Booked Successfully! We’ll contact you soon!",
-    submitLoading: "Sending booking...",
+    errorNoClass: "Please select a class first.",
+    errorNoSession: "Please select a session time.",
+    errorNoEmail: "Please enter your email.",
     submitLabel: "Book this class",
+    submitLoading: "Booking...",
+    successBooked: "✅ Booking submitted! You’ll receive a confirmation email.",
     privacyText: "We’ll use your corporate email to confirm your attendance.",
-    seats: "Seat",
-    seatsPlural: "Seats",
+    seats: "seat",
+    seatsPlural: "seats",
     seatsAvailable: "Available",
-    colClassSeats: "Available Seats",
-    colClassDescription: "Description",
+    sessions: "Sessions",
+    chooseSession: "Choose a session",
+    highlightedHint: "Highlighted: days with classes",
+    selectedSession: "Selected session",
   },
   es: {
-    badge: "Clases disponibles",
-    headerTitle: "Reserva tu próxima clase",
-    headerSubtitle:
-      "Selecciona una de las clases disponibles este mes y reserva tu cupo con tu correo corporativo.",
-    updatedTag: "Actualizado en tiempo real",
+    updatedTag: "Actualizado",
     adminPanel: "Panel Admin",
-    adminLogin: "Inicio de sesión admin",
-    availableClassesTitle: "Clases disponibles este mes",
-    availableClassesSubtitle:
-      "Haz clic en una clase para ver el detalle y reservar.",
-    loadingClasses: "Cargando clases disponibles",
-    noClassesError: "No se pudieron cargar las clases disponibles.",
-    noClasses: "No hay clases disponibles este mes",
-    clickOnClassTitle: "¡Haz clic en una clase disponible!",
-    clickOnClassText:
-      "Elige una clase de la lista de la izquierda para ver el detalle y reservar tu cupo.",
-    selectedClassLabel: "Clase seleccionada",
-    emailLabel: "Correo corporativo para la reserva",
+    adminLogin: "Login Admin",
+    availableClassesTitle: "CLASES DISPONIBLES ESTE MES",
+    availableClassesSubtitle: "Haz click en una clase para ver detalles y reservar.",
+    loadingClasses: "Cargando clases...",
+    noClassesError: "No se pudieron cargar las clases. Intenta más tarde.",
+    clickOnClassTitle: "Selecciona una clase",
+    clickOnClassText: "Haz click en una clase a la izquierda para ver detalles y sesiones.",
+    selectedClassLabel: "CLASE SELECCIONADA",
+    emailLabel: "Por favor ingresa tu correo corporativo A&A",
     emailPlaceholder: "tucorreo@tuempresa.com",
-    errorNoClass: "Debes seleccionar una clase disponible.",
-    errorNoEmail: "El correo corporativo es obligatorio.",
-    genericError: "Ocurrió un error al enviar la reserva.",
-    unexpectedError: "Ocurrió un error inesperado.",
-    successBooked:
-      "✅ ¡Reserva enviada! Nos pondremos en contacto contigo pronto.",
-    submitLoading: "Enviando reserva...",
+    errorNoClass: "Selecciona una clase primero.",
+    errorNoSession: "Selecciona una sesión (hora) por favor.",
+    errorNoEmail: "Ingresa tu correo por favor.",
     submitLabel: "Reservar esta clase",
+    submitLoading: "Reservando...",
+    successBooked: "✅ Reserva enviada. Te llegará un correo de confirmación.",
     privacyText: "Usaremos tu correo corporativo para confirmar tu asistencia.",
     seats: "cupo",
     seatsPlural: "cupos",
-    seatsAvailable: "disponibles",
-    colClassSeats: "Cupos",
-    colClassDescription: "Descripción",
+    seatsAvailable: "Disponibles",
+    sessions: "Sesiones",
+    chooseSession: "Escoge una sesión",
+    highlightedHint: "Resaltado: días con clases",
+    selectedSession: "Sesión seleccionada",
   },
 };
 
-// ==========================
-// 🗓️ MINI CALENDARIO GLOBAL
-// ==========================
-type MiniCalendarProps = {
-  classes: AvailableClass[];
-  lang: Lang;
+/** =========================
+ *  Helpers
+ *  ========================= */
+const formatDateLabel = (iso: string, lang: Lang) => {
+  const d = new Date(iso);
+  const locale = lang === "en" ? "en-US" : "es-ES";
+  return d.toLocaleDateString(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 };
 
-const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
-  if (!classes || classes.length === 0) {
-    return null;
-  }
+const getMonthAnchor = (groups: AvailableClassGroup[]) => {
+  const first = groups[0]?.sessions?.[0]?.date_iso;
+  return first ? new Date(first) : new Date();
+};
 
-  // Tomamos el mes del startDate de la primera clase
-  const ref = new Date(classes[0].startDateISO || classes[0].dateISO);
-  if (Number.isNaN(ref.getTime())) return null;
-
-  const year = ref.getFullYear();
-  const month = ref.getMonth(); // 0–11
+/** =========================
+ *  MiniCalendar (marca días que tienen sesiones)
+ *  ========================= */
+const MiniCalendar: React.FC<{ groups: AvailableClassGroup[]; lang: Lang }> = ({
+  groups,
+  lang,
+}) => {
+  const anchor = useMemo(() => getMonthAnchor(groups), [groups]);
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth();
 
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);
-
-  // Día de la semana del primer día (0=Dom, 1=Lun, etc.)
   const firstWeekday = monthStart.getDay();
 
-  // Generar todos los días de ese mes
   const days: Date[] = [];
-  for (
-    let d = new Date(monthStart);
-    d <= monthEnd;
-    d.setDate(d.getDate() + 1)
-  ) {
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
-
-  // 🔹 Set con todas las fechas (YYYY-MM-DD) que tengan al menos una clase
-  const highlighted = new Set<string>();
 
   const makeKey = (d: Date) => {
     const y = d.getFullYear();
@@ -142,41 +137,36 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
     return `${y}-${m}-${day}`;
   };
 
-  classes.forEach((cls) => {
-    const start = new Date(cls.startDateISO);
-    const end = new Date(cls.endDateISO);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
-
-    const cur = new Date(start);
-    while (cur <= end) {
-      // solo añadimos si está en el mismo mes que el calendario
-      if (cur.getFullYear() === year && cur.getMonth() === month) {
-        highlighted.add(makeKey(cur));
+  // Highlight: cualquier sesión dentro del mes
+  const highlighted = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of groups) {
+      for (const s of g.sessions) {
+        // solo marcar sesiones del mes visible
+        const dt = new Date(s.date_iso);
+        if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === year && dt.getMonth() === month) {
+          set.add(makeKey(dt));
+        }
       }
-      cur.setDate(cur.getDate() + 1);
     }
-  });
+    return set;
+  }, [groups, year, month]);
 
   const locale = lang === "en" ? "en-US" : "es-ES";
-  const monthLabel = monthStart.toLocaleDateString(locale, {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel = monthStart.toLocaleDateString(locale, { month: "long", year: "numeric" });
 
   const weekdayLabels =
     lang === "en"
       ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-      : ["L", "M", "X", "J", "V", "S", "D"];
+      : ["D", "L", "M", "X", "J", "V", "S"];
+
+  const t = (k: string) => translations[lang][k];
 
   return (
     <div className="booking-mini-calendar">
       <div className="mini-calendar-header">
         <span className="mini-calendar-title">{monthLabel}</span>
-        <span className="mini-calendar-hint">
-          {lang === "en"
-            ? "Highlighted: days with classes"
-            : "Resaltado: días con clases"}
-        </span>
+        <span className="mini-calendar-hint">{t("highlightedHint")}</span>
       </div>
 
       <div className="mini-calendar-grid">
@@ -186,26 +176,19 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
           </div>
         ))}
 
-        {/* espacios en blanco antes del primer día */}
         {Array.from({ length: firstWeekday }).map((_, idx) => (
           <div key={`blank-${idx}`} className="mini-calendar-day empty" />
         ))}
 
-        {/* días del mes */}
         {days.map((d) => {
           const key = makeKey(d);
           const inRange = highlighted.has(key);
-          const dayNumber = d.getDate();
-
           return (
             <div
               key={key}
-              className={
-                "mini-calendar-day" +
-                (inRange ? " mini-calendar-day--highlight" : "")
-              }
+              className={"mini-calendar-day" + (inRange ? " mini-calendar-day--highlight" : "")}
             >
-              {dayNumber}
+              {d.getDate()}
             </div>
           );
         })}
@@ -214,76 +197,40 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ classes, lang }) => {
   );
 };
 
+/** =========================
+ *  BookingCalendar
+ *  ========================= */
 const BookingCalendar: React.FC = () => {
-  const [availableClasses, setAvailableClasses] = useState<AvailableClass[]>(
-    []
-  );
-  const [loadingClasses, setLoadingClasses] = useState(true);
-  const [classesError, setClassesError] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const navigate = useNavigate();
 
-  // 🌍 idioma
   const [lang, setLang] = useState<Lang>("en");
   const t = (key: string) => translations[lang][key];
 
-  // 🔹 Cargar clases públicas para el calendario/landing
+  const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>([]);
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [classesError, setClassesError] = useState<string | null>(null);
+
+  const [selectedGroup, setSelectedGroup] = useState<AvailableClassGroup | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  /** Load classes grouped */
   useEffect(() => {
     const fetchClasses = async () => {
       try {
         setLoadingClasses(true);
         setClassesError(null);
 
-        const res = await api.get("/api/classes");
+        const res = await api.get("/api/classes-grouped");
         const data = res.data;
+        const list = (data?.classes ?? data) as AvailableClassGroup[];
 
-        type BackendClass = {
-          id: number;
-          title: string;
-          trainer_name: string;
-          date_iso: string;
-          time_range: string;
-          modality: "Online" | "Presencial";
-          level: string;
-          spots_left: number;
-          start_date?: string;
-          end_date?: string;
-          description?: string | null;
-        };
-
-        const list = (data.classes ?? data) as BackendClass[];
-
-        const mapped: AvailableClass[] = list.map((cls) => {
-          const startDateISO = cls.start_date ?? cls.date_iso;
-          const endDateISO = cls.end_date ?? cls.date_iso;
-
-          const d = new Date(startDateISO);
-          const locale = lang === "en" ? "en-US" : "es-ES";
-
-          const dateLabel = d.toLocaleDateString(locale, {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          });
-
-          return {
-            id: cls.id,
-            title: cls.title,
-            trainerName: cls.trainer_name,
-            dateLabel,
-            dateISO: cls.date_iso,
-            timeRange: cls.time_range,
-            modality: cls.modality,
-            level: cls.level,
-            spotsLeft: cls.spots_left,
-            startDateISO,
-            endDateISO,
-            description: cls.description ?? null, // 👈 SOLO una vez
-          };
-        });
-
-        setAvailableClasses(mapped);
+        setAvailableGroups(Array.isArray(list) ? list : []);
       } catch (err) {
         console.error("Error cargando clases:", err);
         setClassesError(t("noClassesError"));
@@ -295,98 +242,99 @@ const BookingCalendar: React.FC = () => {
     fetchClasses();
   }, [lang]);
 
-  // 🔹 Verificar si hay admin logueado
+  /** Check admin token */
   useEffect(() => {
-    const checkAdmin = () => {
-      const token = localStorage.getItem("admin_token");
-
-      if (!token) {
-        setIsAdmin(false);
-        return;
-      }
-
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      setIsAdmin(true);
-    };
-
-    checkAdmin();
+    const token = localStorage.getItem("admin_token");
+    if (!token) {
+      setIsAdmin(false);
+      return;
+    }
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    setIsAdmin(true);
   }, []);
 
-  const [selectedClass, setSelectedClass] = useState<AvailableClass | null>(
-    null
-  );
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
+  const selectedSession = useMemo(() => {
+    if (!selectedGroup || !selectedSessionId) return null;
+    return selectedGroup.sessions.find((s) => s.id === selectedSessionId) ?? null;
+  }, [selectedGroup, selectedSessionId]);
 
-  const handleSelectClass = (cls: AvailableClass) => {
-    setSelectedClass(cls);
+  const handleSelectGroup = (g: AvailableClassGroup) => {
+    setSelectedGroup(g);
     setStatus("idle");
     setErrorMessage("");
+
+    // preselecciona la primera sesión si existe
+    const first = g.sessions?.[0]?.id ?? null;
+    setSelectedSessionId(first);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedClass) {
+    if (!selectedGroup) {
       setStatus("error");
       setErrorMessage(t("errorNoClass"));
       return;
     }
-
+    if (!selectedSessionId) {
+      setStatus("error");
+      setErrorMessage(t("errorNoSession"));
+      return;
+    }
     if (!email) {
       setStatus("error");
       setErrorMessage(t("errorNoEmail"));
       return;
     }
 
-    const payload = {
-      class_id: selectedClass.id,
-      name: selectedClass.title,
-      email,
-      notes: `Reserva para la clase "${selectedClass.title}" el ${selectedClass.dateLabel} (${selectedClass.timeRange})`,
-      start_date: selectedClass.dateISO,
-      end_date: selectedClass.dateISO,
-      trainer_name: selectedClass.trainerName,
-      original_start_date: selectedClass.dateISO,
-      original_end_date: selectedClass.dateISO,
-      original_training_days: 1,
-      new_training_days: 1,
-    };
+    const session = selectedGroup.sessions.find((s) => s.id === selectedSessionId);
+    if (!session) {
+      setStatus("error");
+      setErrorMessage(t("errorNoSession"));
+      return;
+    }
+
+    setStatus("loading");
+    setErrorMessage("");
 
     try {
-      setStatus("loading");
-      setErrorMessage("");
+      // Reservamos UNA sesión (id real de class_sessions)
+      const payload = {
+        class_id: session.id,
+        name: selectedGroup.title,
+        email,
+        notes: `Booking for "${selectedGroup.title}" on ${session.date_iso} (${session.time_range})`,
+      };
 
-      await api.get("/sanctum/csrf-cookie");
       await api.post("/api/bookings", payload);
 
       setStatus("success");
-      setEmail("");
     } catch (err: any) {
-      console.error("❌ Error:", err);
-      if (err.response) {
-        setErrorMessage(err.response.data?.message ?? t("genericError"));
-      } else {
-        setErrorMessage(t("unexpectedError"));
-      }
+      console.error("Error creando booking:", err);
       setStatus("error");
+
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Error sending booking.";
+      setErrorMessage(String(msg));
     }
+  };
+
+  /** Total seats label (simple: usa el mínimo cupo entre sesiones como referencia) */
+  const getGroupSpotsLabel = (g: AvailableClassGroup) => {
+    const minSpots = g.sessions.reduce((acc, s) => Math.min(acc, s.spots_left), Number.POSITIVE_INFINITY);
+    const spots = Number.isFinite(minSpots) ? minSpots : 0;
+    return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t("seatsAvailable")}`;
   };
 
   return (
     <div className="booking-page">
       <div className="booking-card">
         <header className="booking-header">
-          <div>
-            <div className="booking-badge">{t("badge")}</div>
-            <h1>{t("headerTitle")}</h1>
-            <p className="booking-subtitle">{t("headerSubtitle")}</p>
-          </div>
-
-          <div className="booking-header-logo">
+          <div className="booking-header-left">
             <img
-              src={Logo}
+              src="/logo.png"
               alt="Alonso & Alonso Academy"
               className="booking-logo"
             />
@@ -398,7 +346,6 @@ const BookingCalendar: React.FC = () => {
               <span>{t("updatedTag")}</span>
             </div>
 
-            {/* 🌍 Toggle idioma */}
             <button
               type="button"
               className="booking-lang-toggle"
@@ -424,6 +371,7 @@ const BookingCalendar: React.FC = () => {
         </header>
 
         <div className="booking-layout">
+          {/* LEFT: class list */}
           <section className="class-list-section">
             <div className="class-list-header">
               <h2>{t("availableClassesTitle")}</h2>
@@ -431,78 +379,87 @@ const BookingCalendar: React.FC = () => {
             </div>
 
             <div className="class-list">
-              {loadingClasses && (
-                <p className="form-message">{t("loadingClasses")}</p>
-              )}
-
-              {classesError && (
-                <p className="form-message error">{classesError}</p>
-              )}
+              {loadingClasses && <p className="form-message">{t("loadingClasses")}</p>}
+              {classesError && <p className="form-message error">{classesError}</p>}
 
               {!loadingClasses &&
                 !classesError &&
-                availableClasses.length === 0 && (
-                  <p className="form-message">{t("noClasses")}</p>
-                )}
+                availableGroups.map((g) => {
+                  const isSelected = selectedGroup?.group_code === g.group_code;
+                  const firstSession = g.sessions?.[0];
+                  const dateLabel = firstSession ? formatDateLabel(firstSession.date_iso, lang) : "";
+                  const timeLabel = firstSession ? firstSession.time_range : "";
 
-              {!loadingClasses &&
-                !classesError &&
-                availableClasses.length > 0 &&
-                availableClasses.map((cls) => (
-                  <button
-                    key={cls.id}
-                    type="button"
-                    className={
-                      "class-card" +
-                      (selectedClass?.id === cls.id
-                        ? " class-card--selected"
-                        : "")
-                    }
-                    onClick={() => handleSelectClass(cls)}
-                  >
-                    <div className="class-card-top">
-                      <span className="class-title">{cls.title}</span>
-                      <span className="class-badge">
-                        <span
-                          className={`dot ${
-                            cls.modality === "Online" ? "online" : "presencial"
-                          }`}
-                        />
-                        {cls.modality === "Online" ? "Online" : "Presencial"}
-                      </span>
+                  return (
+                    <div key={g.group_code} className="class-list-item">
+                      <button
+                        type="button"
+                        className={"class-card" + (isSelected ? " class-card--selected" : "")}
+                        onClick={() => handleSelectGroup(g)}
+                      >
+                        <div className="class-card-top">
+                          <h3 className="class-card-title">{g.title}</h3>
+                          <span className="class-card-pill">
+                            <span className="dot" /> {g.modality.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="class-card-meta">
+                          <span>📅 {dateLabel}</span>
+                          <span>⏰ {timeLabel}</span>
+                        </div>
+
+                        <p className="class-card-desc">{g.description ?? ""}</p>
+
+                        <div className="class-card-bottom">
+                          <span className="class-card-trainer">👤 {g.trainer_name}</span>
+                          <span className="class-card-level">{g.level}</span>
+                          <span className="class-card-spots">{getGroupSpotsLabel(g)}</span>
+                        </div>
+                      </button>
+
+                      {/* ✅ Sessions shown UNDER the selected class */}
+                      {isSelected && (
+                        <div className="class-sessions">
+                          <div className="class-sessions-title">
+                            {t("sessions")} ({g.sessions_count})
+                          </div>
+
+                          <div className="class-sessions-list">
+                            {g.sessions.map((s) => {
+                              const picked = selectedSessionId === s.id;
+                              return (
+                                <button
+                                  type="button"
+                                  key={s.id}
+                                  className={
+                                    "class-session-row" + (picked ? " class-session-row--selected" : "")
+                                  }
+                                  onClick={() => setSelectedSessionId(s.id)}
+                                >
+                                  <span className="class-session-date">{s.date_iso}</span>
+                                  <span className="class-session-time">{s.time_range}</span>
+                                  <span className="class-session-spots">
+                                    {s.spots_left} {s.spots_left === 1 ? t("seats") : t("seatsPlural")}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-
-                    <div className="class-meta">
-                      <span className="class-date">{cls.dateLabel}</span>
-                      <span className="class-time">{cls.timeRange}</span>
-                    </div>
-
-                    {cls.description && (
-                      <p className="class-description">{cls.description}</p>
-                    )}
-
-                    <div className="class-footer">
-                      <span className="class-trainer">
-                        👤 {cls.trainerName}
-                      </span>
-                      <span className="class-level">{cls.level}</span>
-                      <span className="class-spots">
-                        {cls.spotsLeft}{" "}
-                        {cls.spotsLeft === 1 ? t("seats") : t("seatsPlural")}{" "}
-                        {t("seatsAvailable")}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                  );
+                })}
             </div>
           </section>
 
+          {/* RIGHT: details + calendar */}
           <section className="booking-detail-section">
             <div className="booking-detail-card">
-              {/* 🗓️ Calendario SIEMPRE visible con todas las clases */}
-              <MiniCalendar classes={availableClasses} lang={lang} />
+              <MiniCalendar groups={availableGroups} lang={lang} />
 
-              {!selectedClass ? (
+              {!selectedGroup ? (
                 <div className="booking-detail-empty">
                   <h3>{t("clickOnClassTitle")}</h3>
                   <p>{t("clickOnClassText")}</p>
@@ -510,22 +467,53 @@ const BookingCalendar: React.FC = () => {
               ) : (
                 <>
                   <div className="booking-detail-header">
-                    <span className="booking-detail-label">
-                      {t("selectedClassLabel")}
-                    </span>
-                    <h3>{selectedClass.title}</h3>
+                    <span className="booking-detail-label">{t("selectedClassLabel")}</span>
+                    <h3>{selectedGroup.title}</h3>
                     <p className="booking-detail-meta">
-                      {selectedClass.dateLabel} · {selectedClass.timeRange}
-                      <br />
-                      Trainer: {selectedClass.trainerName} ·{" "}
-                      {selectedClass.level} · {selectedClass.modality}
+                      Trainer: {selectedGroup.trainer_name} · {selectedGroup.level} · {selectedGroup.modality}
                     </p>
+                    {selectedGroup.description ? (
+                      <p className="booking-detail-desc">{selectedGroup.description}</p>
+                    ) : null}
+                  </div>
 
-                    {selectedClass.description && (
-                      <p className="booking-detail-description">
-                        {selectedClass.description}
-                      </p>
-                    )}
+                  <div className="booking-detail-sessions">
+                    <h4>
+                      {t("chooseSession")} ({selectedGroup.sessions_count})
+                    </h4>
+
+                    <div className="booking-session-list">
+                      {selectedGroup.sessions.map((s) => {
+                        const picked = selectedSessionId === s.id;
+                        return (
+                          <label
+                            key={s.id}
+                            className={"booking-session-row" + (picked ? " booking-session-row--selected" : "")}
+                          >
+                            <input
+                              type="radio"
+                              name="session"
+                              checked={picked}
+                              onChange={() => setSelectedSessionId(s.id)}
+                            />
+                            <div className="booking-session-info">
+                              <div className="booking-session-date">{s.date_iso}</div>
+                              <div className="booking-session-time">{s.time_range}</div>
+                            </div>
+                            <div className="booking-session-spots">
+                              {s.spots_left} {s.spots_left === 1 ? t("seats") : t("seatsPlural")}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {selectedSession ? (
+                      <div className="booking-selected-session">
+                        <strong>{t("selectedSession")}:</strong>{" "}
+                        {selectedSession.date_iso} · {selectedSession.time_range}
+                      </div>
+                    ) : null}
                   </div>
 
                   <form onSubmit={handleSubmit} className="booking-detail-form">
@@ -545,19 +533,11 @@ const BookingCalendar: React.FC = () => {
                     )}
 
                     {status === "success" && (
-                      <p className="form-message success">
-                        {t("successBooked")}
-                      </p>
+                      <p className="form-message success">{t("successBooked")}</p>
                     )}
 
-                    <button
-                      type="submit"
-                      className="booking-button"
-                      disabled={status === "loading"}
-                    >
-                      {status === "loading"
-                        ? t("submitLoading")
-                        : t("submitLabel")}
+                    <button type="submit" className="booking-button" disabled={status === "loading"}>
+                      {status === "loading" ? t("submitLoading") : t("submitLabel")}
                     </button>
 
                     <p className="booking-privacy">{t("privacyText")}</p>

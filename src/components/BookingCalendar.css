@@ -5,19 +5,13 @@
 .booking-page {
   position: fixed;
   inset: 0;
-  background: radial-gradient(
-    circle at top left,
-    #d10000 0,
-    #17161c 45%,
-    #3f4353 100%
-  );
+  background: radial-gradient(circle at top left, #d10000 0, #17161c 45%, #3f4353 100%);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding: 3rem 2rem;
   overflow-y: auto;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /* =========================== */
@@ -30,14 +24,13 @@
   background: rgba(15, 23, 42, 0.97);
   border-radius: 32px;
   padding: 3rem 3.25rem;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(148, 163, 184, 0.15);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(148, 163, 184, 0.15);
   color: #e5e7eb;
   backdrop-filter: blur(10px);
 }
 
 /* =========================== */
-/* 🧭   HEADER                 */
+/* 🧭   HEADER                */
 /* =========================== */
 
 .booking-header {
@@ -48,44 +41,7 @@
   margin-bottom: 2.5rem;
 }
 
-.booking-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.15);
-  color: #bfdbfe;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.booking-badge::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #22c55e;
-  box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.25);
-}
-
-.booking-header h1 {
-  margin-top: 0.75rem;
-  font-size: 2.3rem;
-  letter-spacing: -0.04em;
-  color: #f9fafb;
-}
-
-.booking-subtitle {
-  margin-top: 0.5rem;
-  max-width: 32rem;
-  color: #9ca3af;
-  font-size: 0.95rem;
-}
-
-/* logo y tag a la derecha */
-
+/* logo */
 .booking-header-logo {
   flex-shrink: 0;
   display: flex;
@@ -98,6 +54,7 @@
   object-fit: contain;
 }
 
+/* right buttons */
 .booking-header-right {
   display: flex;
   align-items: center;
@@ -123,8 +80,6 @@
   background: #22c55e;
 }
 
-/* toggle idioma */
-
 .booking-lang-toggle {
   padding: 0.35rem 0.8rem;
   border-radius: 999px;
@@ -133,8 +88,7 @@
   color: #e5e7eb;
   font-size: 0.8rem;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease,
-    border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
 }
 
 .booking-lang-toggle:hover {
@@ -143,8 +97,6 @@
   transform: translateY(-1px);
 }
 
-/* botón admin/login */
-
 .booking-login-btn {
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
@@ -152,6 +104,8 @@
   color: #f97316;
   font-size: 0.85rem;
   text-decoration: none;
+  background: transparent;
+  cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 
@@ -167,7 +121,8 @@
 
 .booking-layout {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  /* ✅ izquierda más grande para “expandir” la tarjeta hacia la derecha */
+  grid-template-columns: 1.65fr 1fr;
   gap: 2.5rem;
   align-items: flex-start;
 }
@@ -180,6 +135,9 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+
+  /* ✅ ayuda a que no se estreche */
+  min-width: 560px;
 }
 
 .class-list-header h2 {
@@ -202,8 +160,14 @@
   gap: 0.85rem;
 }
 
+.class-list-item {
+  width: 100%;
+}
+
+/* ✅ tarjeta más ancha */
 .class-card {
   width: 100%;
+  max-width: 740px; /* 👈 aquí se expande */
   text-align: left;
   border-radius: 1.25rem;
   padding: 0.95rem 1rem;
@@ -214,8 +178,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  transition: transform 0.12s ease, box-shadow 0.12s ease,
-    border-color 0.12s ease, background 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
 .class-card:hover {
@@ -250,6 +213,9 @@
   border-radius: 999px;
   background: rgba(59, 130, 246, 0.18);
   color: #bfdbfe;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .class-meta {
@@ -266,6 +232,13 @@
 
 .class-time::before {
   content: "⏰ ";
+}
+
+.class-card-desc {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  opacity: 0.95;
+  margin: 0.25rem 0 0.15rem;
 }
 
 .class-footer {
@@ -359,7 +332,7 @@
 }
 
 /* =========================== */
-/* 📝   INPUTS / TEXTAREAS     */
+/* 📝   INPUTS                */
 /* =========================== */
 
 .form-group label {
@@ -379,8 +352,7 @@
   color: #f9fafb;
   font-size: 0.9rem;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease,
-    background-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .form-group input::placeholder,
@@ -391,13 +363,12 @@
 .form-group input:focus,
 .form-group textarea:focus {
   border-color: #60a5fa;
-  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.85),
-    0 0 0 10px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.85), 0 0 0 10px rgba(37, 99, 235, 0.2);
   background: rgba(15, 23, 42, 0.95);
 }
 
 /* =========================== */
-/* 🔘 BOTÓN                    */
+/* 🔘 BOTÓN                   */
 /* =========================== */
 
 .booking-button {
@@ -415,15 +386,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  box-shadow: 0 15px 35px rgba(37, 99, 235, 0.45),
-    0 0 0 1px rgba(15, 23, 42, 0.9);
+  box-shadow: 0 15px 35px rgba(37, 99, 235, 0.45), 0 0 0 1px rgba(15, 23, 42, 0.9);
   transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
 
 .booking-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 22px 45px rgba(37, 99, 235, 0.5),
-    0 0 0 1px rgba(15, 23, 42, 0.9);
+  box-shadow: 0 22px 45px rgba(37, 99, 235, 0.5), 0 0 0 1px rgba(15, 23, 42, 0.9);
 }
 
 .booking-button:active {
@@ -479,7 +448,7 @@
 }
 
 /* =========================== */
-/* 🗓️ MINI CALENDARIO GLOBAL */
+/* 🗓️ MINI CALENDARIO         */
 /* =========================== */
 
 .booking-mini-calendar {
@@ -548,6 +517,10 @@
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
 }
 
+/* =========================== */
+/* ✅ SESIONES DEBAJO          */
+/* =========================== */
+
 .class-sessions {
   margin-top: 12px;
   padding-top: 12px;
@@ -562,15 +535,6 @@
   margin-bottom: 8px;
 }
 
-.class-session-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  margin-bottom: 8px;
-}
 .class-sessions-list {
   display: flex;
   flex-direction: column;
@@ -578,11 +542,16 @@
 }
 
 .class-session-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.22);
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease,
-    background 0.12s ease;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
 .class-session-row:hover {
@@ -634,17 +603,17 @@
     align-items: flex-start;
   }
 
-  .booking-header-tag {
-    margin-top: 1rem;
-  }
-
   .booking-layout {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
 
-  .booking-detail-section {
-    order: -1; /* panel de detalle primero en mobile */
+  .class-list-section {
+    min-width: 0;
+  }
+
+  .class-card {
+    max-width: 100%;
   }
 }
 
@@ -655,9 +624,5 @@
 
   .booking-card {
     padding: 1.75rem 1.3rem;
-  }
-
-  .booking-header h1 {
-    font-size: 1.7rem;
   }
 }

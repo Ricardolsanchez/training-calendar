@@ -49,7 +49,6 @@ const translations: Record<Lang, Record<string, string>> = {
     seatsPlural: "seats",
     seatsAvailable: "Available",
     sessions: "Sessions",
-    chooseSession: "Choose a session",
     highlightedHint: "Highlighted: days with classes",
     selectedSession: "Selected session",
   },
@@ -77,7 +76,6 @@ const translations: Record<Lang, Record<string, string>> = {
     seatsPlural: "cupos",
     seatsAvailable: "Disponibles",
     sessions: "Sesiones",
-    chooseSession: "Escoge una sesión",
     highlightedHint: "Resaltado: días con clases",
     selectedSession: "Sesión seleccionada",
   },
@@ -220,6 +218,7 @@ const BookingCalendar: React.FC = () => {
     };
 
     fetchClasses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
   useEffect(() => {
@@ -308,12 +307,12 @@ const BookingCalendar: React.FC = () => {
       <div className="booking-card">
         <header className="booking-header">
           <div className="booking-header-left booking-header-logo">
+            {/* ✅ Logo desde /public/logo.png */}
             <img src="/logo.png" alt="Alonso & Alonso Academy" className="booking-logo" />
           </div>
 
           <div className="booking-header-right">
             <div className="booking-header-tag">
-              {/* este dot es el del header (verde) */}
               <span className="dot" />
               <span>{t("updatedTag")}</span>
             </div>
@@ -363,17 +362,15 @@ const BookingCalendar: React.FC = () => {
 
                   return (
                     <div key={g.group_code} className="class-list-item">
-                      {/* 👇 mantenemos class-card (ya lo tienes en tu CSS) */}
                       <button
                         type="button"
                         className={"class-card" + (isSelected ? " class-card--selected" : "")}
                         onClick={() => handleSelectGroup(g)}
                       >
                         <div className="class-card-top">
-                          {/* 👇 IMPORTANTE: usa los nombres que tu CSS ya estiliza */}
                           <span className="class-title">{g.title}</span>
 
-                          {/* badge “ONLINE” con dot verde/rojo */}
+                          {/* ✅ Badge pill con dot */}
                           <span className="class-badge">
                             <span className={`dot ${modalityDotClass}`} />
                             {g.modality.toUpperCase()}
@@ -385,7 +382,7 @@ const BookingCalendar: React.FC = () => {
                           <span className="class-time">{timeLabel}</span>
                         </div>
 
-                        <p className="class-card-desc">{g.description ?? ""}</p>
+                        {!!g.description && <p className="class-card-desc">{g.description}</p>}
 
                         <div className="class-footer">
                           <span className="class-trainer">👤 {g.trainer_name}</span>
@@ -394,7 +391,7 @@ const BookingCalendar: React.FC = () => {
                         </div>
                       </button>
 
-                      {/* sesiones debajo */}
+                      {/* ✅ sesiones debajo */}
                       {isSelected && (
                         <div className="class-sessions">
                           <div className="class-sessions-title">
@@ -404,11 +401,14 @@ const BookingCalendar: React.FC = () => {
                           <div className="class-sessions-list">
                             {g.sessions.map((s) => {
                               const picked = selectedSessionId === s.id;
+
                               return (
                                 <button
                                   type="button"
                                   key={s.id}
-                                  className={"class-session-row" + (picked ? " class-session-row--selected" : "")}
+                                  className={
+                                    "class-session-row" + (picked ? " class-session-row--selected" : "")
+                                  }
                                   onClick={() => setSelectedSessionId(s.id)}
                                 >
                                   <span className="class-session-date">{s.date_iso}</span>
@@ -453,7 +453,6 @@ const BookingCalendar: React.FC = () => {
                     ) : null}
                   </div>
 
-                  {/* Si quieres, aquí también puedes mantener la lista de sesiones */}
                   {selectedSession ? (
                     <p className="booking-detail-meta">
                       <strong>{t("selectedSession")}:</strong> {selectedSession.date_iso} · {selectedSession.time_range}

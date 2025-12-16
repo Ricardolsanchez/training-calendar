@@ -38,6 +38,7 @@ type AvailableClass = {
   modality: "Online" | "Presencial";
   spots_left: number;
   description: string | null;
+  group_code?: string | null;
 };
 
 type GroupedSession = {
@@ -45,9 +46,6 @@ type GroupedSession = {
   date_iso: string;
   time_range: string;
   spots_left: number;
-  modality?: "Online" | "Presencial";
-  trainer_name?: string | null;
-  title?: string;
 };
 
 type GroupedClass = {
@@ -81,8 +79,7 @@ const translations: Record<Lang, Record<string, string>> = {
   en: {
     adminBadge: "Admin Panel",
     adminTitle: "Training Management",
-    adminSubtitle:
-      "Review the reservations received and manage the available classes.",
+    adminSubtitle: "Review the reservations received and manage the available classes.",
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabBookings: "Bookings",
@@ -162,26 +159,22 @@ const translations: Record<Lang, Record<string, string>> = {
     kpiTotalAttended: "Total attended (overall)",
     kpiLoadError: "Could not load KPIs.",
 
-    sessions: "Sessions",
     sessionsCount: "Sessions",
     expand: "Expand",
     collapse: "Collapse",
-
-    addSessionsTitle: "Add sessions",
-    addSessionsHint:
-      "Define the start/end time for each session, then save. Times will be added to this class group.",
-    sessionsCountLabel: "Number of sessions",
-    addSessionsBtn: "Save sessions",
-
     carouselPrev: "Previous",
     carouselNext: "Next",
     sessionsPanelTitle: "Sessions for",
+
+    addSessionsTitle: "Sessions (edit hours / count)",
+    addSessionsHint:
+      "Edit the start/end time for each session. Increase/decrease the number of sessions and save.",
+    sessionsCountLabel: "Number of sessions",
   },
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-    adminSubtitle:
-      "Revisa las reservas recibidas y administra las clases disponibles.",
+    adminSubtitle: "Revisa las reservas recibidas y administra las clases disponibles.",
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabBookings: "Reservas",
@@ -261,20 +254,17 @@ const translations: Record<Lang, Record<string, string>> = {
     kpiTotalAttended: "Total asistentes (global)",
     kpiLoadError: "No se pudieron cargar los KPIs.",
 
-    sessions: "Sesiones",
     sessionsCount: "Sesiones",
     expand: "Ver",
     collapse: "Ocultar",
-
-    addSessionsTitle: "Agregar sesiones",
-    addSessionsHint:
-      "Define la hora de inicio/fin de cada sesión y guarda. Se agregarán a este grupo de clase.",
-    sessionsCountLabel: "Número de sesiones",
-    addSessionsBtn: "Guardar sesiones",
-
     carouselPrev: "Anterior",
     carouselNext: "Siguiente",
     sessionsPanelTitle: "Sesiones de",
+
+    addSessionsTitle: "Sesiones (editar horas / cantidad)",
+    addSessionsHint:
+      "Edita la hora inicio/fin de cada sesión. Sube/baja la cantidad de sesiones y guarda.",
+    sessionsCountLabel: "Número de sesiones",
   },
 };
 
@@ -327,16 +317,18 @@ function isKpis(data: unknown): data is Kpis {
   );
 }
 
-type SessionDraft = { start_time: string; end_time: string };
+type SessionDraft = { id?: number; start_time: string; end_time: string };
+
+const parseTimeRange = (tr: string) => {
+  const [a, b] = (tr || "").split("-").map((x) => x.trim());
+  return { start_time: a || "", end_time: b || "" };
+};
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang>("en");
-  const t = useCallback(
-    (key: string) => translations[lang][key] ?? key,
-    [lang]
-  );
+  const t = useCallback((key: string) => translations[lang][key] ?? key, [lang]);
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
@@ -357,11 +349,8 @@ const AdminPanel: React.FC = () => {
 
   /** Grouped classes + selection */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
-  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(
-    null
-  );
-  const toggleGroup = (code: string) =>
-    setExpandedGroupCode((prev) => (prev === code ? null : code));
+  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
+  const toggleGroup = (code: string) => setExpandedGroupCode((prev) => (prev === code ? null : code));
 
   /** Carousel */
   const carouselRef = useRef<HTMLDivElement | null>(null);
@@ -371,12 +360,9 @@ const AdminPanel: React.FC = () => {
     el.scrollBy({ left: dir * 420, behavior: "smooth" });
   };
 
-  /** Sessions Draft (NOW used for both NEW + EDIT) */
+  /** Sessions Draft (NEW + EDIT) */
   const [sessionsCount, setSessionsCount] = useState<number>(1);
-  const [sessions, setSessions] = useState<SessionDraft[]>([
-    { start_time: "", end_time: "" },
-  ]);
-  const [addingSessions, setAddingSessions] = useState(false);
+  const [sessions, setSessions] = useState<SessionDraft[]>([{ start_time: "", end_time: "" }]);
 
   const setCount = (n: number) => {
     const safe = Math.max(1, Math.min(20, Number.isFinite(n) ? n : 1));
@@ -388,37 +374,9 @@ const AdminPanel: React.FC = () => {
     });
   };
 
-  const selectedGroup =
-    expandedGroupCode
-      ? groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null
-      : null;
-
-  const downloadKpisCsv = async () => {
-    try {
-      await ensureCsrf();
-      const res = await api.get("/api/admin/stats/kpis.csv", {
-        responseType: "blob",
-      });
-
-      const blob = new Blob([res.data], { type: "text/csv;charset=utf-8;" });
-      const url = window.URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `kpis_${new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/[:T]/g, "-")}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error downloading KPIs CSV:", err);
-      alert("Could not download KPIs CSV");
-    }
-  };
+  const selectedGroup = expandedGroupCode
+    ? groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null
+    : null;
 
   /** Fetch helpers */
   const fetchBookings = useCallback(async () => {
@@ -453,6 +411,7 @@ const AdminPanel: React.FC = () => {
           modality: cls.modality,
           spots_left: cls.spots_left,
           description: cls.description ?? null,
+          group_code: cls.group_code ?? null,
         };
       });
 
@@ -485,6 +444,7 @@ const AdminPanel: React.FC = () => {
     fetchGrouped();
   }, [activeTab, fetchGrouped]);
 
+  /** Format helpers */
   const formatDate = (value: string) => {
     if (!value) return "—";
     const [y, m, d] = value.split("-");
@@ -504,25 +464,20 @@ const AdminPanel: React.FC = () => {
   };
 
   const totalDays = (b: Booking) => {
-    if (typeof b.new_training_days === "number" && b.new_training_days > 0)
-      return b.new_training_days;
-    if (
-      typeof b.original_training_days === "number" &&
-      b.original_training_days > 0
-    )
-      return b.original_training_days;
+    if (typeof b.new_training_days === "number" && b.new_training_days > 0) return b.new_training_days;
+    if (typeof b.original_training_days === "number" && b.original_training_days > 0) return b.original_training_days;
 
     try {
       const s = new Date(b.start_date);
       const e = new Date(b.end_date);
-      const diff =
-        Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const diff = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       return diff > 0 ? diff : 1;
     } catch {
       return 1;
     }
   };
 
+  /** Booking actions */
   const openEditBookingModal = (booking: Booking) => {
     setEditBooking(booking);
     setShowEditBookingModal(true);
@@ -541,7 +496,6 @@ const AdminPanel: React.FC = () => {
 
   const handleDeleteBooking = async (id: number) => {
     if (!window.confirm(t("confirmDeleteBooking"))) return;
-
     try {
       await ensureCsrf();
       await api.delete(`/api/admin/bookings/${id}`);
@@ -556,10 +510,7 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
       await api.put(`/api/admin/bookings/${id}/status`, { status });
-
-      setBookings((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, status } : b))
-      );
+      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
     } catch (err) {
       console.error("Error updating booking status:", err);
       alert(t("errorUpdateBookingStatus"));
@@ -575,18 +526,14 @@ const AdminPanel: React.FC = () => {
         attendedbutton: next,
       });
 
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === booking.id ? { ...b, attendedbutton: next } : b
-        )
-      );
+      setBookings((prev) => prev.map((b) => (b.id === booking.id ? { ...b, attendedbutton: next } : b)));
     } catch (err) {
       console.error("Error updating attendance:", err);
       alert("Could not update attendance");
     }
   };
 
-  /** NEW/EDIT class modal */
+  /** New/Edit class modal */
   const openNewClassModal = () => {
     setIsNewClass(true);
     setEditClass({
@@ -601,10 +548,10 @@ const AdminPanel: React.FC = () => {
       modality: "Online",
       spots_left: 0,
       description: null,
+      group_code: null,
     });
     setShowClassModal(true);
 
-    // sessions for new class
     setCount(1);
     setSessions([{ start_time: "", end_time: "" }]);
   };
@@ -614,19 +561,49 @@ const AdminPanel: React.FC = () => {
     setEditClass({ ...cls });
     setShowClassModal(true);
 
-    // default: 1 (you can add more)
-    setCount(1);
-    setSessions([{ start_time: "", end_time: "" }]);
+    // Busca su grupo por group_code; si no hay, intenta por id dentro de groupedClasses
+    const code =
+      cls.group_code ||
+      groupedClasses.find((g) => g.sessions?.some((s) => s.id === cls.id))?.group_code ||
+      null;
+
+    const group = code ? groupedClasses.find((g) => g.group_code === code) : null;
+
+    if (group && group.sessions?.length) {
+      setCount(group.sessions.length);
+      setSessions(
+        group.sessions.map((s) => ({
+          id: s.id,
+          ...parseTimeRange(s.time_range),
+        }))
+      );
+
+      // sincroniza los inputs principales con la sesión 1
+      const first = group.sessions[0];
+      const tr = parseTimeRange(first?.time_range || "");
+      setEditClass((prev) =>
+        prev
+          ? {
+              ...prev,
+              group_code: group.group_code,
+              start_time: tr.start_time,
+              end_time: tr.end_time,
+            }
+          : prev
+      );
+    } else {
+      setCount(1);
+      setSessions([{ id: cls.id, start_time: cls.start_time || "", end_time: cls.end_time || "" }]);
+    }
   };
 
-  /** Save class (UPDATED: create N sessions when NEW) */
+  /** Save class */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
     try {
       await ensureCsrf();
 
-      // Use session 1 as base times
       const baseStart = sessions?.[0]?.start_time || editClass.start_time;
       const baseEnd = sessions?.[0]?.end_time || editClass.end_time;
 
@@ -643,46 +620,34 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
-        // 1) create base class (session 1)
+        // 1) crea la sesión base
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        // 2) create extra sessions
-        const extra = sessions
-          .slice(1)
-          .filter((s) => s.start_time && s.end_time);
-
+        // 2) crea sesiones adicionales (sincroniza por POST addSessions)
+        const extra = sessions.slice(1).filter((s) => s.start_time && s.end_time);
         if (extra.length > 0) {
           await api.post(`/api/admin/classes/${saved.id}/sessions`, {
-            sessions: extra.map((s) => ({
-              start_time: s.start_time,
-              end_time: s.end_time,
-            })),
+            sessions: extra.map((s) => ({ start_time: s.start_time, end_time: s.end_time })),
           });
         }
 
-        // refresh lists
         await fetchClasses();
         await fetchGrouped();
       } else {
-        // edit just updates that session row (your existing behavior)
+        // 1) actualiza la sesión base
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
-        setClasses((prev) =>
-          prev.map((c) =>
-            c.id === editClass.id
-              ? {
-                  ...c,
-                  ...editClass,
-                  start_time: baseStart,
-                  end_time: baseEnd,
-                  description: editClass.description ?? null,
-                }
-              : c
-          )
-        );
+        // 2) sincroniza todas las sesiones del grupo (editar cantidad + horas)
+        await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
+          sessions: sessions.map((s) => ({
+            id: s.id,
+            start_time: s.start_time,
+            end_time: s.end_time,
+          })),
+        });
 
-        // refresh grouped in case modal changes affect UI
+        await fetchClasses();
         await fetchGrouped();
       }
 
@@ -694,39 +659,26 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  /** Add sessions to existing group (button inside modal) */
-  const addSessionsToClass = async () => {
-    if (!editClass || isNewClass) return;
-
-    const hasEmpty = sessions.some((s) => !s.start_time || !s.end_time);
-    if (hasEmpty) {
-      alert("Please fill start/end time for all sessions.");
-      return;
-    }
-
-    setAddingSessions(true);
+  /** Stats */
+  const downloadKpisCsv = async () => {
     try {
       await ensureCsrf();
-
-      await api.post(`/api/admin/classes/${editClass.id}/sessions`, {
-        sessions: sessions.map((s) => ({
-          start_time: s.start_time,
-          end_time: s.end_time,
-        })),
-      });
-
-      await fetchGrouped();
-      alert("Sessions saved ✅");
-    } catch (err: any) {
-      console.error("Error saving sessions:", err);
-      if (err.response?.data) alert(JSON.stringify(err.response.data, null, 2));
-      else alert("Could not save sessions.");
-    } finally {
-      setAddingSessions(false);
+      const res = await api.get("/api/admin/stats/kpis.csv", { responseType: "blob" });
+      const blob = new Blob([res.data], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kpis_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error downloading KPIs CSV:", err);
+      alert("Could not download KPIs CSV");
     }
   };
 
-  /** Stats */
   const fetchStats = async () => {
     setStatsLoading(true);
     setStatsError(null);
@@ -785,27 +737,15 @@ const AdminPanel: React.FC = () => {
           </div>
 
           <div className="admin-header-actions">
-            <button
-              type="button"
-              className="admin-lang-toggle"
-              onClick={() => setLang(lang === "en" ? "es" : "en")}
-            >
+            <button type="button" className="admin-lang-toggle" onClick={() => setLang(lang === "en" ? "es" : "en")}>
               {lang === "en" ? "ES" : "EN"}
             </button>
 
-            <button
-              type="button"
-              className="admin-back-button"
-              onClick={() => navigate("/")}
-            >
+            <button type="button" className="admin-back-button" onClick={() => navigate("/")}>
               {t("backToCalendar")}
             </button>
 
-            <button
-              type="button"
-              className="admin-logout-button"
-              onClick={handleLogout}
-            >
+            <button type="button" className="admin-logout-button" onClick={handleLogout}>
               {t("logout")}
             </button>
           </div>
@@ -814,10 +754,7 @@ const AdminPanel: React.FC = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "bookings" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "bookings" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("bookings")}
           >
             {t("tabBookings")}
@@ -825,10 +762,7 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "classes" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
@@ -836,10 +770,7 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "stats" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "stats" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("stats")}
           >
             {t("tabStats")}
@@ -851,9 +782,7 @@ const AdminPanel: React.FC = () => {
           <section className="admin-table-section">
             <h2 className="admin-table-title">{t("bookingListTitle")}</h2>
 
-            {bookings.length === 0 && (
-              <p className="admin-message">{t("noBookings")}</p>
-            )}
+            {bookings.length === 0 && <p className="admin-message">{t("noBookings")}</p>}
 
             {bookings.length > 0 && (
               <div className="admin-table-wrapper">
@@ -877,11 +806,7 @@ const AdminPanel: React.FC = () => {
                   <tbody>
                     {bookings.map((b) => {
                       const attendanceLabel =
-                        b.attendedbutton === true
-                          ? "Attended"
-                          : b.attendedbutton === false
-                          ? "Not attended"
-                          : "Not marked";
+                        b.attendedbutton === true ? "Attended" : b.attendedbutton === false ? "Not attended" : "Not marked";
 
                       return (
                         <tr key={b.id}>
@@ -891,9 +816,7 @@ const AdminPanel: React.FC = () => {
                           <td>{formatDate(b.end_date)}</td>
                           <td>{totalDays(b)}</td>
                           <td>{b.trainer_name || "—"}</td>
-                          <td className="admin-description-cell">
-                            {b.notes || "—"}
-                          </td>
+                          <td className="admin-description-cell">{b.notes || "—"}</td>
                           <td>{formatDateTime(b.created_at)}</td>
 
                           <td>
@@ -903,8 +826,7 @@ const AdminPanel: React.FC = () => {
                               onClick={() => toggleAttendance(b)}
                               title={attendanceLabel}
                             >
-                              {b.attendedbutton === true ? "✅" : "⬜"}{" "}
-                              {attendanceLabel}
+                              {b.attendedbutton === true ? "✅" : "⬜"} {attendanceLabel}
                             </button>
                           </td>
 
@@ -929,31 +851,15 @@ const AdminPanel: React.FC = () => {
 
                           <td>
                             <div className="admin-actions">
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() =>
-                                  updateBookingStatus(b.id, "accepted")
-                                }
-                              >
+                              <button type="button" className="btn btn-primary" onClick={() => updateBookingStatus(b.id, "accepted")}>
                                 ✅ {t("btnAccept")}
                               </button>
 
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                onClick={() =>
-                                  updateBookingStatus(b.id, "denied")
-                                }
-                              >
+                              <button type="button" className="btn btn-danger" onClick={() => updateBookingStatus(b.id, "denied")}>
                                 ❌ {t("btnDeny")}
                               </button>
 
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => openEditBookingModal(b)}
-                              >
+                              <button type="button" className="btn btn-secondary" onClick={() => openEditBookingModal(b)}>
                                 ✏️
                               </button>
 
@@ -976,23 +882,17 @@ const AdminPanel: React.FC = () => {
           </section>
         )}
 
-        {/* CLASSES (Carousel + sessions panel below) */}
+        {/* CLASSES */}
         {activeTab === "classes" && (
           <section className="admin-table-section">
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("classesTitle")}</h2>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={openNewClassModal}
-              >
+              <button type="button" className="btn btn-primary" onClick={openNewClassModal}>
                 {t("addNewClass")}
               </button>
             </div>
 
-            {groupedClasses.length === 0 && (
-              <p className="admin-message">{t("noClasses")}</p>
-            )}
+            {groupedClasses.length === 0 && <p className="admin-message">{t("noClasses")}</p>}
 
             {groupedClasses.length > 0 && (
               <>
@@ -1015,9 +915,7 @@ const AdminPanel: React.FC = () => {
                       return (
                         <div
                           key={g.group_code}
-                          className={
-                            "class-card" + (isActive ? " class-card--active" : "")
-                          }
+                          className={"class-card" + (isActive ? " class-card--active" : "")}
                           role="button"
                           tabIndex={0}
                           onClick={() => toggleGroup(g.group_code)}
@@ -1040,22 +938,14 @@ const AdminPanel: React.FC = () => {
 
                           <div className="class-card-meta">
                             <div>
-                              <strong>{t("colClassTrainer")}:</strong>{" "}
-                              {g.trainer_name || "—"}
+                              <strong>{t("colClassTrainer")}:</strong> {g.trainer_name || "—"}
                             </div>
                           </div>
 
                           <div className="class-card-desc">{g.description || "—"}</div>
 
-                          <div
-                            className="class-card-actions"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-outline"
-                              onClick={() => toggleGroup(g.group_code)}
-                            >
+                          <div className="class-card-actions" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className="btn btn-secondary btn-outline" onClick={() => toggleGroup(g.group_code)}>
                               {isActive ? `➖ ${t("collapse")}` : `➕ ${t("expand")}`}
                             </button>
 
@@ -1089,7 +979,7 @@ const AdminPanel: React.FC = () => {
                   </button>
                 </div>
 
-                {/* ✅ Sessions panel below */}
+                {/* Sessions panel below */}
                 {selectedGroup && (
                   <div className="sessions-below">
                     <div className="sessions-below-header">
@@ -1141,11 +1031,7 @@ const AdminPanel: React.FC = () => {
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("tabStats")}</h2>
 
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={downloadKpisCsv}
-              >
+              <button type="button" className="btn btn-secondary" onClick={downloadKpisCsv}>
                 ⬇️ Download CSV
               </button>
             </div>
@@ -1157,9 +1043,7 @@ const AdminPanel: React.FC = () => {
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiTotalClasses")}</div>
-                  <div className="admin-kpi-value">
-                    {kpis.total_classes_created}
-                  </div>
+                  <div className="admin-kpi-value">{kpis.total_classes_created}</div>
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiAccepted")}</div>
@@ -1171,9 +1055,7 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiNotAttended")}</div>
-                  <div className="admin-kpi-value">
-                    {kpis.not_attended_total}
-                  </div>
+                  <div className="admin-kpi-value">{kpis.not_attended_total}</div>
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiNotMarked")}</div>
@@ -1181,9 +1063,7 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiTotalAttended")}</div>
-                  <div className="admin-kpi-value">
-                    {kpis.total_attended_overall}
-                  </div>
+                  <div className="admin-kpi-value">{kpis.total_attended_overall}</div>
                 </div>
               </div>
             )}
@@ -1224,19 +1104,14 @@ const AdminPanel: React.FC = () => {
               </>
             )}
 
-            {!statsLoading && !statsError && !kpis && (
-              <p className="admin-message">{t("statsNoData")}</p>
-            )}
+            {!statsLoading && !statsError && !kpis && <p className="admin-message">{t("statsNoData")}</p>}
           </section>
         )}
       </div>
 
       {/* MODAL EDIT BOOKING */}
       {showEditBookingModal && editBooking && (
-        <div
-          className="admin-modal-backdrop"
-          onMouseDown={() => setShowEditBookingModal(false)}
-        >
+        <div className="admin-modal-backdrop" onMouseDown={() => setShowEditBookingModal(false)}>
           <div className="admin-modal" onMouseDown={(e) => e.stopPropagation()}>
             <h3>{t("modalEditBookingTitle")}</h3>
 
@@ -1245,25 +1120,18 @@ const AdminPanel: React.FC = () => {
               className="form-input"
               type="text"
               value={editBooking.name}
-              onChange={(e) =>
-                setEditBooking({ ...editBooking, name: e.target.value })
-              }
+              onChange={(e) => setEditBooking({ ...editBooking, name: e.target.value })}
             />
 
             <label>{t("modalNotesLabel")}</label>
             <textarea
               className="form-textarea"
               value={editBooking.notes ?? ""}
-              onChange={(e) =>
-                setEditBooking({ ...editBooking, notes: e.target.value })
-              }
+              onChange={(e) => setEditBooking({ ...editBooking, notes: e.target.value })}
             />
 
             <div className="admin-modal-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowEditBookingModal(false)}
-              >
+              <button className="btn btn-secondary" onClick={() => setShowEditBookingModal(false)}>
                 {t("modalCancel")}
               </button>
 
@@ -1275,16 +1143,10 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL NEW / EDIT CLASS (scrollable) */}
+      {/* MODAL NEW / EDIT CLASS */}
       {showClassModal && editClass && (
-        <div
-          className="admin-modal-backdrop"
-          onMouseDown={() => setShowClassModal(false)}
-        >
-          <div
-            className="admin-modal admin-modal-dark admin-modal-scroll"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
+        <div className="admin-modal-backdrop" onMouseDown={() => setShowClassModal(false)}>
+          <div className="admin-modal admin-modal-dark admin-modal-scroll" onMouseDown={(e) => e.stopPropagation()}>
             <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
 
             <label>{t("labelClassTitle")}</label>
@@ -1353,7 +1215,6 @@ const AdminPanel: React.FC = () => {
                   onChange={(e) => {
                     const v = e.target.value;
                     setEditClass({ ...editClass, start_time: v });
-                    // keep session #1 synced
                     setSessions((prev) => {
                       const next = [...prev];
                       next[0] = { ...(next[0] || { start_time: "", end_time: "" }), start_time: v };
@@ -1371,7 +1232,6 @@ const AdminPanel: React.FC = () => {
                   onChange={(e) => {
                     const v = e.target.value;
                     setEditClass({ ...editClass, end_time: v });
-                    // keep session #1 synced
                     setSessions((prev) => {
                       const next = [...prev];
                       next[0] = { ...(next[0] || { start_time: "", end_time: "" }), end_time: v };
@@ -1387,10 +1247,7 @@ const AdminPanel: React.FC = () => {
               className="form-select"
               value={editClass.modality}
               onChange={(e) =>
-                setEditClass({
-                  ...editClass,
-                  modality: e.target.value as "Online" | "Presencial",
-                })
+                setEditClass({ ...editClass, modality: e.target.value as "Online" | "Presencial" })
               }
             >
               <option value="Presencial">{t("typeInPerson")}</option>
@@ -1403,12 +1260,7 @@ const AdminPanel: React.FC = () => {
               type="number"
               min={0}
               value={editClass.spots_left}
-              onChange={(e) =>
-                setEditClass({
-                  ...editClass,
-                  spots_left: Number(e.target.value),
-                })
-              }
+              onChange={(e) => setEditClass({ ...editClass, spots_left: Number(e.target.value) })}
             />
 
             <label>{t("labelDescription")}</label>
@@ -1418,12 +1270,9 @@ const AdminPanel: React.FC = () => {
               onChange={(e) => setEditClass({ ...editClass, description: e.target.value })}
             />
 
-            {/* ✅ Sessions block: NOW shown for NEW + EDIT */}
             <hr style={{ opacity: 0.2, margin: "16px 0" }} />
             <h4 style={{ margin: "0 0 8px 0" }}>{t("addSessionsTitle")}</h4>
-            <p style={{ margin: "0 0 12px 0", opacity: 0.8 }}>
-              {t("addSessionsHint")}
-            </p>
+            <p style={{ margin: "0 0 12px 0", opacity: 0.8 }}>{t("addSessionsHint")}</p>
 
             <label>{t("sessionsCountLabel")}</label>
             <input
@@ -1445,15 +1294,8 @@ const AdminPanel: React.FC = () => {
                     value={s.start_time}
                     onChange={(e) => {
                       const v = e.target.value;
-                      setSessions((prev) =>
-                        prev.map((x, i) =>
-                          i === idx ? { ...x, start_time: v } : x
-                        )
-                      );
-                      // if session 1 edited, sync main times
-                      if (idx === 0) {
-                        setEditClass((prev) => (prev ? { ...prev, start_time: v } : prev));
-                      }
+                      setSessions((prev) => prev.map((x, i) => (i === idx ? { ...x, start_time: v } : x)));
+                      if (idx === 0) setEditClass((prev) => (prev ? { ...prev, start_time: v } : prev));
                     }}
                   />
                 </div>
@@ -1465,42 +1307,18 @@ const AdminPanel: React.FC = () => {
                     value={s.end_time}
                     onChange={(e) => {
                       const v = e.target.value;
-                      setSessions((prev) =>
-                        prev.map((x, i) =>
-                          i === idx ? { ...x, end_time: v } : x
-                        )
-                      );
-                      if (idx === 0) {
-                        setEditClass((prev) => (prev ? { ...prev, end_time: v } : prev));
-                      }
+                      setSessions((prev) => prev.map((x, i) => (i === idx ? { ...x, end_time: v } : x)));
+                      if (idx === 0) setEditClass((prev) => (prev ? { ...prev, end_time: v } : prev));
                     }}
                   />
                 </div>
               </div>
             ))}
 
-            {/* ✅ Add sessions button only for EDIT (existing class) */}
-            {!isNewClass && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={addSessionsToClass}
-                disabled={addingSessions}
-                style={{ marginTop: 12 }}
-              >
-                ➕ {addingSessions ? "Saving…" : t("addSessionsBtn")}
-              </button>
-            )}
-
             <div className="admin-modal-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowClassModal(false)}
-              >
+              <button className="btn btn-secondary" onClick={() => setShowClassModal(false)}>
                 {t("modalCancelDark")}
               </button>
-
-              {/* ✅ For NEW: Save creates all sessions automatically */}
               <button className="btn btn-primary" onClick={saveClassChanges}>
                 {t("modalSaveDark")}
               </button>

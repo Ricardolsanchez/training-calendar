@@ -774,7 +774,174 @@
   margin-bottom: 32px;
 }
 
+/* ===== TOPBAR ===== */
+.admin-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.admin-title {
+  margin: 0;
+  font-size: 20px;
+}
+.admin-subtitle {
+  margin: 6px 0 0;
+  opacity: 0.7;
+  font-size: 13px;
+}
+.admin-topbar-right {
+  display: flex;
+  gap: 10px;
+}
 
+/* ===== KPI GRID (uno al lado del otro) ===== */
+.admin-kpi-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  margin-top: 12px;
+}
+@media (max-width: 1100px) {
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .admin-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-kpi-card {
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.admin-kpi-label {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+.admin-kpi-value {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* ===== DIVIDER ===== */
+.admin-divider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.14);
+  margin: 18px 0;
+}
+
+/* ===== TABLE WRAPPER ===== */
+.admin-table-wrapper {
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+/* ===== Attendance switch ===== */
+.attendance-cell {
+  text-align: center;
+}
+.th-center {
+  text-align: center;
+}
+.attendance-switch {
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(2, 6, 23, 0.55);
+  position: relative;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+.attendance-switch::after {
+  content: "";
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+  background: rgba(148, 163, 184, 0.9);
+  transition: 0.18s ease;
+}
+.attendance-switch--active {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.attendance-switch--active::after {
+  left: 23px;
+  background: rgba(34, 197, 94, 0.95);
+}
+
+/* ===== Status pill ===== */
+.status-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.35);
+}
+.status-accepted {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.status-pending {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.status-rejected {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.mini-pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.35);
+}
+.mini-pill--ok {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.mini-pill--off {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+/* ===== MODAL SCROLL ===== */
+.admin-modal-body--scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.admin-form-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.admin-form-group--full {
+  grid-column: 1 / -1;
+}
+@media (max-width: 800px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-sessions-grid {
+  display: grid;
+  gap: 12px;
+}
+.admin-session-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
 
 /* ===========================
    RESPONSIVE
@@ -801,6 +968,11 @@
 @media (max-width: 700px) {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 800px) {
+  .admin-session-row {
+    grid-template-columns: 1fr;
   }
 }
 

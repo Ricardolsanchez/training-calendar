@@ -1,22 +1,16 @@
 /* ===========================
-   LAYOUT GENERAL
+  LAYOUT GENERAL
 =========================== */
 
 .admin-page {
   min-height: 100vh;
-  background: radial-gradient(
-    circle at top,
-    #111827 0%,
-    #020617 45%,
-    #000 100%
-  );
+  background: radial-gradient(circle at top, #111827 0%, #020617 45%, #000 100%);
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding: 3rem 1.5rem;
   color: #e5e7eb;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Segoe UI", sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 }
 
 .admin-card {
@@ -30,7 +24,7 @@
 }
 
 /* ===========================
-   HEADER
+  HEADER
 =========================== */
 
 .admin-header {
@@ -103,8 +97,7 @@
   cursor: pointer;
   user-select: none;
 
-  transition: transform 0.1s ease, filter 0.15s ease, background 0.15s ease,
-    border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.1s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .admin-lang-toggle {
@@ -155,7 +148,7 @@
 }
 
 /* ===========================
-   TABS
+  TABS
 =========================== */
 
 .admin-tabs {
@@ -190,7 +183,7 @@
 }
 
 /* ===========================
-   SECTION TITLES / TEXT
+  SECTION TITLES / TEXT
 =========================== */
 
 .admin-table-section {
@@ -218,17 +211,8 @@
   margin-bottom: 0.75rem;
 }
 
-/* ✅ Title row for Stats (title + refresh) */
-.stats-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 0.6rem;
-}
-
 /* ===========================
-   TABLE
+  TABLE
 =========================== */
 
 .admin-table-wrapper {
@@ -263,7 +247,6 @@
   text-align: center;
 }
 
-.admin-notes-cell,
 .admin-description-cell {
   max-width: 260px;
   white-space: nowrap;
@@ -272,7 +255,7 @@
 }
 
 /* ===========================
-   BUTTON SYSTEM
+  BUTTON SYSTEM
 =========================== */
 
 .btn {
@@ -293,8 +276,7 @@
   gap: 8px;
   cursor: pointer;
   white-space: nowrap;
-  transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease,
-    border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn:hover {
@@ -339,14 +321,6 @@
   background: transparent;
 }
 
-.btn-icon {
-  width: 34px;
-  padding: 0;
-  border-radius: 12px;
-  background: rgba(30, 41, 59, 0.55);
-  border-color: rgba(148, 163, 184, 0.22);
-}
-
 .admin-actions {
   display: inline-flex;
   align-items: center;
@@ -361,12 +335,8 @@
   min-width: 220px;
 }
 
-.admin-actions .btn {
-  width: auto !important;
-}
-
 /* ===========================
-   STATUS PILLS
+  STATUS PILLS
 =========================== */
 
 .status-pill {
@@ -395,7 +365,7 @@
 }
 
 /* ===========================
-   ATTENDANCE SWITCH
+  ATTENDANCE SWITCH
 =========================== */
 
 .attendance-cell {
@@ -416,8 +386,7 @@
 
 .attendance-switch:hover {
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 10px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 .attendance-switch::after {
@@ -440,63 +409,120 @@
   transform: translateX(28px);
 }
 
+/* inline layout para el toggle al lado del texto (stats->inscritos) */
+.attendance-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* mini pill */
+.mini-pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.35);
+}
+
+.mini-pill--ok {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.mini-pill--off {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
 /* ===========================
-   STATS GROUP
+  KPI GRID
 =========================== */
 
-.admin-stats-group {
-  padding: 1rem;
-}
-
-.admin-stats-group-header h3 {
-  margin: 0 0 0.25rem;
-  color: #f9fafb;
-  font-weight: 900;
-  font-size: 1.05rem;
-}
-
-.admin-stats-group-header p {
-  margin: 0 0 0.9rem;
-  color: #9ca3af;
-  font-size: 0.95rem;
-}
-
-/* ===========================
-   ✅ KPI GRID (NUEVO)
-=========================== */
-
-.kpi-grid {
+.admin-kpi-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   margin: 10px 0 18px;
 }
 
-.kpi-card {
+@media (max-width: 1000px) {
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .admin-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-kpi-card {
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(2, 6, 23, 0.55);
-  border-radius: 16px;
-  padding: 14px 14px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 
-.kpi-label {
-  margin: 0;
-  font-size: 0.78rem;
-  color: #9ca3af;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+.admin-kpi-label {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 8px;
 }
 
-.kpi-value {
-  margin: 8px 0 0;
-  font-size: 1.4rem;
-  font-weight: 950;
-  color: #f9fafb;
+.admin-kpi-value {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* ===== DIVIDER ===== */
+.admin-divider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.14);
+  margin: 18px 0;
 }
 
 /* ===========================
-   MODALS + FORMS
+  ✅ NUEVO: SUBSECCIÓN INSCRITOS + PAGINACIÓN
+=========================== */
+
+.admin-subsection-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.admin-subsection-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f9fafb;
+}
+
+.admin-subsection-subtitle {
+  margin: 4px 0 0;
+  color: #9ca3af;
+  font-size: 0.92rem;
+}
+
+.admin-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-pagination-label {
+  color: #cbd5e1;
+  font-weight: 800;
+  font-size: 0.9rem;
+  min-width: 70px;
+  text-align: center;
+}
+
+/* ===========================
+  MODALS + FORMS
 =========================== */
 
 .admin-modal-backdrop {
@@ -543,448 +569,148 @@
 .form-select,
 .form-textarea {
   width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.65);
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.55);
   color: #e5e7eb;
   padding: 10px 12px;
   outline: none;
 }
 
 .form-textarea {
-  min-height: 90px;
+  min-height: 88px;
   resize: vertical;
 }
 
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: rgba(250, 204, 21, 0.55);
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.12);
 }
 
 .admin-modal-actions {
-  margin-top: 16px;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* Backdrop centrado */
-.admin-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  padding: 16px; /* importante en mobile */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ✅ Scroll vertical dentro del modal */
-.admin-modal {
-  max-height: 85vh; /* controla el alto visible */
-  overflow-y: auto; /* activa el scroll */
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Si el dark modal tiene otros estilos, igual hereda max-height/overflow */
-.admin-modal.admin-modal-dark {
-  max-height: 85vh;
-  overflow-y: auto;
-}
-
-.admin-kpi-card {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.06),
-    rgba(255, 255, 255, 0.03)
-  );
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 14px 14px 16px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
-  transition: transform 0.18s ease, box-shadow 0.18s ease,
-    border-color 0.18s ease;
-}
-
-.admin-kpi-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
-}
-
-.admin-kpi-label {
-  font-size: 12px;
-  letter-spacing: 0.2px;
-  opacity: 0.78;
-  margin-bottom: 6px;
-}
-
-.admin-kpi-value {
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1.05;
-}
-
-/* =========================
-   CLASSES CAROUSEL
-========================= */
-.classes-carousel {
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
-  gap: 10px;
-  align-items: center;
-  margin-top: 12px;
-}
-
-.carousel-arrow {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: #e5e7eb;
-  font-size: 24px;
-  cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.carousel-arrow:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.22);
-}
-
-.carousel-track {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding: 4px 2px 8px;
-  scrollbar-width: thin;
-}
-
-.carousel-track::-webkit-scrollbar {
-  height: 8px;
-}
-.carousel-track::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-}
-
-.class-card {
-  min-width: 360px;
-  max-width: 360px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  padding: 14px;
-  cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease,
-    background 0.18s ease;
-  user-select: none;
-}
-
-.class-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.class-card--active {
-  border-color: rgba(56, 189, 248, 0.45);
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.1);
-}
-
-.class-card-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: flex-start;
-  margin-bottom: 10px;
-}
-
-.class-card-title {
-  font-weight: 800;
-  font-size: 15px;
-  line-height: 1.15;
-}
-
-.class-card-badges {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.pill {
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.pill--muted {
-  opacity: 0.85;
-}
-
-.class-card-meta {
-  font-size: 13px;
-  opacity: 0.9;
-  margin-bottom: 10px;
-}
-
-.class-card-desc {
-  font-size: 13px;
-  opacity: 0.82;
-  min-height: 44px;
-}
-
-.class-card-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-/* SESSIONS BELOW */
-.sessions-below {
   margin-top: 16px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.18);
 }
 
-.sessions-below-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.admin-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-/* ===== TOPBAR ===== */
-.admin-topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-.admin-title {
-  margin: 0;
-  font-size: 20px;
-}
-.admin-subtitle {
-  margin: 6px 0 0;
-  opacity: 0.7;
-  font-size: 13px;
-}
-.admin-topbar-right {
-  display: flex;
-  gap: 10px;
-}
-
-/* ===== KPI GRID (uno al lado del otro) ===== */
-.admin-kpi-grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  margin-top: 12px;
-}
-@media (max-width: 1100px) {
-  .admin-kpi-grid {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
-  }
-}
-@media (max-width: 720px) {
-  .admin-kpi-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.admin-kpi-card {
-  border-radius: 18px;
-  padding: 14px 16px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-}
-.admin-kpi-label {
-  font-size: 12px;
-  opacity: 0.75;
-  margin-bottom: 8px;
-}
-.admin-kpi-value {
-  font-size: 26px;
-  font-weight: 700;
-}
-
-/* ===== DIVIDER ===== */
-.admin-divider {
-  height: 1px;
-  background: rgba(148, 163, 184, 0.14);
-  margin: 18px 0;
-}
-
-/* ===== TABLE WRAPPER ===== */
-.admin-table-wrapper {
-  overflow: auto;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-}
-
-/* ===== Attendance switch ===== */
-.attendance-cell {
-  text-align: center;
-}
-.th-center {
-  text-align: center;
-}
-.attendance-switch {
-  width: 46px;
-  height: 26px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(2, 6, 23, 0.55);
-  position: relative;
-  cursor: pointer;
-  transition: 0.18s ease;
-}
-.attendance-switch::after {
-  content: "";
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  position: absolute;
-  top: 50%;
-  left: 3px;
-  transform: translateY(-50%);
-  background: rgba(148, 163, 184, 0.9);
-  transition: 0.18s ease;
-}
-.attendance-switch--active {
-  background: rgba(34, 197, 94, 0.18);
-  border-color: rgba(34, 197, 94, 0.35);
-}
-.attendance-switch--active::after {
-  left: 23px;
-  background: rgba(34, 197, 94, 0.95);
-}
-
-/* ===== Status pill ===== */
-.status-pill {
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(2, 6, 23, 0.35);
-}
-.status-accepted {
-  border-color: rgba(34, 197, 94, 0.35);
-}
-.status-pending {
-  border-color: rgba(245, 158, 11, 0.35);
-}
-.status-rejected {
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
-.mini-pill {
-  display: inline-block;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(2, 6, 23, 0.35);
-}
-.mini-pill--ok {
-  border-color: rgba(34, 197, 94, 0.35);
-}
-.mini-pill--off {
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
-/* ===== MODAL SCROLL ===== */
 .admin-modal-body--scroll {
   max-height: 70vh;
   overflow-y: auto;
   padding-right: 6px;
 }
+
 .admin-form-grid {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.admin-form-group--full {
-  grid-column: 1 / -1;
-}
+
 @media (max-width: 800px) {
   .admin-form-grid {
     grid-template-columns: 1fr;
   }
 }
-.admin-sessions-grid {
-  display: grid;
-  gap: 12px;
-}
-.admin-session-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+
+.admin-inline-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* ===========================
-   RESPONSIVE
+  CAROUSEL (CLASSES)
 =========================== */
 
-@media (max-width: 1000px) {
-  .admin-kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.admin-carousel-wrap {
+  margin-top: 8px;
 }
+
+.admin-carousel-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.admin-carousel {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-behavior: smooth;
+}
+
+.admin-carousel::-webkit-scrollbar {
+  height: 10px;
+}
+.admin-carousel::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+}
+
+.admin-class-card {
+  min-width: 360px;
+  max-width: 360px;
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+
+.admin-class-card--active {
+  border-color: rgba(250, 204, 21, 0.35);
+}
+
+.admin-class-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-class-title {
+  font-weight: 950;
+  color: #f9fafb;
+}
+
+.admin-class-sub {
+  margin-top: 6px;
+}
+
+.admin-class-meta {
+  margin-top: 12px;
+  color: #cbd5e1;
+}
+
+.admin-class-desc {
+  margin-top: 8px;
+  color: #9ca3af;
+}
+
+.admin-class-sessions {
+  margin-top: 10px;
+}
+
+.admin-session-pill {
+  margin-top: 8px;
+}
+
+/* ===========================
+  RESPONSIVE
+=========================== */
 
 @media (max-width: 640px) {
-  .admin-kpi-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 1100px) {
-  .kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 700px) {
-  .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 800px) {
-  .admin-session-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 900px) {
   .admin-card {
-    padding: 1.5rem;
+    padding: 1.5rem 1.25rem 1.75rem;
   }
 
   .admin-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
   }
 
   .admin-header-actions {
@@ -994,10 +720,6 @@
   }
 
   .admin-table {
-    min-width: 760px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
+    min-width: 860px;
   }
 }

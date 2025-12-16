@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import "./AdminPanel.css";
@@ -23,6 +23,7 @@ type Booking = {
   status: BookingStatus;
   calendar_url?: string | null;
 
+  // ✅ toggle
   attendedbutton?: boolean | null;
 };
 
@@ -159,6 +160,15 @@ const translations: Record<Lang, Record<string, string>> = {
     kpiTotalAttended: "Total attended (overall)",
     kpiLoadError: "Could not load KPIs.",
 
+    // ✅ NUEVO
+    enrolledTitle: "People enrolled",
+    enrolledSubtitle: "Accepted bookings (inscribed users).",
+    attendanceYes: "Attended",
+    attendanceNo: "Not attended",
+    attendanceNotMarked: "Not marked",
+    paginationPrev: "Previous",
+    paginationNext: "Next",
+
     sessionsCount: "Sessions",
     expand: "Expand",
     collapse: "Collapse",
@@ -167,8 +177,7 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionsPanelTitle: "Sessions for",
 
     addSessionsTitle: "Sessions (edit hours / count)",
-    addSessionsHint:
-      "Edit the start/end time for each session. Increase/decrease the number of sessions and save.",
+    addSessionsHint: "Edit the start/end time for each session. Increase/decrease the number of sessions and save.",
     sessionsCountLabel: "Number of sessions",
   },
   es: {
@@ -254,6 +263,15 @@ const translations: Record<Lang, Record<string, string>> = {
     kpiTotalAttended: "Total asistentes (global)",
     kpiLoadError: "No se pudieron cargar los KPIs.",
 
+    // ✅ NUEVO
+    enrolledTitle: "Personas inscritas",
+    enrolledSubtitle: "Reservas aceptadas (inscritos).",
+    attendanceYes: "Asistió",
+    attendanceNo: "No asistió",
+    attendanceNotMarked: "Sin marcar",
+    paginationPrev: "Anterior",
+    paginationNext: "Siguiente",
+
     sessionsCount: "Sesiones",
     expand: "Ver",
     collapse: "Ocultar",
@@ -262,8 +280,7 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionsPanelTitle: "Sesiones de",
 
     addSessionsTitle: "Sesiones (editar horas / cantidad)",
-    addSessionsHint:
-      "Edita la hora inicio/fin de cada sesión. Sube/baja la cantidad de sesiones y guarda.",
+    addSessionsHint: "Edita la hora inicio/fin de cada sesión. Sube/baja la cantidad de sesiones y guarda.",
     sessionsCountLabel: "Número de sesiones",
   },
 };
@@ -346,6 +363,10 @@ const AdminPanel: React.FC = () => {
   const [perClass, setPerClass] = useState<StatsPerClass[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
+
+  /** ✅ NUEVO: paginación de inscritos */
+  const [enrolledPage, setEnrolledPage] = useState(1);
+  const ENROLLED_PAGE_SIZE = 8;
 
   /** Grouped classes + selection */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
@@ -444,6 +465,11 @@ const AdminPanel: React.FC = () => {
     fetchGrouped();
   }, [activeTab, fetchGrouped]);
 
+  /** Cuando entras a STATS, resetea página para que se vea siempre desde el inicio */
+  useEffect(() => {
+    if (activeTab === "stats") setEnrolledPage(1);
+  }, [activeTab]);
+
   /** Format helpers */
   const formatDate = (value: string) => {
     if (!value) return "—";
@@ -487,6 +513,7 @@ const AdminPanel: React.FC = () => {
     if (!editBooking) return;
     try {
       await ensureCsrf();
+      // aquí normalmente mandarías PUT si editas name/notes, etc.
       setShowEditBookingModal(false);
     } catch (err) {
       console.error("Error saving booking changes:", err);
@@ -517,6 +544,7 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  /** ✅ Toggle attendance (reutilizado en bookings y en stats->inscritos) */
   const toggleAttendance = async (booking: Booking) => {
     try {
       await ensureCsrf();
@@ -561,7 +589,6 @@ const AdminPanel: React.FC = () => {
     setEditClass({ ...cls });
     setShowClassModal(true);
 
-    // Busca su grupo por group_code; si no hay, intenta por id dentro de groupedClasses
     const code =
       cls.group_code ||
       groupedClasses.find((g) => g.sessions?.some((s) => s.id === cls.id))?.group_code ||
@@ -578,7 +605,6 @@ const AdminPanel: React.FC = () => {
         }))
       );
 
-      // sincroniza los inputs principales con la sesión 1
       const first = group.sessions[0];
       const tr = parseTimeRange(first?.time_range || "");
       setEditClass((prev) =>
@@ -620,11 +646,9 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
-        // 1) crea la sesión base
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        // 2) crea sesiones adicionales (sincroniza por POST addSessions)
         const extra = sessions.slice(1).filter((s) => s.start_time && s.end_time);
         if (extra.length > 0) {
           await api.post(`/api/admin/classes/${saved.id}/sessions`, {
@@ -635,10 +659,8 @@ const AdminPanel: React.FC = () => {
         await fetchClasses();
         await fetchGrouped();
       } else {
-        // 1) actualiza la sesión base
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
-        // 2) sincroniza todas las sesiones del grupo (editar cantidad + horas)
         await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
           sessions: sessions.map((s) => ({
             id: s.id,
@@ -726,6 +748,34 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  /** ✅ NUEVO: data de inscritos + paginación */
+  const enrolled = useMemo(() => {
+    // 👇 solo ACCEPTED (inscritos reales)
+    const list = bookings;
+
+    // orden más útil: más recientes arriba
+    return [...list].sort((a, b) => {
+      const da = new Date(a.created_at).getTime();
+      const db = new Date(b.created_at).getTime();
+      return db - da;
+    });
+  }, [bookings]);
+
+  const enrolledTotalPages = Math.max(1, Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE));
+
+  const enrolledPageSafe = Math.min(enrolledPage, enrolledTotalPages);
+
+  const enrolledSlice = useMemo(() => {
+    const start = (enrolledPageSafe - 1) * ENROLLED_PAGE_SIZE;
+    return enrolled.slice(start, start + ENROLLED_PAGE_SIZE);
+  }, [enrolled, enrolledPageSafe]);
+
+  const attendanceLabel = (b: Booking) => {
+    if (b.attendedbutton === true) return t("attendanceYes");
+    if (b.attendedbutton === false) return t("attendanceNo");
+    return t("attendanceNotMarked");
+  };
+
   return (
     <div className="admin-page">
       <div className="admin-card">
@@ -797,84 +847,67 @@ const AdminPanel: React.FC = () => {
                       <th>{t("columnTrainer")}</th>
                       <th>{t("columnNotes")}</th>
                       <th>{t("columnCreatedAt")}</th>
-                      <th>{t("statsColumnAttendance")}</th>
+                      <th className="th-center">{t("statsColumnAttendance")}</th>
                       <th>{t("columnStatus")}</th>
                       <th>{t("columnActions")}</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {bookings.map((b) => {
-                      const attendanceLabel =
-                        b.attendedbutton === true ? "Attended" : b.attendedbutton === false ? "Not attended" : "Not marked";
+                    {bookings.map((b) => (
+                      <tr key={b.id}>
+                        <td>{b.name}</td>
+                        <td>{b.email}</td>
+                        <td>{formatDate(b.start_date)}</td>
+                        <td>{formatDate(b.end_date)}</td>
+                        <td>{totalDays(b)}</td>
+                        <td>{b.trainer_name || "—"}</td>
+                        <td className="admin-description-cell">{b.notes || "—"}</td>
+                        <td>{formatDateTime(b.created_at)}</td>
 
-                      return (
-                        <tr key={b.id}>
-                          <td>{b.name}</td>
-                          <td>{b.email}</td>
-                          <td>{formatDate(b.start_date)}</td>
-                          <td>{formatDate(b.end_date)}</td>
-                          <td>{totalDays(b)}</td>
-                          <td>{b.trainer_name || "—"}</td>
-                          <td className="admin-description-cell">{b.notes || "—"}</td>
-                          <td>{formatDateTime(b.created_at)}</td>
+                        {/* ✅ Toggle */}
+                        <td className="attendance-cell">
+                          <button
+                            type="button"
+                            className={"attendance-switch" + (b.attendedbutton === true ? " attendance-switch--active" : "")}
+                            onClick={() => toggleAttendance(b)}
+                            aria-label="toggle attendance"
+                            title={attendanceLabel(b)}
+                          />
+                          <div className="mini-pill" style={{ marginTop: 8 }}>
+                            {attendanceLabel(b)}
+                          </div>
+                        </td>
 
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-outline"
-                              onClick={() => toggleAttendance(b)}
-                              title={attendanceLabel}
-                            >
-                              {b.attendedbutton === true ? "✅" : "⬜"} {attendanceLabel}
+                        <td>
+                          <span
+                            className={
+                              "status-pill " +
+                              (b.status === "accepted" ? "status-accepted" : b.status === "denied" ? "status-denied" : "status-pending")
+                            }
+                          >
+                            {b.status === "accepted" ? t("statusAccepted") : b.status === "denied" ? t("statusDenied") : t("statusPending")}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div className="admin-actions">
+                            <button type="button" className="btn btn-secondary" onClick={() => openEditBookingModal(b)}>
+                              ✏️
                             </button>
-                          </td>
-
-                          <td>
-                            <span
-                              className={
-                                "status-pill " +
-                                (b.status === "accepted"
-                                  ? "status-accepted"
-                                  : b.status === "denied"
-                                  ? "status-denied"
-                                  : "status-pending")
-                              }
-                            >
-                              {b.status === "accepted"
-                                ? t("statusAccepted")
-                                : b.status === "denied"
-                                ? t("statusDenied")
-                                : t("statusPending")}
-                            </span>
-                          </td>
-
-                          <td>
-                            <div className="admin-actions">
-                              <button type="button" className="btn btn-primary" onClick={() => updateBookingStatus(b.id, "accepted")}>
-                                ✅ {t("btnAccept")}
-                              </button>
-
-                              <button type="button" className="btn btn-danger" onClick={() => updateBookingStatus(b.id, "denied")}>
-                                ❌ {t("btnDeny")}
-                              </button>
-
-                              <button type="button" className="btn btn-secondary" onClick={() => openEditBookingModal(b)}>
-                                ✏️
-                              </button>
-
-                              <button
-                                type="button"
-                                className="btn btn-danger btn-outline"
-                                onClick={() => handleDeleteBooking(b.id)}
-                              >
-                                🗑 {t("btnDelete")}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            <button type="button" className="btn btn-success" onClick={() => updateBookingStatus(b.id, "accepted")}>
+                              {t("btnAccept")}
+                            </button>
+                            <button type="button" className="btn btn-danger" onClick={() => updateBookingStatus(b.id, "denied")}>
+                              {t("btnDeny")}
+                            </button>
+                            <button type="button" className="btn btn-outline" onClick={() => handleDeleteBooking(b.id)}>
+                              {t("btnDelete")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -887,6 +920,7 @@ const AdminPanel: React.FC = () => {
           <section className="admin-table-section">
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("classesTitle")}</h2>
+
               <button type="button" className="btn btn-primary" onClick={openNewClassModal}>
                 {t("addNewClass")}
               </button>
@@ -895,132 +929,97 @@ const AdminPanel: React.FC = () => {
             {groupedClasses.length === 0 && <p className="admin-message">{t("noClasses")}</p>}
 
             {groupedClasses.length > 0 && (
-              <>
-                <div className="classes-carousel">
-                  <button
-                    type="button"
-                    className="carousel-arrow"
-                    onClick={() => scrollCarousel(-1)}
-                    aria-label={t("carouselPrev")}
-                    title={t("carouselPrev")}
-                  >
-                    ‹
+              <div className="admin-carousel-wrap">
+                <div className="admin-carousel-controls">
+                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(-1)}>
+                    ◀ {t("carouselPrev")}
                   </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(1)}>
+                    {t("carouselNext")} ▶
+                  </button>
+                </div>
 
-                  <div className="carousel-track" ref={carouselRef}>
-                    {groupedClasses.map((g) => {
-                      const isActive = expandedGroupCode === g.group_code;
-                      const firstSessionId = g.sessions?.[0]?.id;
-
-                      return (
-                        <div
-                          key={g.group_code}
-                          className={"class-card" + (isActive ? " class-card--active" : "")}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleGroup(g.group_code)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              toggleGroup(g.group_code);
-                            }
-                          }}
-                        >
-                          <div className="class-card-top">
-                            <div className="class-card-title">{g.title}</div>
-                            <div className="class-card-badges">
-                              <span className="pill">{g.modality}</span>
-                              <span className="pill pill--muted">
-                                {g.sessions_count} {t("sessionsCount")}
+                <div className="admin-carousel" ref={carouselRef}>
+                  {groupedClasses.map((g) => {
+                    const expanded = expandedGroupCode === g.group_code;
+                    return (
+                      <div key={g.group_code} className={"admin-class-card" + (expanded ? " admin-class-card--active" : "")}>
+                        <div className="admin-class-card-head">
+                          <div>
+                            <div className="admin-class-title">{g.title}</div>
+                            <div className="admin-class-sub">
+                              <span className="mini-pill">{g.modality}</span>
+                              <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                {t("sessionsCount")}: {g.sessions_count}
                               </span>
                             </div>
                           </div>
 
-                          <div className="class-card-meta">
-                            <div>
-                              <strong>{t("colClassTrainer")}:</strong> {g.trainer_name || "—"}
-                            </div>
+                          <button type="button" className="btn btn-secondary" onClick={() => toggleGroup(g.group_code)}>
+                            {expanded ? t("collapse") : t("expand")}
+                          </button>
+                        </div>
+
+                        <div className="admin-class-meta">
+                          <div className="admin-class-meta-row">
+                            <strong>{t("colClassTrainer")}:</strong> {g.trainer_name || t("statsNoTrainer")}
                           </div>
+                          {g.description && <div className="admin-class-desc">{g.description}</div>}
+                        </div>
 
-                          <div className="class-card-desc">{g.description || "—"}</div>
+                        {expanded && (
+                          <div className="admin-divider" />
+                        )}
 
-                          <div className="class-card-actions" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" className="btn btn-secondary btn-outline" onClick={() => toggleGroup(g.group_code)}>
-                              {isActive ? `➖ ${t("collapse")}` : `➕ ${t("expand")}`}
-                            </button>
+                        {expanded && (
+                          <div className="admin-class-sessions">
+                            {g.sessions.map((s) => (
+                              <div key={s.id} className="admin-session-pill">
+                                <span className="mini-pill">{s.date_iso}</span>
+                                <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                  {s.time_range}
+                                </span>
+                                <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                  Seats: {s.spots_left}
+                                </span>
+                              </div>
+                            ))}
 
+                            <div className="admin-divider" />
+
+                            {/* botón edit: usa la 1era sesión como "cls" base en este UI */}
                             <button
                               type="button"
-                              className="btn btn-secondary"
-                              disabled={!firstSessionId}
+                              className="btn btn-primary"
                               onClick={() => {
-                                if (!firstSessionId) return;
-                                const cls = classes.find((c) => c.id === firstSessionId);
-                                if (cls) openEditClassModal(cls);
-                                else alert("Could not find that session in admin classes list.");
+                                const fallback = classes.find((c) => c.group_code === g.group_code) || classes.find((c) => c.title === g.title) || null;
+                                if (fallback) openEditClassModal(fallback);
+                                else alert("Could not locate base class row for editing.");
                               }}
                             >
-                              ✏️ {t("btnEditClass")}
+                              {t("btnEditClass")}
                             </button>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    type="button"
-                    className="carousel-arrow"
-                    onClick={() => scrollCarousel(1)}
-                    aria-label={t("carouselNext")}
-                    title={t("carouselNext")}
-                  >
-                    ›
-                  </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+              </div>
+            )}
 
-                {/* Sessions panel below */}
-                {selectedGroup && (
-                  <div className="sessions-below">
-                    <div className="sessions-below-header">
-                      <div>
-                        <h3 style={{ margin: 0 }}>
-                          {t("sessionsPanelTitle")} {selectedGroup.title}
-                        </h3>
-                        <div style={{ opacity: 0.8, marginTop: 4 }}>
-                          {selectedGroup.trainer_name || "—"} · {selectedGroup.modality}
-                        </div>
-                      </div>
-                      <div className="pill">
-                        {selectedGroup.sessions_count} {t("sessionsCount")}
-                      </div>
-                    </div>
-
-                    <div className="admin-table-wrapper" style={{ marginTop: 12 }}>
-                      <table className="admin-table">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>{t("colClassStart")}</th>
-                            <th>{t("colClassTime")}</th>
-                            <th>{t("colClassSeats")}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(selectedGroup.sessions ?? []).map((s, idx) => (
-                            <tr key={s.id}>
-                              <td>{idx + 1}</td>
-                              <td>{formatDate(s.date_iso)}</td>
-                              <td>{s.time_range}</td>
-                              <td>{s.spots_left}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </>
+            {/* Panel lateral opcional si quieres mostrar detalle del seleccionado */}
+            {selectedGroup && (
+              <div className="admin-stats-group" style={{ marginTop: 18 }}>
+                <div className="admin-stats-group-header">
+                  <h3>
+                    {t("sessionsPanelTitle")} {selectedGroup.title}
+                  </h3>
+                  <p>
+                    {selectedGroup.trainer_name || t("statsNoTrainer")} • {selectedGroup.modality} • {t("sessionsCount")}: {selectedGroup.sessions_count}
+                  </p>
+                </div>
+              </div>
             )}
           </section>
         )}
@@ -1068,6 +1067,92 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
+            {/* ✅ NUEVO: lista de inscritos debajo de KPIs */}
+            {!statsLoading && !statsError && (
+              <>
+                <div className="admin-divider" />
+
+                <div className="admin-subsection-header">
+                  <div>
+                    <h3 className="admin-subsection-title">{t("enrolledTitle")}</h3>
+                    <p className="admin-subsection-subtitle">{t("enrolledSubtitle")}</p>
+                  </div>
+
+                  <div className="admin-pagination">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setEnrolledPage((p) => Math.max(1, p - 1))}
+                      disabled={enrolledPageSafe <= 1}
+                    >
+                      ◀ {t("paginationPrev")}
+                    </button>
+
+                    <span className="admin-pagination-label">
+                      {enrolled.length === 0 ? "0" : enrolledPageSafe} / {enrolledTotalPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1))}
+                      disabled={enrolledPageSafe >= enrolledTotalPages}
+                    >
+                      {t("paginationNext")} ▶
+                    </button>
+                  </div>
+                </div>
+
+                {enrolled.length === 0 ? (
+                  <p className="admin-message">{t("statsNoData")}</p>
+                ) : (
+                  <div className="admin-table-wrapper">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>{t("columnName")}</th>
+                          <th>{t("columnEmail")}</th>
+                          <th>{t("columnStartDate")}</th>
+                          <th>{t("columnEndDate")}</th>
+                          <th>{t("columnTrainer")}</th>
+                          <th className="th-center">{t("statsColumnAttendance")}</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {enrolledSlice.map((b) => (
+                          <tr key={b.id}>
+                            <td>{b.name}</td>
+                            <td>{b.email}</td>
+                            <td>{formatDate(b.start_date)}</td>
+                            <td>{formatDate(b.end_date)}</td>
+                            <td>{b.trainer_name || "—"}</td>
+
+                            {/* ✅ Toggle al lado, como pediste */}
+                            <td className="attendance-cell">
+                              <div className="attendance-inline">
+                                <button
+                                  type="button"
+                                  className={"attendance-switch" + (b.attendedbutton === true ? " attendance-switch--active" : "")}
+                                  onClick={() => toggleAttendance(b)}
+                                  aria-label="toggle attendance"
+                                  title={attendanceLabel(b)}
+                                />
+                                <span className={"mini-pill " + (b.attendedbutton === true ? "mini-pill--ok" : b.attendedbutton === false ? "mini-pill--off" : "")}>
+                                  {attendanceLabel(b)}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* tabla per class (lo que ya tenías) */}
             {!statsLoading && !statsError && perClass.length > 0 && (
               <>
                 <h3 style={{ marginTop: 18 }}>{t("statsTitle")}</h3>
@@ -1085,17 +1170,18 @@ const AdminPanel: React.FC = () => {
                         <th>{t("kpiNotMarked")}</th>
                       </tr>
                     </thead>
+
                     <tbody>
-                      {perClass.map((r, idx) => (
-                        <tr key={`${r.classTitle}_${idx}`}>
-                          <td>{r.classTitle}</td>
-                          <td>{formatDate(r.start_date)}</td>
-                          <td>{formatDate(r.end_date)}</td>
-                          <td>{r.trainer_name || t("statsNoTrainer")}</td>
-                          <td>{r.requests}</td>
-                          <td>{r.attended}</td>
-                          <td>{r.not_attended}</td>
-                          <td>{r.not_marked}</td>
+                      {perClass.map((row, idx) => (
+                        <tr key={idx}>
+                          <td>{row.classTitle}</td>
+                          <td>{formatDate(row.start_date)}</td>
+                          <td>{formatDate(row.end_date)}</td>
+                          <td>{row.trainer_name || t("statsNoTrainer")}</td>
+                          <td>{row.requests}</td>
+                          <td>{row.attended}</td>
+                          <td>{row.not_attended}</td>
+                          <td>{row.not_marked}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1104,228 +1190,177 @@ const AdminPanel: React.FC = () => {
               </>
             )}
 
-            {!statsLoading && !statsError && !kpis && <p className="admin-message">{t("statsNoData")}</p>}
+            {!statsLoading && !statsError && perClass.length === 0 && (
+              <p className="admin-message">{t("statsNoData")}</p>
+            )}
           </section>
         )}
+
+        {/* MODAL Edit Booking */}
+        {showEditBookingModal && editBooking && (
+          <div className="admin-modal-backdrop" onClick={() => setShowEditBookingModal(false)}>
+            <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+              <h3>{t("modalEditBookingTitle")}</h3>
+
+              <label>{t("modalNameLabel")}</label>
+              <input className="form-input" value={editBooking.name} disabled />
+
+              <label>{t("modalNotesLabel")}</label>
+              <textarea
+                className="form-textarea"
+                value={editBooking.notes ?? ""}
+                onChange={(e) => setEditBooking({ ...editBooking, notes: e.target.value })}
+              />
+
+              <div className="admin-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditBookingModal(false)}>
+                  {t("modalCancel")}
+                </button>
+                <button type="button" className="btn btn-primary" onClick={saveBookingChanges}>
+                  {t("modalSave")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL New/Edit Class */}
+        {showClassModal && editClass && (
+          <div className="admin-modal-backdrop" onClick={() => setShowClassModal(false)}>
+            <div className="admin-modal admin-modal-dark" onClick={(e) => e.stopPropagation()}>
+              <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
+
+              <div className="admin-modal-body--scroll">
+                <label>{t("labelClassTitle")}</label>
+                <input className="form-input" value={editClass.title} onChange={(e) => setEditClass({ ...editClass, title: e.target.value })} />
+
+                <label>{t("labelTrainer")}</label>
+                <select
+                  className="form-select"
+                  value={editClass.trainer_name ?? ""}
+                  onChange={(e) => setEditClass({ ...editClass, trainer_name: e.target.value || null })}
+                >
+                  <option value="">{t("optionSelectTrainer")}</option>
+                  {TRAINERS.map((tr) => (
+                    <option key={tr.id} value={tr.name}>
+                      {tr.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="admin-form-grid">
+                  <div>
+                    <label>{t("labelStartDate")}</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={editClass.start_date}
+                      onChange={(e) => setEditClass({ ...editClass, start_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label>{t("labelEndDate")}</label>
+                    <input type="date" className="form-input" value={editClass.end_date} onChange={(e) => setEditClass({ ...editClass, end_date: e.target.value })} />
+                  </div>
+
+                  <div>
+                    <label>{t("labelStartTime")}</label>
+                    <input type="time" className="form-input" value={editClass.start_time} onChange={(e) => setEditClass({ ...editClass, start_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <label>{t("labelEndTime")}</label>
+                    <input type="time" className="form-input" value={editClass.end_time} onChange={(e) => setEditClass({ ...editClass, end_time: e.target.value })} />
+                  </div>
+                </div>
+
+                <label>{t("labelType")}</label>
+                <select className="form-select" value={editClass.modality} onChange={(e) => setEditClass({ ...editClass, modality: e.target.value as any })}>
+                  <option value="Online">{t("typeOnline")}</option>
+                  <option value="Presencial">{t("typeInPerson")}</option>
+                </select>
+
+                <label>{t("labelSeats")}</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={editClass.spots_left}
+                  onChange={(e) => setEditClass({ ...editClass, spots_left: Number(e.target.value || 0) })}
+                />
+
+                <label>{t("labelDescription")}</label>
+                <textarea className="form-textarea" value={editClass.description ?? ""} onChange={(e) => setEditClass({ ...editClass, description: e.target.value })} />
+
+                <div className="admin-divider" />
+
+                {/* ✅ Sesiones: editar cantidad + horas */}
+                <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>{t("addSessionsTitle")}</h4>
+                <p className="admin-message" style={{ marginTop: 0 }}>
+                  {t("addSessionsHint")}
+                </p>
+
+                <label>{t("sessionsCountLabel")}</label>
+                <div className="admin-inline-controls">
+                  <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount - 1)}>
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    className="form-input"
+                    style={{ width: 90, textAlign: "center" }}
+                    value={sessionsCount}
+                    onChange={(e) => setCount(Number(e.target.value))}
+                  />
+                  <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount + 1)}>
+                    +
+                  </button>
+                </div>
+
+                <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
+                  {sessions.map((s, idx) => (
+                    <div key={idx} className="admin-session-row">
+                      <div>
+                        <label>Session {idx + 1} Start</label>
+                        <input
+                          type="time"
+                          className="form-input"
+                          value={s.start_time}
+                          onChange={(e) => {
+                            const next = [...sessions];
+                            next[idx] = { ...next[idx], start_time: e.target.value };
+                            setSessions(next);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label>Session {idx + 1} End</label>
+                        <input
+                          type="time"
+                          className="form-input"
+                          value={s.end_time}
+                          onChange={(e) => {
+                            const next = [...sessions];
+                            next[idx] = { ...next[idx], end_time: e.target.value };
+                            setSessions(next);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="admin-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowClassModal(false)}>
+                  {t("modalCancelDark")}
+                </button>
+                <button type="button" className="btn btn-primary" onClick={saveClassChanges}>
+                  {t("modalSaveDark")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* MODAL EDIT BOOKING */}
-      {showEditBookingModal && editBooking && (
-        <div className="admin-modal-backdrop" onMouseDown={() => setShowEditBookingModal(false)}>
-          <div className="admin-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <h3>{t("modalEditBookingTitle")}</h3>
-
-            <label>{t("modalNameLabel")}</label>
-            <input
-              className="form-input"
-              type="text"
-              value={editBooking.name}
-              onChange={(e) => setEditBooking({ ...editBooking, name: e.target.value })}
-            />
-
-            <label>{t("modalNotesLabel")}</label>
-            <textarea
-              className="form-textarea"
-              value={editBooking.notes ?? ""}
-              onChange={(e) => setEditBooking({ ...editBooking, notes: e.target.value })}
-            />
-
-            <div className="admin-modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowEditBookingModal(false)}>
-                {t("modalCancel")}
-              </button>
-
-              <button className="btn btn-primary" onClick={saveBookingChanges}>
-                {t("modalSave")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL NEW / EDIT CLASS */}
-      {showClassModal && editClass && (
-        <div className="admin-modal-backdrop" onMouseDown={() => setShowClassModal(false)}>
-          <div className="admin-modal admin-modal-dark admin-modal-scroll" onMouseDown={(e) => e.stopPropagation()}>
-            <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
-
-            <label>{t("labelClassTitle")}</label>
-            <input
-              className="form-input"
-              type="text"
-              value={editClass.title}
-              onChange={(e) => setEditClass({ ...editClass, title: e.target.value })}
-            />
-
-            <label>{t("labelTrainer")}</label>
-            <select
-              className="form-select"
-              value={editClass.trainer_id ?? ""}
-              onChange={(e) => {
-                const id = e.target.value ? Number(e.target.value) : null;
-                const trainer = TRAINERS.find((tt) => tt.id === id) || null;
-                setEditClass({
-                  ...editClass,
-                  trainer_id: id,
-                  trainer_name: trainer ? trainer.name : null,
-                });
-              }}
-            >
-              <option value="">{t("optionSelectTrainer")}</option>
-              {TRAINERS.map((tt) => (
-                <option key={tt.id} value={tt.id}>
-                  {tt.name}
-                </option>
-              ))}
-            </select>
-
-            <div className="form-grid">
-              <div>
-                <label>{t("labelStartDate")}</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={editClass.start_date}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setEditClass((prev) => {
-                      if (!prev) return prev;
-                      const end = prev.end_date && prev.end_date >= v ? prev.end_date : v;
-                      return { ...prev, start_date: v, end_date: end };
-                    });
-                  }}
-                />
-              </div>
-              <div>
-                <label>{t("labelEndDate")}</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={editClass.end_date}
-                  min={editClass.start_date || undefined}
-                  onChange={(e) => setEditClass({ ...editClass, end_date: e.target.value })}
-                />
-              </div>
-              <div>
-                <label>{t("labelStartTime")}</label>
-                <input
-                  className="form-input"
-                  type="time"
-                  value={editClass.start_time}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setEditClass({ ...editClass, start_time: v });
-                    setSessions((prev) => {
-                      const next = [...prev];
-                      next[0] = { ...(next[0] || { start_time: "", end_time: "" }), start_time: v };
-                      return next;
-                    });
-                  }}
-                />
-              </div>
-              <div>
-                <label>{t("labelEndTime")}</label>
-                <input
-                  className="form-input"
-                  type="time"
-                  value={editClass.end_time}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setEditClass({ ...editClass, end_time: v });
-                    setSessions((prev) => {
-                      const next = [...prev];
-                      next[0] = { ...(next[0] || { start_time: "", end_time: "" }), end_time: v };
-                      return next;
-                    });
-                  }}
-                />
-              </div>
-            </div>
-
-            <label>{t("labelType")}</label>
-            <select
-              className="form-select"
-              value={editClass.modality}
-              onChange={(e) =>
-                setEditClass({ ...editClass, modality: e.target.value as "Online" | "Presencial" })
-              }
-            >
-              <option value="Presencial">{t("typeInPerson")}</option>
-              <option value="Online">{t("typeOnline")}</option>
-            </select>
-
-            <label>{t("labelSeats")}</label>
-            <input
-              className="form-input"
-              type="number"
-              min={0}
-              value={editClass.spots_left}
-              onChange={(e) => setEditClass({ ...editClass, spots_left: Number(e.target.value) })}
-            />
-
-            <label>{t("labelDescription")}</label>
-            <textarea
-              className="form-textarea"
-              value={editClass.description ?? ""}
-              onChange={(e) => setEditClass({ ...editClass, description: e.target.value })}
-            />
-
-            <hr style={{ opacity: 0.2, margin: "16px 0" }} />
-            <h4 style={{ margin: "0 0 8px 0" }}>{t("addSessionsTitle")}</h4>
-            <p style={{ margin: "0 0 12px 0", opacity: 0.8 }}>{t("addSessionsHint")}</p>
-
-            <label>{t("sessionsCountLabel")}</label>
-            <input
-              className="form-input"
-              type="number"
-              min={1}
-              max={20}
-              value={sessionsCount}
-              onChange={(e) => setCount(Number(e.target.value))}
-            />
-
-            {sessions.map((s, idx) => (
-              <div key={idx} className="form-grid" style={{ marginTop: 10 }}>
-                <div>
-                  <label>Session {idx + 1} start</label>
-                  <input
-                    className="form-input"
-                    type="time"
-                    value={s.start_time}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSessions((prev) => prev.map((x, i) => (i === idx ? { ...x, start_time: v } : x)));
-                      if (idx === 0) setEditClass((prev) => (prev ? { ...prev, start_time: v } : prev));
-                    }}
-                  />
-                </div>
-                <div>
-                  <label>Session {idx + 1} end</label>
-                  <input
-                    className="form-input"
-                    type="time"
-                    value={s.end_time}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSessions((prev) => prev.map((x, i) => (i === idx ? { ...x, end_time: v } : x)));
-                      if (idx === 0) setEditClass((prev) => (prev ? { ...prev, end_time: v } : prev));
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-
-            <div className="admin-modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowClassModal(false)}>
-                {t("modalCancelDark")}
-              </button>
-              <button className="btn btn-primary" onClick={saveClassChanges}>
-                {t("modalSaveDark")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

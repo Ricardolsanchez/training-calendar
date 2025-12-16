@@ -3,16 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import "./BookingCalendar.css";
 
-/** =========================
- *  Types
- *  ========================= */
 type Lang = "en" | "es";
 type Status = "idle" | "loading" | "success" | "error";
 
 type AvailableSession = {
   id: number;
-  date_iso: string; // YYYY-MM-DD
-  time_range: string; // "10:00 - 10:30"
+  date_iso: string;
+  time_range: string;
   spots_left: number;
 };
 
@@ -27,13 +24,7 @@ type AvailableClassGroup = {
   sessions: AvailableSession[];
 };
 
-/** =========================
- *  i18n (usa el tuyo si ya lo tienes)
- *  ========================= */
-const translations: Record<
-  Lang,
-  Record<string, string>
-> = {
+const translations: Record<Lang, Record<string, string>> = {
   en: {
     updatedTag: "Updated",
     adminPanel: "Admin Panel",
@@ -92,9 +83,6 @@ const translations: Record<
   },
 };
 
-/** =========================
- *  Helpers
- *  ========================= */
 const formatDateLabel = (iso: string, lang: Lang) => {
   const d = new Date(iso);
   const locale = lang === "en" ? "en-US" : "es-ES";
@@ -111,9 +99,6 @@ const getMonthAnchor = (groups: AvailableClassGroup[]) => {
   return first ? new Date(first) : new Date();
 };
 
-/** =========================
- *  MiniCalendar (marca días que tienen sesiones)
- *  ========================= */
 const MiniCalendar: React.FC<{ groups: AvailableClassGroup[]; lang: Lang }> = ({
   groups,
   lang,
@@ -138,12 +123,10 @@ const MiniCalendar: React.FC<{ groups: AvailableClassGroup[]; lang: Lang }> = ({
     return `${y}-${m}-${day}`;
   };
 
-  // Highlight: cualquier sesión dentro del mes
   const highlighted = useMemo(() => {
     const set = new Set<string>();
     for (const g of groups) {
       for (const s of g.sessions) {
-        // solo marcar sesiones del mes visible
         const dt = new Date(s.date_iso);
         if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === year && dt.getMonth() === month) {
           set.add(makeKey(dt));
@@ -198,9 +181,6 @@ const MiniCalendar: React.FC<{ groups: AvailableClassGroup[]; lang: Lang }> = ({
   );
 };
 
-/** =========================
- *  BookingCalendar
- *  ========================= */
 const BookingCalendar: React.FC = () => {
   const navigate = useNavigate();
 
@@ -220,7 +200,6 @@ const BookingCalendar: React.FC = () => {
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
-  /** Load classes grouped */
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -243,7 +222,6 @@ const BookingCalendar: React.FC = () => {
     fetchClasses();
   }, [lang]);
 
-  /** Check admin token */
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
     if (!token) {
@@ -263,10 +241,16 @@ const BookingCalendar: React.FC = () => {
     setSelectedGroup(g);
     setStatus("idle");
     setErrorMessage("");
+    setSelectedSessionId(g.sessions?.[0]?.id ?? null);
+  };
 
-    // preselecciona la primera sesión si existe
-    const first = g.sessions?.[0]?.id ?? null;
-    setSelectedSessionId(first);
+  const getGroupSpotsLabel = (g: AvailableClassGroup) => {
+    const minSpots = g.sessions.reduce(
+      (acc, s) => Math.min(acc, s.spots_left),
+      Number.POSITIVE_INFINITY
+    );
+    const spots = Number.isFinite(minSpots) ? minSpots : 0;
+    return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t("seatsAvailable")}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -299,7 +283,6 @@ const BookingCalendar: React.FC = () => {
     setErrorMessage("");
 
     try {
-      // Reservamos UNA sesión (id real de class_sessions)
       const payload = {
         class_id: session.id,
         name: selectedGroup.title,
@@ -308,12 +291,10 @@ const BookingCalendar: React.FC = () => {
       };
 
       await api.post("/api/bookings", payload);
-
       setStatus("success");
     } catch (err: any) {
       console.error("Error creando booking:", err);
       setStatus("error");
-
       const msg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
@@ -322,27 +303,17 @@ const BookingCalendar: React.FC = () => {
     }
   };
 
-  /** Total seats label (simple: usa el mínimo cupo entre sesiones como referencia) */
-  const getGroupSpotsLabel = (g: AvailableClassGroup) => {
-    const minSpots = g.sessions.reduce((acc, s) => Math.min(acc, s.spots_left), Number.POSITIVE_INFINITY);
-    const spots = Number.isFinite(minSpots) ? minSpots : 0;
-    return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t("seatsAvailable")}`;
-  };
-
   return (
     <div className="booking-page">
       <div className="booking-card">
         <header className="booking-header">
-          <div className="booking-header-left">
-            <img
-              src="/logo.png"
-              alt="Alonso & Alonso Academy"
-              className="booking-logo"
-            />
+          <div className="booking-header-left booking-header-logo">
+            <img src="/logo.png" alt="Alonso & Alonso Academy" className="booking-logo" />
           </div>
 
           <div className="booking-header-right">
             <div className="booking-header-tag">
+              {/* este dot es el del header (verde) */}
               <span className="dot" />
               <span>{t("updatedTag")}</span>
             </div>
@@ -356,11 +327,7 @@ const BookingCalendar: React.FC = () => {
             </button>
 
             {isAdmin === null ? null : isAdmin ? (
-              <button
-                type="button"
-                className="booking-login-btn"
-                onClick={() => navigate("/admin")}
-              >
+              <button type="button" className="booking-login-btn" onClick={() => navigate("/admin")}>
                 {t("adminPanel")}
               </button>
             ) : (
@@ -372,7 +339,7 @@ const BookingCalendar: React.FC = () => {
         </header>
 
         <div className="booking-layout">
-          {/* LEFT: class list */}
+          {/* LEFT */}
           <section className="class-list-section">
             <div className="class-list-header">
               <h2>{t("availableClassesTitle")}</h2>
@@ -388,38 +355,46 @@ const BookingCalendar: React.FC = () => {
                 availableGroups.map((g) => {
                   const isSelected = selectedGroup?.group_code === g.group_code;
                   const firstSession = g.sessions?.[0];
+
                   const dateLabel = firstSession ? formatDateLabel(firstSession.date_iso, lang) : "";
                   const timeLabel = firstSession ? firstSession.time_range : "";
 
+                  const modalityDotClass = g.modality === "Online" ? "online" : "presencial";
+
                   return (
                     <div key={g.group_code} className="class-list-item">
+                      {/* 👇 mantenemos class-card (ya lo tienes en tu CSS) */}
                       <button
                         type="button"
                         className={"class-card" + (isSelected ? " class-card--selected" : "")}
                         onClick={() => handleSelectGroup(g)}
                       >
                         <div className="class-card-top">
-                          <h3 className="class-card-title">{g.title}</h3>
-                          <span className="class-card-pill">
-                            <span className="dot" /> {g.modality.toUpperCase()}
+                          {/* 👇 IMPORTANTE: usa los nombres que tu CSS ya estiliza */}
+                          <span className="class-title">{g.title}</span>
+
+                          {/* badge “ONLINE” con dot verde/rojo */}
+                          <span className="class-badge">
+                            <span className={`dot ${modalityDotClass}`} />
+                            {g.modality.toUpperCase()}
                           </span>
                         </div>
 
-                        <div className="class-card-meta">
-                          <span>📅 {dateLabel}</span>
-                          <span>⏰ {timeLabel}</span>
+                        <div className="class-meta">
+                          <span className="class-date">{dateLabel}</span>
+                          <span className="class-time">{timeLabel}</span>
                         </div>
 
                         <p className="class-card-desc">{g.description ?? ""}</p>
 
-                        <div className="class-card-bottom">
-                          <span className="class-card-trainer">👤 {g.trainer_name}</span>
-                          <span className="class-card-level">{g.level}</span>
-                          <span className="class-card-spots">{getGroupSpotsLabel(g)}</span>
+                        <div className="class-footer">
+                          <span className="class-trainer">👤 {g.trainer_name}</span>
+                          <span className="class-level">{g.level}</span>
+                          <span className="class-spots">{getGroupSpotsLabel(g)}</span>
                         </div>
                       </button>
 
-                      {/* ✅ Sessions shown UNDER the selected class */}
+                      {/* sesiones debajo */}
                       {isSelected && (
                         <div className="class-sessions">
                           <div className="class-sessions-title">
@@ -433,9 +408,7 @@ const BookingCalendar: React.FC = () => {
                                 <button
                                   type="button"
                                   key={s.id}
-                                  className={
-                                    "class-session-row" + (picked ? " class-session-row--selected" : "")
-                                  }
+                                  className={"class-session-row" + (picked ? " class-session-row--selected" : "")}
                                   onClick={() => setSelectedSessionId(s.id)}
                                 >
                                   <span className="class-session-date">{s.date_iso}</span>
@@ -455,7 +428,7 @@ const BookingCalendar: React.FC = () => {
             </div>
           </section>
 
-          {/* RIGHT: details + calendar */}
+          {/* RIGHT */}
           <section className="booking-detail-section">
             <div className="booking-detail-card">
               <MiniCalendar groups={availableGroups} lang={lang} />
@@ -470,52 +443,22 @@ const BookingCalendar: React.FC = () => {
                   <div className="booking-detail-header">
                     <span className="booking-detail-label">{t("selectedClassLabel")}</span>
                     <h3>{selectedGroup.title}</h3>
+
                     <p className="booking-detail-meta">
                       Trainer: {selectedGroup.trainer_name} · {selectedGroup.level} · {selectedGroup.modality}
                     </p>
+
                     {selectedGroup.description ? (
                       <p className="booking-detail-desc">{selectedGroup.description}</p>
                     ) : null}
                   </div>
 
-                  <div className="booking-detail-sessions">
-                    <h4>
-                      {t("chooseSession")} ({selectedGroup.sessions_count})
-                    </h4>
-
-                    <div className="booking-session-list">
-                      {selectedGroup.sessions.map((s) => {
-                        const picked = selectedSessionId === s.id;
-                        return (
-                          <label
-                            key={s.id}
-                            className={"booking-session-row" + (picked ? " booking-session-row--selected" : "")}
-                          >
-                            <input
-                              type="radio"
-                              name="session"
-                              checked={picked}
-                              onChange={() => setSelectedSessionId(s.id)}
-                            />
-                            <div className="booking-session-info">
-                              <div className="booking-session-date">{s.date_iso}</div>
-                              <div className="booking-session-time">{s.time_range}</div>
-                            </div>
-                            <div className="booking-session-spots">
-                              {s.spots_left} {s.spots_left === 1 ? t("seats") : t("seatsPlural")}
-                            </div>
-                          </label>
-                        );
-                      })}
-                    </div>
-
-                    {selectedSession ? (
-                      <div className="booking-selected-session">
-                        <strong>{t("selectedSession")}:</strong>{" "}
-                        {selectedSession.date_iso} · {selectedSession.time_range}
-                      </div>
-                    ) : null}
-                  </div>
+                  {/* Si quieres, aquí también puedes mantener la lista de sesiones */}
+                  {selectedSession ? (
+                    <p className="booking-detail-meta">
+                      <strong>{t("selectedSession")}:</strong> {selectedSession.date_iso} · {selectedSession.time_range}
+                    </p>
+                  ) : null}
 
                   <form onSubmit={handleSubmit} className="booking-detail-form">
                     <div className="form-group">
@@ -529,13 +472,8 @@ const BookingCalendar: React.FC = () => {
                       />
                     </div>
 
-                    {status === "error" && (
-                      <p className="form-message error">⚠️ {errorMessage}</p>
-                    )}
-
-                    {status === "success" && (
-                      <p className="form-message success">{t("successBooked")}</p>
-                    )}
+                    {status === "error" && <p className="form-message error">⚠️ {errorMessage}</p>}
+                    {status === "success" && <p className="form-message success">{t("successBooked")}</p>}
 
                     <button type="submit" className="booking-button" disabled={status === "loading"}>
                       {status === "loading" ? t("submitLoading") : t("submitLabel")}

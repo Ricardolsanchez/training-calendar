@@ -133,10 +133,7 @@
   color: #e5e7eb;
   font-size: 0.8rem;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.1s ease,
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease,
     border-color 0.15s ease;
 }
 
@@ -217,11 +214,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease,
-    border-color 0.12s ease,
-    background 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease,
+    border-color 0.12s ease, background 0.12s ease;
 }
 
 .class-card:hover {
@@ -232,8 +226,7 @@
 
 .class-card--selected {
   border-color: #e6be52;
-  box-shadow: 0 0 0 1px rgba(230, 190, 82, 0.8),
-    0 18px 45px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 0 1px rgba(230, 190, 82, 0.8), 0 18px 45px rgba(0, 0, 0, 0.9);
   background: radial-gradient(circle at top left, #111827 0, #020617 75%);
 }
 
@@ -386,9 +379,7 @@
   color: #f9fafb;
   font-size: 0.9rem;
   outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
     background-color 0.15s ease;
 }
 
@@ -400,8 +391,7 @@
 .form-group input:focus,
 .form-group textarea:focus {
   border-color: #60a5fa;
-  box-shadow:
-    0 0 0 1px rgba(96, 165, 250, 0.85),
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.85),
     0 0 0 10px rgba(37, 99, 235, 0.2);
   background: rgba(15, 23, 42, 0.95);
 }
@@ -425,27 +415,20 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  box-shadow:
-    0 15px 35px rgba(37, 99, 235, 0.45),
+  box-shadow: 0 15px 35px rgba(37, 99, 235, 0.45),
     0 0 0 1px rgba(15, 23, 42, 0.9);
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease,
-    opacity 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
 
 .booking-button:hover {
   transform: translateY(-1px);
-  box-shadow:
-    0 22px 45px rgba(37, 99, 235, 0.5),
+  box-shadow: 0 22px 45px rgba(37, 99, 235, 0.5),
     0 0 0 1px rgba(15, 23, 42, 0.9);
 }
 
 .booking-button:active {
   transform: translateY(1px);
-  box-shadow:
-    0 10px 25px rgba(15, 23, 42, 0.9),
-    0 0 0 1px rgba(15, 23, 42, 0.9);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.9), 0 0 0 1px rgba(15, 23, 42, 0.9);
 }
 
 .booking-button:disabled {
@@ -563,6 +546,78 @@
   color: #020617;
   font-weight: 700;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
+}
+
+.class-sessions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.class-sessions-title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 8px;
+}
+
+.class-session-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 8px;
+}
+.class-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.class-session-row {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.class-session-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.class-session-row--selected {
+  border-color: rgba(230, 190, 82, 0.9);
+  box-shadow: 0 0 0 1px rgba(230, 190, 82, 0.55);
+  background: rgba(230, 190, 82, 0.08);
+}
+
+.class-session-date,
+.class-session-time,
+.class-session-spots {
+  font-size: 0.82rem;
+  color: #e5e7eb;
+}
+
+.class-session-date {
+  min-width: 110px;
+  opacity: 0.9;
+}
+
+.class-session-time {
+  flex: 1;
+  opacity: 0.95;
+}
+
+.class-session-spots {
+  color: #4ade80;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* =========================== */

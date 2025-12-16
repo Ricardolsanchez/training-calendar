@@ -675,28 +675,6 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleDeleteClass = async (id: number) => {
-    if (!window.confirm(t("confirmDeleteClass"))) return;
-
-    try {
-      await ensureCsrf();
-      await api.delete(`/api/admin/classes/${id}`);
-      setClasses((prev) => prev.filter((c) => c.id !== id));
-
-      // refrescar grouped list
-      if (activeTab === "classes") {
-        try {
-          const res = await api.get("/api/classes-grouped");
-          const list: GroupedClass[] = res.data?.classes ?? res.data ?? [];
-          setGroupedClasses(list);
-        } catch {}
-      }
-    } catch (err) {
-      console.error("Error eliminando clase:", err);
-      alert(t("errorDeleteClass"));
-    }
-  };
-
   // ✅ Add sessions to existing class/group
   const addSessionsToClass = async () => {
     if (!editClass || isNewClass) return;

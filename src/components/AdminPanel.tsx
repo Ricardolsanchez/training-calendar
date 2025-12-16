@@ -342,7 +342,10 @@ const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang>("en");
-  const t = useCallback((key: string) => translations[lang][key] ?? key, [lang]);
+  const t = useCallback(
+    (key: string) => translations[lang][key] ?? key,
+    [lang]
+  );
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
@@ -363,13 +366,17 @@ const AdminPanel: React.FC = () => {
 
   /** ✅ Grouped classes for sessions expand */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
-  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
+  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(
+    null
+  );
   const toggleGroup = (code: string) =>
     setExpandedGroupCode((prev) => (prev === code ? null : code));
 
   /** ✅ Add sessions modal state */
   const [sessionsCount, setSessionsCount] = useState<number>(1);
-  const [sessions, setSessions] = useState<SessionDraft[]>([{ start_time: "", end_time: "" }]);
+  const [sessions, setSessions] = useState<SessionDraft[]>([
+    { start_time: "", end_time: "" },
+  ]);
   const [addingSessions, setAddingSessions] = useState(false);
 
   const setCount = (n: number) => {
@@ -495,14 +502,20 @@ const AdminPanel: React.FC = () => {
   };
 
   const totalDays = (b: Booking) => {
-    if (typeof b.new_training_days === "number" && b.new_training_days > 0) return b.new_training_days;
-    if (typeof b.original_training_days === "number" && b.original_training_days > 0) return b.original_training_days;
+    if (typeof b.new_training_days === "number" && b.new_training_days > 0)
+      return b.new_training_days;
+    if (
+      typeof b.original_training_days === "number" &&
+      b.original_training_days > 0
+    )
+      return b.original_training_days;
 
     // fallback simple
     try {
       const s = new Date(b.start_date);
       const e = new Date(b.end_date);
-      const diff = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const diff =
+        Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       return diff > 0 ? diff : 1;
     } catch {
       return 1;
@@ -557,8 +570,7 @@ const AdminPanel: React.FC = () => {
   const toggleAttendance = async (booking: Booking) => {
     try {
       await ensureCsrf();
-      const next =
-        booking.attendedbutton === true ? false : true; // toggling simple
+      const next = booking.attendedbutton === true ? false : true; // toggling simple
 
       await api.put(`/api/admin/bookings/${booking.id}/attendance`, {
         attendedbutton: next,
@@ -652,7 +664,11 @@ const AdminPanel: React.FC = () => {
         setClasses((prev) =>
           prev.map((c) =>
             c.id === editClass.id
-              ? { ...c, ...editClass, description: editClass.description ?? null }
+              ? {
+                  ...c,
+                  ...editClass,
+                  description: editClass.description ?? null,
+                }
               : c
           )
         );
@@ -881,7 +897,9 @@ const AdminPanel: React.FC = () => {
                           <td>{formatDate(b.end_date)}</td>
                           <td>{totalDays(b)}</td>
                           <td>{b.trainer_name || "—"}</td>
-                          <td className="admin-description-cell">{b.notes || "—"}</td>
+                          <td className="admin-description-cell">
+                            {b.notes || "—"}
+                          </td>
                           <td>{formatDateTime(b.created_at)}</td>
 
                           <td>
@@ -891,7 +909,8 @@ const AdminPanel: React.FC = () => {
                               onClick={() => toggleAttendance(b)}
                               title={attendanceLabel}
                             >
-                              {b.attendedbutton === true ? "✅" : "⬜"} {attendanceLabel}
+                              {b.attendedbutton === true ? "✅" : "⬜"}{" "}
+                              {attendanceLabel}
                             </button>
                           </td>
 
@@ -919,7 +938,9 @@ const AdminPanel: React.FC = () => {
                               <button
                                 type="button"
                                 className="btn btn-primary"
-                                onClick={() => updateBookingStatus(b.id, "accepted")}
+                                onClick={() =>
+                                  updateBookingStatus(b.id, "accepted")
+                                }
                               >
                                 ✅ {t("btnAccept")}
                               </button>
@@ -927,7 +948,9 @@ const AdminPanel: React.FC = () => {
                               <button
                                 type="button"
                                 className="btn btn-danger"
-                                onClick={() => updateBookingStatus(b.id, "denied")}
+                                onClick={() =>
+                                  updateBookingStatus(b.id, "denied")
+                                }
                               >
                                 ❌ {t("btnDeny")}
                               </button>
@@ -1025,7 +1048,9 @@ const AdminPanel: React.FC = () => {
                                   className="btn btn-secondary btn-outline"
                                   onClick={() => toggleGroup(g.group_code)}
                                 >
-                                  {isOpen ? `➖ ${t("collapse")}` : `➕ ${t("expand")}`}
+                                  {isOpen
+                                    ? `➖ ${t("collapse")}`
+                                    : `➕ ${t("expand")}`}
                                 </button>
 
                                 {/* Edit: abrimos el modal con la sesión 1 (si existe) */}
@@ -1035,9 +1060,14 @@ const AdminPanel: React.FC = () => {
                                   disabled={!firstSessionId}
                                   onClick={() => {
                                     if (!firstSessionId) return;
-                                    const cls = classes.find((c) => c.id === firstSessionId);
+                                    const cls = classes.find(
+                                      (c) => c.id === firstSessionId
+                                    );
                                     if (cls) openEditClassModal(cls);
-                                    else alert("Could not find that session in admin classes list.");
+                                    else
+                                      alert(
+                                        "Could not find that session in admin classes list."
+                                      );
                                   }}
                                 >
                                   ✏️ {t("btnEditClass")}
@@ -1053,7 +1083,10 @@ const AdminPanel: React.FC = () => {
                                   <strong>{t("sessions")}:</strong>
                                 </div>
 
-                                <div className="admin-table-wrapper" style={{ marginTop: 6 }}>
+                                <div
+                                  className="admin-table-wrapper"
+                                  style={{ marginTop: 6 }}
+                                >
                                   <table className="admin-table">
                                     <thead>
                                       <tr>
@@ -1107,10 +1140,18 @@ const AdminPanel: React.FC = () => {
             {statsError && <p className="admin-message">{statsError}</p>}
 
             {!statsLoading && !statsError && kpis && (
-              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 12,
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                }}
+              >
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiTotalClasses")}</div>
-                  <div className="admin-kpi-value">{kpis.total_classes_created}</div>
+                  <div className="admin-kpi-value">
+                    {kpis.total_classes_created}
+                  </div>
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiAccepted")}</div>
@@ -1122,7 +1163,9 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiNotAttended")}</div>
-                  <div className="admin-kpi-value">{kpis.not_attended_total}</div>
+                  <div className="admin-kpi-value">
+                    {kpis.not_attended_total}
+                  </div>
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiNotMarked")}</div>
@@ -1130,7 +1173,9 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiTotalAttended")}</div>
-                  <div className="admin-kpi-value">{kpis.total_attended_overall}</div>
+                  <div className="admin-kpi-value">
+                    {kpis.total_attended_overall}
+                  </div>
                 </div>
               </div>
             )}
@@ -1239,9 +1284,17 @@ const AdminPanel: React.FC = () => {
               className="form-input"
               type="text"
               value={editClass.title}
-              onChange={(e) =>
-                setEditClass({ ...editClass, title: e.target.value })
-              }
+              onChange={(e) => {
+                const newStart = e.target.value;
+                setEditClass((prev) => {
+                  if (!prev) return prev;
+                  const end =
+                    prev.end_date && prev.end_date >= newStart
+                      ? prev.end_date
+                      : newStart;
+                  return { ...prev, start_date: newStart, end_date: end };
+                });
+              }}
             />
 
             <label>{t("labelTrainer")}</label>
@@ -1272,9 +1325,10 @@ const AdminPanel: React.FC = () => {
                 <input
                   className="form-input"
                   type="date"
-                  value={editClass.start_date}
+                  value={editClass.end_date}
+                  min={editClass.start_date || undefined}
                   onChange={(e) =>
-                    setEditClass({ ...editClass, start_date: e.target.value })
+                    setEditClass({ ...editClass, end_date: e.target.value })
                   }
                 />
               </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import "./BookingCalendar.css";
@@ -198,6 +198,15 @@ const BookingCalendar: React.FC = () => {
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
+  // ✅ carousel ref
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollCarousel = (dir: -1 | 1) => {
+    const el = carouselRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * 460, behavior: "smooth" }); // ancho aprox de card + gap
+  };
+
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -208,7 +217,14 @@ const BookingCalendar: React.FC = () => {
         const data = res.data;
         const list = (data?.classes ?? data) as AvailableClassGroup[];
 
-        setAvailableGroups(Array.isArray(list) ? list : []);
+        const normalized = Array.isArray(list) ? list : [];
+        setAvailableGroups(normalized);
+
+        // Si no hay selección aún, autoselecciona la primera
+        if (normalized.length && !selectedGroup) {
+          setSelectedGroup(normalized[0]);
+          setSelectedSessionId(normalized[0]?.sessions?.[0]?.id ?? null);
+        }
       } catch (err) {
         console.error("Error cargando clases:", err);
         setClassesError(t("noClassesError"));
@@ -282,16 +298,13 @@ const BookingCalendar: React.FC = () => {
     setErrorMessage("");
 
     try {
-      // ✅ FIX: tu backend exige start_date y end_date (y end_date >= start_date)
       const payload = {
-        class_id: session.id,                 // id REAL de la sesión
+        class_id: session.id,
         name: selectedGroup.title,
         email,
         trainer_name: selectedGroup.trainer_name ?? null,
-
-        start_date: session.date_iso,         // REQUIRED
-        end_date: session.date_iso,           // REQUIRED (mismo día)
-
+        start_date: session.date_iso,
+        end_date: session.date_iso,
         notes: `Booking for "${selectedGroup.title}" on ${session.date_iso} (${session.time_range})`,
       };
 
@@ -301,7 +314,6 @@ const BookingCalendar: React.FC = () => {
       console.error("Error creando booking:", err);
       setStatus("error");
 
-      // ✅ muestra mensaje de validación completo si viene
       const backendMsg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
@@ -357,85 +369,107 @@ const BookingCalendar: React.FC = () => {
               <p>{t("availableClassesSubtitle")}</p>
             </div>
 
-            <div className="class-list">
-              {loadingClasses && <p className="form-message">{t("loadingClasses")}</p>}
-              {classesError && <p className="form-message error">{classesError}</p>}
+            {loadingClasses && <p className="form-message">{t("loadingClasses")}</p>}
+            {classesError && <p className="form-message error">{classesError}</p>}
 
-              {!loadingClasses &&
-                !classesError &&
-                availableGroups.map((g) => {
-                  const isSelected = selectedGroup?.group_code === g.group_code;
-                  const firstSession = g.sessions?.[0];
+            {!loadingClasses && !classesError && (
+              <>
+                {/* ✅ CAROUSEL */}
+                <div className="class-carousel">
+                  <button
+                    type="button"
+                    className="carousel-btn carousel-btn--left"
+                    onClick={() => scrollCarousel(-1)}
+                    aria-label="Previous"
+                  >
+                    ‹
+                  </button>
 
-                  const dateLabel = firstSession ? formatDateLabel(firstSession.date_iso, lang) : "";
-                  const timeLabel = firstSession ? firstSession.time_range : "";
+                  <div className="class-carousel-viewport" ref={carouselRef}>
+                    <div className="class-carousel-track">
+                      {availableGroups.map((g) => {
+                        const isSelected = selectedGroup?.group_code === g.group_code;
+                        const firstSession = g.sessions?.[0];
 
-                  const modalityDotClass = g.modality === "Online" ? "online" : "presencial";
+                        const dateLabel = firstSession ? formatDateLabel(firstSession.date_iso, lang) : "";
+                        const timeLabel = firstSession ? firstSession.time_range : "";
+                        const modalityDotClass = g.modality === "Online" ? "online" : "presencial";
 
-                  return (
-                    <div key={g.group_code} className="class-list-item">
-                      <button
-                        type="button"
-                        className={"class-card" + (isSelected ? " class-card--selected" : "")}
-                        onClick={() => handleSelectGroup(g)}
-                      >
-                        <div className="class-card-top">
-                          <span className="class-title">{g.title}</span>
+                        return (
+                          <button
+                            key={g.group_code}
+                            type="button"
+                            className={"class-card class-card--carousel" + (isSelected ? " class-card--selected" : "")}
+                            onClick={() => handleSelectGroup(g)}
+                          >
+                            <div className="class-card-top">
+                              <span className="class-title">{g.title}</span>
 
-                          <span className="class-badge">
-                            <span className={`dot ${modalityDotClass}`} />
-                            {g.modality.toUpperCase()}
-                          </span>
-                        </div>
+                              <span className="class-badge">
+                                <span className={`dot ${modalityDotClass}`} />
+                                {g.modality.toUpperCase()}
+                              </span>
+                            </div>
 
-                        <div className="class-meta">
-                          <span className="class-date">{dateLabel}</span>
-                          <span className="class-time">{timeLabel}</span>
-                        </div>
+                            <div className="class-meta">
+                              <span className="class-date">{dateLabel}</span>
+                              <span className="class-time">{timeLabel}</span>
+                            </div>
 
-                        {!!g.description && <p className="class-card-desc">{g.description}</p>}
+                            {!!g.description && <p className="class-card-desc">{g.description}</p>}
 
-                        <div className="class-footer">
-                          <span className="class-trainer">👤 {g.trainer_name}</span>
-                          <span className="class-level">{g.level}</span>
-                          <span className="class-spots">{getGroupSpotsLabel(g)}</span>
-                        </div>
-                      </button>
-
-                      {isSelected && (
-                        <div className="class-sessions">
-                          <div className="class-sessions-title">
-                            {t("sessions")} ({g.sessions_count})
-                          </div>
-
-                          <div className="class-sessions-list">
-                            {g.sessions.map((s) => {
-                              const picked = selectedSessionId === s.id;
-
-                              return (
-                                <button
-                                  type="button"
-                                  key={s.id}
-                                  className={
-                                    "class-session-row" + (picked ? " class-session-row--selected" : "")
-                                  }
-                                  onClick={() => setSelectedSessionId(s.id)}
-                                >
-                                  <span className="class-session-date">{s.date_iso}</span>
-                                  <span className="class-session-time">{s.time_range}</span>
-                                  <span className="class-session-spots">
-                                    {s.spots_left} {s.spots_left === 1 ? t("seats") : t("seatsPlural")}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                            <div className="class-footer">
+                              <span className="class-trainer">👤 {g.trainer_name}</span>
+                              <span className="class-level">{g.level}</span>
+                              <span className="class-spots">{getGroupSpotsLabel(g)}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-            </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="carousel-btn carousel-btn--right"
+                    onClick={() => scrollCarousel(1)}
+                    aria-label="Next"
+                  >
+                    ›
+                  </button>
+                </div>
+
+                {/* ✅ SESSIONS (debajo del carrusel) */}
+                {selectedGroup && (
+                  <div className="class-sessions class-sessions--below">
+                    <div className="class-sessions-title">
+                      {t("sessions")} ({selectedGroup.sessions_count})
+                    </div>
+
+                    <div className="class-sessions-list">
+                      {selectedGroup.sessions.map((s) => {
+                        const picked = selectedSessionId === s.id;
+
+                        return (
+                          <button
+                            type="button"
+                            key={s.id}
+                            className={"class-session-row" + (picked ? " class-session-row--selected" : "")}
+                            onClick={() => setSelectedSessionId(s.id)}
+                          >
+                            <span className="class-session-date">{s.date_iso}</span>
+                            <span className="class-session-time">{s.time_range}</span>
+                            <span className="class-session-spots">
+                              {s.spots_left} {s.spots_left === 1 ? t("seats") : t("seatsPlural")}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </section>
 
           {/* RIGHT */}

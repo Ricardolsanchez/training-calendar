@@ -698,6 +698,12 @@
 .admin-session-pill {
   margin-top: 8px;
 }
+.admin-class-actions{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  align-items:center;
+}
 
 /* ===========================
   RESPONSIVE

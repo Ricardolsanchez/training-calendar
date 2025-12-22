@@ -1525,34 +1525,7 @@ const AdminPanel: React.FC = () => {
                       }
                     />
                   </div>
-
-                  <div>
-                    <label>{t("labelStartTime")}</label>
-                    <input
-                      type="time"
-                      className="form-input"
-                      value={editClass.start_time}
-                      onChange={(e) =>
-                        setEditClass({
-                          ...editClass,
-                          start_time: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label>{t("labelEndTime")}</label>
-                    <input
-                      type="time"
-                      className="form-input"
-                      value={editClass.end_time}
-                      onChange={(e) =>
-                        setEditClass({ ...editClass, end_time: e.target.value })
-                      }
-                    />
-                  </div>
                 </div>
-
                 <label>{t("labelType")}</label>
                 <select
                   className="form-select"

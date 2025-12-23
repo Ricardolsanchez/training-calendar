@@ -48,7 +48,6 @@
   margin-bottom: 2.5rem;
 }
 
-/* logo */
 .booking-header-logo {
   flex-shrink: 0;
   display: flex;
@@ -61,7 +60,6 @@
   object-fit: contain;
 }
 
-/* right buttons */
 .booking-header-right {
   display: flex;
   align-items: center;
@@ -210,7 +208,6 @@
   padding: 0.25rem 0.25rem;
 }
 
-/* ✅ tarjeta en modo carrusel */
 .class-card--carousel {
   width: 430px;
   min-width: 430px;
@@ -332,7 +329,7 @@
 }
 
 .class-sessions--below {
-  max-width: 920px; /* para que se vea “bajo” el carrusel y no infinito */
+  max-width: 920px;
 }
 
 .class-sessions-title {
@@ -637,6 +634,8 @@
   background: rgba(15, 23, 42, 0.9);
   color: #e5e7eb;
   border: 1px solid rgba(55, 65, 81, 0.8);
+  position: relative;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
 .mini-calendar-day.empty {
@@ -644,16 +643,57 @@
   border: none;
 }
 
+/* ✅ days with sessions */
 .mini-calendar-day--highlight {
   background: linear-gradient(135deg, #d10000, #e6be52);
   border-color: rgba(234, 179, 8, 0.9);
   color: #020617;
-  font-weight: 700;
+  font-weight: 800;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
 }
-.mini-calendar-day--range{
-  outline: 2px solid rgba(255, 180, 0, .55);
-  box-shadow: 0 0 0 3px rgba(255, 180, 0, .10);
+
+/* ✅ PRO RANGE: same palette as highlight, pill bar */
+.mini-calendar-day--range {
+  /* priority over default */
+  background: linear-gradient(135deg, #d10000, #e6be52);
+  border-color: rgba(234, 179, 8, 0.9);
+  color: #020617;
+  font-weight: 800;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
+}
+
+/* when day is both highlight and range, keep range look (same anyway) */
+.mini-calendar-day--highlight.mini-calendar-day--range {
+  filter: brightness(1.02);
+}
+
+/* range “positions” to create connected pills */
+.mini-calendar-day--range-mid {
+  border-radius: 10px;
+}
+
+.mini-calendar-day--range-start {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+
+.mini-calendar-day--range-end {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+
+.mini-calendar-day--range-single {
+  border-radius: 999px;
+}
+
+/* subtle pop */
+.mini-calendar-day--range:hover,
+.mini-calendar-day--highlight:hover {
+  transform: translateY(-1px);
 }
 
 /* =========================== */
@@ -695,7 +735,7 @@
   }
 
   .carousel-btn {
-    display: none; /* en móvil, swipe horizontal natural */
+    display: none;
   }
 
   .class-card--carousel {

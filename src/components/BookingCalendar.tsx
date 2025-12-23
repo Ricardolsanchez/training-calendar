@@ -57,8 +57,6 @@ const translations: Record<Lang, Record<string, string>> = {
     sessions: "Sessions",
     highlightedHint: "Highlighted: days with classes",
     selectedSession: "Selected session",
-    startDate: "Start Date",
-    endDate: "End Date",
   },
   es: {
     updatedTag: "Actualizado",
@@ -88,8 +86,6 @@ const translations: Record<Lang, Record<string, string>> = {
     sessions: "Sesiones",
     highlightedHint: "Resaltado: días con clases",
     selectedSession: "Sesión seleccionada",
-    startDate: "Fecha inicio",
-    endDate: "Fecha fin",
   },
 };
 
@@ -149,11 +145,7 @@ const getMonthAnchor = (
   groups: AvailableClassGroup[],
   selectedGroup: AvailableClassGroup | null
 ) => {
-  // ✅ Prefer selected group’s start date
-  if (selectedGroup?.start_date_iso)
-    return parseLocalDate(selectedGroup.start_date_iso);
-
-  // fallback to first group’s first session
+  if (selectedGroup?.start_date_iso) return parseLocalDate(selectedGroup.start_date_iso);
   const first = groups[0]?.sessions?.[0]?.date_iso;
   return first ? parseLocalDate(first) : new Date();
 };
@@ -193,25 +185,16 @@ const MiniCalendar: React.FC<{
   const firstWeekday = monthStart.getDay();
 
   const days: Date[] = [];
-  for (
-    let d = new Date(monthStart);
-    d <= monthEnd;
-    d.setDate(d.getDate() + 1)
-  ) {
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
 
-  // ✅ “days with classes” (as before) – based on sessions
   const daysWithSessions = useMemo(() => {
     const set = new Set<string>();
     for (const g of groups) {
       for (const s of g.sessions) {
         const dt = parseLocalDate(s.date_iso);
-        if (
-          !Number.isNaN(dt.getTime()) &&
-          dt.getFullYear() === year &&
-          dt.getMonth() === month
-        ) {
+        if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === year && dt.getMonth() === month) {
           set.add(makeKey(dt));
         }
       }
@@ -219,7 +202,6 @@ const MiniCalendar: React.FC<{
     return set;
   }, [groups, year, month]);
 
-  // ✅ Selected class range (uses backend start/end if available)
   const selectedRange = useMemo(() => {
     if (!selectedGroup) return new Set<string>();
     const { start, end } = getGroupRange(selectedGroup);
@@ -260,9 +242,26 @@ const MiniCalendar: React.FC<{
 
         {days.map((d) => {
           const key = makeKey(d);
-
           const hasSession = daysWithSessions.has(key);
-          const inSelectedRange = selectedRange.has(key);
+          const inRange = selectedRange.has(key);
+
+          const prev = new Date(d);
+          prev.setDate(prev.getDate() - 1);
+          const next = new Date(d);
+          next.setDate(next.getDate() + 1);
+
+          const prevInRange = selectedRange.has(makeKey(prev));
+          const nextInRange = selectedRange.has(makeKey(next));
+
+          const rangePosClass = inRange
+            ? !prevInRange && nextInRange
+              ? " mini-calendar-day--range-start"
+              : prevInRange && !nextInRange
+              ? " mini-calendar-day--range-end"
+              : prevInRange && nextInRange
+              ? " mini-calendar-day--range-mid"
+              : " mini-calendar-day--range-single"
+            : "";
 
           return (
             <div
@@ -270,7 +269,8 @@ const MiniCalendar: React.FC<{
               className={
                 "mini-calendar-day" +
                 (hasSession ? " mini-calendar-day--highlight" : "") +
-                (inSelectedRange ? " mini-calendar-day--range" : "")
+                (inRange ? " mini-calendar-day--range" : "") +
+                rangePosClass
               }
             >
               {d.getDate()}
@@ -288,17 +288,12 @@ const BookingCalendar: React.FC = () => {
   const [lang, setLang] = useState<Lang>("en");
   const t = (key: string) => translations[lang][key];
 
-  const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>(
-    []
-  );
+  const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
 
-  const [selectedGroup, setSelectedGroup] =
-    useState<AvailableClassGroup | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
-    null
-  );
+  const [selectedGroup, setSelectedGroup] = useState<AvailableClassGroup | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -355,9 +350,7 @@ const BookingCalendar: React.FC = () => {
 
   const selectedSession = useMemo(() => {
     if (!selectedGroup || !selectedSessionId) return null;
-    return (
-      selectedGroup.sessions.find((s) => s.id === selectedSessionId) ?? null
-    );
+    return selectedGroup.sessions.find((s) => s.id === selectedSessionId) ?? null;
   }, [selectedGroup, selectedSessionId]);
 
   const handleSelectGroup = (g: AvailableClassGroup) => {
@@ -373,9 +366,7 @@ const BookingCalendar: React.FC = () => {
       Number.POSITIVE_INFINITY
     );
     const spots = Number.isFinite(minSpots) ? minSpots : 0;
-    return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t(
-      "seatsAvailable"
-    )}`;
+    return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t("seatsAvailable")}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -397,9 +388,7 @@ const BookingCalendar: React.FC = () => {
       return;
     }
 
-    const session = selectedGroup.sessions.find(
-      (s) => s.id === selectedSessionId
-    );
+    const session = selectedGroup.sessions.find((s) => s.id === selectedSessionId);
     if (!session) {
       setStatus("error");
       setErrorMessage(t("errorNoSession"));
@@ -437,9 +426,7 @@ const BookingCalendar: React.FC = () => {
         ? Object.values(err.response.data.errors).flat().join(" ")
         : "";
 
-      setErrorMessage(
-        fieldErrors ? `${backendMsg} ${fieldErrors}` : String(backendMsg)
-      );
+      setErrorMessage(fieldErrors ? `${backendMsg} ${fieldErrors}` : String(backendMsg));
     }
   };
 
@@ -493,12 +480,8 @@ const BookingCalendar: React.FC = () => {
               <p>{t("availableClassesSubtitle")}</p>
             </div>
 
-            {loadingClasses && (
-              <p className="form-message">{t("loadingClasses")}</p>
-            )}
-            {classesError && (
-              <p className="form-message error">{classesError}</p>
-            )}
+            {loadingClasses && <p className="form-message">{t("loadingClasses")}</p>}
+            {classesError && <p className="form-message error">{classesError}</p>}
 
             {!loadingClasses && !classesError && (
               <>
@@ -515,18 +498,14 @@ const BookingCalendar: React.FC = () => {
                   <div className="class-carousel-viewport" ref={carouselRef}>
                     <div className="class-carousel-track">
                       {availableGroups.map((g) => {
-                        const isSelected =
-                          selectedGroup?.group_code === g.group_code;
+                        const isSelected = selectedGroup?.group_code === g.group_code;
                         const firstSession = g.sessions?.[0];
 
                         const dateLabel = formatRangeLabel(g, lang);
-                        const timeLabel = firstSession
-                          ? firstSession.time_range
-                          : "";
+                        const timeLabel = firstSession ? firstSession.time_range : "";
+
                         const modalityDotClass =
                           g.modality === "Online" ? "online" : "presencial";
-
-                        const { start, end } = getGroupRange(g);
 
                         return (
                           <button
@@ -547,15 +526,10 @@ const BookingCalendar: React.FC = () => {
                               </span>
                             </div>
 
+                            {/* ✅ PRO: no repetimos fechas. Solo range label + hora */}
                             <div className="class-meta">
                               <span className="class-date">{dateLabel}</span>
                               <span className="class-time">{timeLabel}</span>
-                              <span className="class-range">
-                                {t("startDate")}:{" "}
-                                {start ? formatDateLabel(start, lang) : "—"} ·{" "}
-                                {t("endDate")}:{" "}
-                                {end ? formatDateLabel(end, lang) : "—"}
-                              </span>
                             </div>
 
                             {!!g.description && (
@@ -563,13 +537,9 @@ const BookingCalendar: React.FC = () => {
                             )}
 
                             <div className="class-footer">
-                              <span className="class-trainer">
-                                👤 {g.trainer_name}
-                              </span>
+                              <span className="class-trainer">👤 {g.trainer_name}</span>
                               <span className="class-level">{g.level}</span>
-                              <span className="class-spots">
-                                {getGroupSpotsLabel(g)}
-                              </span>
+                              <span className="class-spots">{getGroupSpotsLabel(g)}</span>
                             </div>
                           </button>
                         );
@@ -610,14 +580,9 @@ const BookingCalendar: React.FC = () => {
                             <span className="class-session-date">
                               {formatDateLabel(s.date_iso, lang)}
                             </span>
-                            <span className="class-session-time">
-                              {s.time_range}
-                            </span>
+                            <span className="class-session-time">{s.time_range}</span>
                             <span className="class-session-spots">
-                              {s.spots_left}{" "}
-                              {s.spots_left === 1
-                                ? t("seats")
-                                : t("seatsPlural")}
+                              {s.spots_left} {s.spots_left === 1 ? t("seats") : t("seatsPlural")}
                             </span>
                           </button>
                         );
@@ -646,28 +611,22 @@ const BookingCalendar: React.FC = () => {
               ) : (
                 <>
                   <div className="booking-detail-header">
-                    <span className="booking-detail-label">
-                      {t("selectedClassLabel")}
-                    </span>
+                    <span className="booking-detail-label">{t("selectedClassLabel")}</span>
                     <h3>{selectedGroup.title}</h3>
 
                     <p className="booking-detail-meta">
-                      Trainer: {selectedGroup.trainer_name} ·{" "}
-                      {selectedGroup.level} · {selectedGroup.modality}
+                      Trainer: {selectedGroup.trainer_name} · {selectedGroup.level} · {selectedGroup.modality}
                     </p>
 
                     {selectedGroup.description ? (
-                      <p className="booking-detail-desc">
-                        {selectedGroup.description}
-                      </p>
+                      <p className="booking-detail-desc">{selectedGroup.description}</p>
                     ) : null}
                   </div>
 
                   {selectedSession ? (
                     <p className="booking-detail-meta">
                       <strong>{t("selectedSession")}:</strong>{" "}
-                      {formatDateLabel(selectedSession.date_iso, lang)} ·{" "}
-                      {selectedSession.time_range}
+                      {formatDateLabel(selectedSession.date_iso, lang)} · {selectedSession.time_range}
                     </p>
                   ) : null}
 
@@ -683,23 +642,11 @@ const BookingCalendar: React.FC = () => {
                       />
                     </div>
 
-                    {status === "error" && (
-                      <p className="form-message error">⚠️ {errorMessage}</p>
-                    )}
-                    {status === "success" && (
-                      <p className="form-message success">
-                        {t("successBooked")}
-                      </p>
-                    )}
+                    {status === "error" && <p className="form-message error">⚠️ {errorMessage}</p>}
+                    {status === "success" && <p className="form-message success">{t("successBooked")}</p>}
 
-                    <button
-                      type="submit"
-                      className="booking-button"
-                      disabled={status === "loading"}
-                    >
-                      {status === "loading"
-                        ? t("submitLoading")
-                        : t("submitLabel")}
+                    <button type="submit" className="booking-button" disabled={status === "loading"}>
+                      {status === "loading" ? t("submitLoading") : t("submitLabel")}
                     </button>
 
                     <p className="booking-privacy">{t("privacyText")}</p>

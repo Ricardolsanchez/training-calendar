@@ -651,6 +651,10 @@
   font-weight: 700;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
 }
+.mini-calendar-day--range{
+  outline: 2px solid rgba(255, 180, 0, .55);
+  box-shadow: 0 0 0 3px rgba(255, 180, 0, .10);
+}
 
 /* =========================== */
 /* 📱 RESPONSIVE              */

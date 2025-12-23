@@ -22,6 +22,8 @@ type AvailableClassGroup = {
   description?: string | null;
   sessions_count: number;
   sessions: AvailableSession[];
+  start_date_iso?: string | null;
+  end_date_iso?: string | null;
 };
 
 const translations: Record<Lang, Record<string, string>> = {
@@ -54,6 +56,7 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Highlighted: days with classes",
     selectedSession: "Selected session",
     endDate: "End Date",
+    startDate: "Fecha inicio",
   },
   es: {
     updatedTag: "Actualizado",
@@ -84,6 +87,7 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Resaltado: días con clases",
     selectedSession: "Sesión seleccionada",
     endDate: "Fecha fin",
+    startDate: "Start Date",
   },
 };
 
@@ -306,10 +310,19 @@ const BookingCalendar: React.FC = () => {
   };
 
   const getGroupRange = (g: AvailableClassGroup) => {
+    const startFromApi = g.start_date_iso ?? "";
+    const endFromApi = g.end_date_iso ?? "";
+
+    // ✅ Si viene del backend, úsalo
+    if (startFromApi) {
+      return { start: startFromApi, end: endFromApi || startFromApi };
+    }
+
+    // ⛑️ Fallback: calcula por sesiones
     const dates = (g.sessions ?? [])
       .map((s) => s.date_iso)
       .filter(Boolean)
-      .sort(); // YYYY-MM-DD ordena bien
+      .sort();
 
     const start = dates[0] ?? "";
     const end = dates[dates.length - 1] ?? start;

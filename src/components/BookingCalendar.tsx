@@ -498,9 +498,6 @@ const BookingCalendar: React.FC = () => {
                             </div>
 
                             <div className="class-meta">
-                              <span className="class-date">{dateLabel}</span>
-                              <span className="class-time">{timeLabel}</span>
-
                               <span className="class-range">
                                 {t("startDate")}:{" "}
                                 {start ? formatDateLabel(start, lang) : "—"} · {t("endDate")}:{" "}

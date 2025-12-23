@@ -571,8 +571,11 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  /** ✅ Toggle attendance */
+  /** ✅ Toggle attendance (BLINDADO) */
   const toggleAttendance = async (booking: Booking) => {
+    // ✅ no permitir si no está aceptado
+    if (booking.status !== "accepted") return;
+
     try {
       await ensureCsrf();
       const next = booking.attendedbutton === true ? false : true;
@@ -600,7 +603,6 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      // Borra TODAS las sesiones del grupo (tu endpoint es por ID de sesión)
       for (const s of g.sessions) {
         await api.delete(`/api/admin/classes/${s.id}`);
       }
@@ -823,7 +825,7 @@ const AdminPanel: React.FC = () => {
 
   /** inscritos + paginación */
   const enrolled = useMemo(() => {
-    const list = bookings; // (si quieres solo accepted, cambia a bookings.filter(b=>b.status==="accepted"))
+    const list = bookings;
     return [...list].sort((a, b) => {
       const da = new Date(a.created_at).getTime();
       const db = new Date(b.created_at).getTime();
@@ -965,22 +967,34 @@ const AdminPanel: React.FC = () => {
                         </td>
                         <td>{formatDateTime(b.created_at)}</td>
 
+                        {/* ✅ SOLO SI ACCEPTED */}
                         <td className="attendance-cell">
-                          <button
-                            type="button"
-                            className={
-                              "attendance-switch" +
-                              (b.attendedbutton === true
-                                ? " attendance-switch--active"
-                                : "")
-                            }
-                            onClick={() => toggleAttendance(b)}
-                            aria-label="toggle attendance"
-                            title={attendanceLabel(b)}
-                          />
-                          <div className="mini-pill" style={{ marginTop: 8 }}>
-                            {attendanceLabel(b)}
-                          </div>
+                          {b.status === "accepted" ? (
+                            <>
+                              <button
+                                type="button"
+                                className={
+                                  "attendance-switch" +
+                                  (b.attendedbutton === true
+                                    ? " attendance-switch--active"
+                                    : "")
+                                }
+                                onClick={() => toggleAttendance(b)}
+                                aria-label="toggle attendance"
+                                title={attendanceLabel(b)}
+                              />
+                              <div
+                                className="mini-pill"
+                                style={{ marginTop: 8 }}
+                              >
+                                {attendanceLabel(b)}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="mini-pill" style={{ opacity: 0.7 }}>
+                              —
+                            </div>
+                          )}
                         </td>
 
                         <td>
@@ -1156,7 +1170,6 @@ const AdminPanel: React.FC = () => {
 
                             <div className="admin-divider" />
 
-                            {/* ✅ Edit + Delete */}
                             <div className="admin-class-actions">
                               <button
                                 type="button"
@@ -1337,33 +1350,40 @@ const AdminPanel: React.FC = () => {
                             <td>{formatDate(b.end_date)}</td>
                             <td>{b.trainer_name || "—"}</td>
 
+                            {/* ✅ SOLO SI ACCEPTED (también en stats) */}
                             <td className="attendance-cell">
-                              <div className="attendance-inline">
-                                <button
-                                  type="button"
-                                  className={
-                                    "attendance-switch" +
-                                    (b.attendedbutton === true
-                                      ? " attendance-switch--active"
-                                      : "")
-                                  }
-                                  onClick={() => toggleAttendance(b)}
-                                  aria-label="toggle attendance"
-                                  title={attendanceLabel(b)}
-                                />
-                                <span
-                                  className={
-                                    "mini-pill " +
-                                    (b.attendedbutton === true
-                                      ? "mini-pill--ok"
-                                      : b.attendedbutton === false
-                                      ? "mini-pill--off"
-                                      : "")
-                                  }
-                                >
-                                  {attendanceLabel(b)}
+                              {b.status === "accepted" ? (
+                                <div className="attendance-inline">
+                                  <button
+                                    type="button"
+                                    className={
+                                      "attendance-switch" +
+                                      (b.attendedbutton === true
+                                        ? " attendance-switch--active"
+                                        : "")
+                                    }
+                                    onClick={() => toggleAttendance(b)}
+                                    aria-label="toggle attendance"
+                                    title={attendanceLabel(b)}
+                                  />
+                                  <span
+                                    className={
+                                      "mini-pill " +
+                                      (b.attendedbutton === true
+                                        ? "mini-pill--ok"
+                                        : b.attendedbutton === false
+                                        ? "mini-pill--off"
+                                        : "")
+                                    }
+                                  >
+                                    {attendanceLabel(b)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="mini-pill" style={{ opacity: 0.7 }}>
+                                  —
                                 </span>
-                              </div>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1526,6 +1546,7 @@ const AdminPanel: React.FC = () => {
                     />
                   </div>
                 </div>
+
                 <label>{t("labelType")}</label>
                 <select
                   className="form-select"
@@ -1624,7 +1645,10 @@ const AdminPanel: React.FC = () => {
                           value={s.end_time}
                           onChange={(e) => {
                             const next = [...sessions];
-                            next[idx] = { ...next[idx], end_time: e.target.value };
+                            next[idx] = {
+                              ...next[idx],
+                              end_time: e.target.value,
+                            };
                             setSessions(next);
                           }}
                         />

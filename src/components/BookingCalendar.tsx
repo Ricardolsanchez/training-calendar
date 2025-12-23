@@ -53,6 +53,7 @@ const translations: Record<Lang, Record<string, string>> = {
     sessions: "Sessions",
     highlightedHint: "Highlighted: days with classes",
     selectedSession: "Selected session",
+    endDate: "End Date",
   },
   es: {
     updatedTag: "Actualizado",
@@ -82,6 +83,7 @@ const translations: Record<Lang, Record<string, string>> = {
     sessions: "Sesiones",
     highlightedHint: "Resaltado: días con clases",
     selectedSession: "Sesión seleccionada",
+    endDate: "Fecha fin",
   },
 };
 
@@ -493,6 +495,18 @@ const BookingCalendar: React.FC = () => {
                             <div className="class-meta">
                               <span className="class-date">{dateLabel}</span>
                               <span className="class-time">{timeLabel}</span>
+
+                              {(() => {
+                                const { start, end } = getGroupRange(g);
+                                return (
+                                  <span className="class-range">
+                                    {t("startDate")}:{" "}
+                                    {start ? formatDateLabel(start, lang) : "—"}{" "}
+                                    · {t("endDate")}:{" "}
+                                    {end ? formatDateLabel(end, lang) : "—"}
+                                  </span>
+                                );
+                              })()}
                             </div>
 
                             {!!g.description && (

@@ -4,13 +4,19 @@
 
 .admin-page {
   min-height: 100vh;
-  background: radial-gradient(circle at top, #111827 0%, #020617 45%, #000 100%);
+  background: radial-gradient(
+    circle at top,
+    #111827 0%,
+    #020617 45%,
+    #000 100%
+  );
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding: 3rem 1.5rem;
   color: #e5e7eb;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", sans-serif;
 }
 
 .admin-card {
@@ -97,7 +103,8 @@
   cursor: pointer;
   user-select: none;
 
-  transition: transform 0.1s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.1s ease, filter 0.15s ease, background 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .admin-lang-toggle {
@@ -276,7 +283,8 @@
   gap: 8px;
   cursor: pointer;
   white-space: nowrap;
-  transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn:hover {
@@ -386,7 +394,8 @@
 
 .attendance-switch:hover {
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 10px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 .attendance-switch::after {
@@ -433,6 +442,12 @@
 
 .mini-pill--off {
   border-color: rgba(239, 68, 68, 0.35);
+}
+
+.mini-pill--neutral {
+  background: rgba(148, 163, 184, 0.14); /* slate-ish */
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  color: rgba(226, 232, 240, 0.92);
 }
 
 /* ===========================
@@ -698,11 +713,11 @@
 .admin-session-pill {
   margin-top: 8px;
 }
-.admin-class-actions{
-  display:flex;
-  gap:10px;
-  justify-content:flex-end;
-  align-items:center;
+.admin-class-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 /* ===========================

@@ -983,12 +983,18 @@ const AdminPanel: React.FC = () => {
                                 aria-label="toggle attendance"
                                 title={attendanceLabel(b)}
                               />
-                              <div
-                                className="mini-pill"
-                                style={{ marginTop: 8 }}
+                              <span
+                                className={
+                                  "mini-pill " +
+                                  (b.attendedbutton === true
+                                    ? "mini-pill--ok"
+                                    : b.attendedbutton === false
+                                    ? "mini-pill--off"
+                                    : "mini-pill--neutral")
+                                }
                               >
                                 {attendanceLabel(b)}
-                              </div>
+                              </span>
                             </>
                           ) : (
                             <div className="mini-pill" style={{ opacity: 0.7 }}>
@@ -1380,7 +1386,10 @@ const AdminPanel: React.FC = () => {
                                   </span>
                                 </div>
                               ) : (
-                                <span className="mini-pill" style={{ opacity: 0.7 }}>
+                                <span
+                                  className="mini-pill"
+                                  style={{ opacity: 0.7 }}
+                                >
                                   —
                                 </span>
                               )}

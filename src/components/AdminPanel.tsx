@@ -23,7 +23,6 @@ type Booking = {
   status: BookingStatus;
   calendar_url?: string | null;
 
-  // ✅ toggle
   attendedbutton?: boolean | null;
 };
 
@@ -32,8 +31,8 @@ type AvailableClass = {
   title: string;
   trainer_id: number | null;
   trainer_name: string | null;
-  start_date: string;
-  end_date: string;
+  start_date: string; // range start
+  end_date: string; // range end
   start_time: string;
   end_time: string;
   modality: "Online" | "Presencial";
@@ -114,7 +113,6 @@ const translations: Record<Lang, Record<string, string>> = {
     btnDeny: "Deny",
     btnDelete: "Delete",
 
-    // ✅ NUEVO: delete de clases
     btnDeleteClass: "Delete",
     confirmDeleteClassGroup: "Delete this class group and all its sessions?",
 
@@ -180,20 +178,15 @@ const translations: Record<Lang, Record<string, string>> = {
     carouselNext: "Next",
     sessionsPanelTitle: "Sessions for",
 
-    addSessionsTitle: "Sessions (edit hours / count)",
+    addSessionsTitle: "Sessions (edit dates & hours)",
     addSessionsHint:
-      "Edit the start/end time for each session. Increase/decrease the number of sessions and save.",
+      "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
     sessionsCountLabel: "Number of sessions",
+    sessionDateLabel: "Session date",
   },
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-
-    // ✅ NUEVO: delete de clases
-    btnDeleteClass: "Eliminar",
-    confirmDeleteClassGroup:
-      "¿Eliminar este grupo de clases y todas sus sesiones?",
-
     adminSubtitle:
       "Revisa las reservas recibidas y administra las clases disponibles.",
     backToCalendar: "← Calendario",
@@ -227,6 +220,10 @@ const translations: Record<Lang, Record<string, string>> = {
     btnAccept: "Aceptar",
     btnDeny: "Rechazar",
     btnDelete: "Eliminar",
+
+    btnDeleteClass: "Eliminar",
+    confirmDeleteClassGroup:
+      "¿Eliminar este grupo de clases y todas sus sesiones?",
 
     classesTitle: "Clases disponibles",
     colClassTitle: "Título",
@@ -290,10 +287,11 @@ const translations: Record<Lang, Record<string, string>> = {
     carouselNext: "Siguiente",
     sessionsPanelTitle: "Sesiones de",
 
-    addSessionsTitle: "Sesiones (editar horas / cantidad)",
+    addSessionsTitle: "Sesiones (editar fechas y horas)",
     addSessionsHint:
-      "Edita la hora inicio/fin de cada sesión. Sube/baja la cantidad de sesiones y guarda.",
+      "Define la fecha y hora inicio/fin por sesión. Sube/baja la cantidad de sesiones y guarda.",
     sessionsCountLabel: "Número de sesiones",
+    sessionDateLabel: "Fecha de la sesión",
   },
 };
 
@@ -346,11 +344,31 @@ function isKpis(data: unknown): data is Kpis {
   );
 }
 
-type SessionDraft = { id?: number; start_time: string; end_time: string };
+/** ✅ Ahora cada sesión tiene su fecha */
+type SessionDraft = {
+  id?: number;
+  date_iso: string; // YYYY-MM-DD
+  start_time: string;
+  end_time: string;
+};
 
 const parseTimeRange = (tr: string) => {
   const [a, b] = (tr || "").split("-").map((x) => x.trim());
   return { start_time: a || "", end_time: b || "" };
+};
+
+const toISO = (d: Date) => d.toISOString().slice(0, 10);
+
+const addDaysISO = (iso: string, days: number) => {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return toISO(d);
+};
+
+const clampISO = (iso: string, min: string, max: string) => {
+  if (iso < min) return min;
+  if (iso > max) return max;
+  return iso;
 };
 
 const AdminPanel: React.FC = () => {
@@ -402,7 +420,7 @@ const AdminPanel: React.FC = () => {
   /** Sessions Draft (NEW + EDIT) */
   const [sessionsCount, setSessionsCount] = useState<number>(1);
   const [sessions, setSessions] = useState<SessionDraft[]>([
-    { start_time: "", end_time: "" },
+    { date_iso: "", start_time: "", end_time: "" },
   ]);
 
   const setCount = (n: number) => {
@@ -410,7 +428,9 @@ const AdminPanel: React.FC = () => {
     setSessionsCount(safe);
     setSessions((prev) => {
       const next = [...prev];
-      while (next.length < safe) next.push({ start_time: "", end_time: "" });
+      while (next.length < safe) {
+        next.push({ date_iso: "", start_time: "", end_time: "" });
+      }
       return next.slice(0, safe);
     });
   };
@@ -418,6 +438,24 @@ const AdminPanel: React.FC = () => {
   const selectedGroup = expandedGroupCode
     ? groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null
     : null;
+
+  /** ✅ Autocompletar fechas sugeridas por sesión dentro del rango */
+  useEffect(() => {
+    if (!editClass?.start_date) return;
+
+    const min = editClass.start_date;
+    const max = editClass.end_date || editClass.start_date;
+
+    setSessions((prev) =>
+      prev.map((s, idx) => {
+        const suggested = clampISO(addDaysISO(min, idx), min, max);
+        return {
+          ...s,
+          date_iso: s.date_iso ? clampISO(s.date_iso, min, max) : suggested,
+        };
+      })
+    );
+  }, [editClass?.start_date, editClass?.end_date]);
 
   /** Fetch helpers */
   const fetchBookings = useCallback(async () => {
@@ -571,9 +609,8 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  /** ✅ Toggle attendance (BLINDADO) */
+  /** ✅ Toggle attendance (solo accepted) */
   const toggleAttendance = async (booking: Booking) => {
-    // ✅ no permitir si no está aceptado
     if (booking.status !== "accepted") return;
 
     try {
@@ -595,6 +632,12 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const attendanceLabel = (b: Booking) => {
+    if (b.attendedbutton === true) return t("attendanceYes");
+    if (b.attendedbutton === false) return t("attendanceNo");
+    return t("attendanceNotMarked");
+  };
+
   /** ✅ DELETE group (all sessions) */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
@@ -602,14 +645,11 @@ const AdminPanel: React.FC = () => {
 
     try {
       await ensureCsrf();
-
       for (const s of g.sessions) {
         await api.delete(`/api/admin/classes/${s.id}`);
       }
-
       await fetchClasses();
       await fetchGrouped();
-
       setExpandedGroupCode((prev) => (prev === g.group_code ? null : prev));
     } catch (err) {
       console.error("Error deleting class group:", err);
@@ -637,7 +677,7 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
 
     setCount(1);
-    setSessions([{ start_time: "", end_time: "" }]);
+    setSessions([{ date_iso: "", start_time: "", end_time: "" }]);
   };
 
   const openEditClassModal = (cls: AvailableClass) => {
@@ -660,6 +700,7 @@ const AdminPanel: React.FC = () => {
       setSessions(
         group.sessions.map((s) => ({
           id: s.id,
+          date_iso: s.date_iso, // ✅ NUEVO
           ...parseTimeRange(s.time_range),
         }))
       );
@@ -681,6 +722,7 @@ const AdminPanel: React.FC = () => {
       setSessions([
         {
           id: cls.id,
+          date_iso: cls.start_date || "",
           start_time: cls.start_time || "",
           end_time: cls.end_time || "",
         },
@@ -692,11 +734,40 @@ const AdminPanel: React.FC = () => {
   const saveClassChanges = async () => {
     if (!editClass) return;
 
+    // ✅ validación mínima
+    const rangeMin = editClass.start_date || "";
+    const rangeMax = editClass.end_date || editClass.start_date || "";
+
+    const cleanSessions = sessions.map((s) => ({
+      ...s,
+      date_iso: (s.date_iso || "").trim(),
+      start_time: (s.start_time || "").trim(),
+      end_time: (s.end_time || "").trim(),
+    }));
+
+    const missing = cleanSessions.some(
+      (s) => !s.date_iso || !s.start_time || !s.end_time
+    );
+    if (missing) {
+      alert("Please set date + start + end time for every session.");
+      return;
+    }
+
+    // ✅ aseguramos que cada sesión esté dentro del rango
+    if (rangeMin && rangeMax) {
+      const out = cleanSessions.some((s) => s.date_iso < rangeMin || s.date_iso > rangeMax);
+      if (out) {
+        alert("One or more sessions are outside the selected date range.");
+        return;
+      }
+    }
+
     try {
       await ensureCsrf();
 
-      const baseStart = sessions?.[0]?.start_time || editClass.start_time;
-      const baseEnd = sessions?.[0]?.end_time || editClass.end_time;
+      // Base time (fallback)
+      const baseStart = cleanSessions?.[0]?.start_time || editClass.start_time;
+      const baseEnd = cleanSessions?.[0]?.end_time || editClass.end_time;
 
       const payload = {
         title: editClass.title,
@@ -711,18 +782,37 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
+        // crea “la primera sesión/base”
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        const extra = sessions
+        // crea sesiones extra (incluye date_iso)
+        const extra = cleanSessions
           .slice(1)
-          .filter((s) => s.start_time && s.end_time);
+          .filter((s) => s.date_iso && s.start_time && s.end_time);
+
         if (extra.length > 0) {
           await api.post(`/api/admin/classes/${saved.id}/sessions`, {
             sessions: extra.map((s) => ({
+              date_iso: s.date_iso,
               start_time: s.start_time,
               end_time: s.end_time,
             })),
+          });
+        }
+
+        // ✅ si quieres que la primera sesión también tenga su date_iso exacto:
+        // esto asume que tu backend updateSessions acepta date_iso por id
+        if (cleanSessions[0]?.date_iso) {
+          await api.put(`/api/admin/classes/${saved.id}/sessions`, {
+            sessions: [
+              {
+                id: saved.id,
+                date_iso: cleanSessions[0].date_iso,
+                start_time: cleanSessions[0].start_time,
+                end_time: cleanSessions[0].end_time,
+              },
+            ],
           });
         }
 
@@ -731,9 +821,11 @@ const AdminPanel: React.FC = () => {
       } else {
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
+        // ✅ update sessions: incluye date_iso
         await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
-          sessions: sessions.map((s) => ({
+          sessions: cleanSessions.map((s) => ({
             id: s.id,
+            date_iso: s.date_iso,
             start_time: s.start_time,
             end_time: s.end_time,
           })),
@@ -825,8 +917,7 @@ const AdminPanel: React.FC = () => {
 
   /** inscritos + paginación */
   const enrolled = useMemo(() => {
-    const list = bookings;
-    return [...list].sort((a, b) => {
+    return [...bookings].sort((a, b) => {
       const da = new Date(a.created_at).getTime();
       const db = new Date(b.created_at).getTime();
       return db - da;
@@ -844,12 +935,6 @@ const AdminPanel: React.FC = () => {
     const start = (enrolledPageSafe - 1) * ENROLLED_PAGE_SIZE;
     return enrolled.slice(start, start + ENROLLED_PAGE_SIZE);
   }, [enrolled, enrolledPageSafe]);
-
-  const attendanceLabel = (b: Booking) => {
-    if (b.attendedbutton === true) return t("attendanceYes");
-    if (b.attendedbutton === false) return t("attendanceNo");
-    return t("attendanceNotMarked");
-  };
 
   return (
     <div className="admin-page">
@@ -967,7 +1052,7 @@ const AdminPanel: React.FC = () => {
                         </td>
                         <td>{formatDateTime(b.created_at)}</td>
 
-                        {/* ✅ SOLO SI ACCEPTED */}
+                        {/* Solo si accepted */}
                         <td className="attendance-cell">
                           {b.status === "accepted" ? (
                             <>
@@ -1043,9 +1128,7 @@ const AdminPanel: React.FC = () => {
                             <button
                               type="button"
                               className="btn btn-danger"
-                              onClick={() =>
-                                updateBookingStatus(b.id, "denied")
-                              }
+                              onClick={() => updateBookingStatus(b.id, "denied")}
                             >
                               {t("btnDeny")}
                             </button>
@@ -1214,21 +1297,6 @@ const AdminPanel: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {selectedGroup && (
-              <div className="admin-stats-group" style={{ marginTop: 18 }}>
-                <div className="admin-stats-group-header">
-                  <h3>
-                    {t("sessionsPanelTitle")} {selectedGroup.title}
-                  </h3>
-                  <p>
-                    {selectedGroup.trainer_name || t("statsNoTrainer")} •{" "}
-                    {selectedGroup.modality} • {t("sessionsCount")}:{" "}
-                    {selectedGroup.sessions_count}
-                  </p>
-                </div>
-              </div>
-            )}
           </section>
         )}
 
@@ -1356,7 +1424,6 @@ const AdminPanel: React.FC = () => {
                             <td>{formatDate(b.end_date)}</td>
                             <td>{b.trainer_name || "—"}</td>
 
-                            {/* ✅ SOLO SI ACCEPTED (también en stats) */}
                             <td className="attendance-cell">
                               {b.status === "accepted" ? (
                                 <div className="attendance-inline">
@@ -1379,17 +1446,14 @@ const AdminPanel: React.FC = () => {
                                         ? "mini-pill--ok"
                                         : b.attendedbutton === false
                                         ? "mini-pill--off"
-                                        : "")
+                                        : "mini-pill--neutral")
                                     }
                                   >
                                     {attendanceLabel(b)}
                                   </span>
                                 </div>
                               ) : (
-                                <span
-                                  className="mini-pill"
-                                  style={{ opacity: 0.7 }}
-                                >
+                                <span className="mini-pill" style={{ opacity: 0.7 }}>
                                   —
                                 </span>
                               )}
@@ -1401,47 +1465,6 @@ const AdminPanel: React.FC = () => {
                   </div>
                 )}
               </>
-            )}
-
-            {!statsLoading && !statsError && perClass.length > 0 && (
-              <>
-                <h3 style={{ marginTop: 18 }}>{t("statsTitle")}</h3>
-                <div className="admin-table-wrapper">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>{t("colClassTitle")}</th>
-                        <th>{t("colClassStart")}</th>
-                        <th>{t("colClassEnd")}</th>
-                        <th>{t("colClassTrainer")}</th>
-                        <th>Requests</th>
-                        <th>{t("kpiAttended")}</th>
-                        <th>{t("kpiNotAttended")}</th>
-                        <th>{t("kpiNotMarked")}</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {perClass.map((row, idx) => (
-                        <tr key={idx}>
-                          <td>{row.classTitle}</td>
-                          <td>{formatDate(row.start_date)}</td>
-                          <td>{formatDate(row.end_date)}</td>
-                          <td>{row.trainer_name || t("statsNoTrainer")}</td>
-                          <td>{row.requests}</td>
-                          <td>{row.attended}</td>
-                          <td>{row.not_attended}</td>
-                          <td>{row.not_marked}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-
-            {!statsLoading && !statsError && perClass.length === 0 && (
-              <p className="admin-message">{t("statsNoData")}</p>
             )}
           </section>
         )}
@@ -1627,9 +1650,33 @@ const AdminPanel: React.FC = () => {
                   </button>
                 </div>
 
+                {/* ✅ Ahora: DATE + START + END por sesión */}
                 <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
                   {sessions.map((s, idx) => (
                     <div key={idx} className="admin-session-row">
+                      <div>
+                        <label>
+                          {t("sessionDateLabel")} {idx + 1}
+                        </label>
+                        <input
+                          type="date"
+                          className="form-input"
+                          value={s.date_iso}
+                          min={editClass.start_date || undefined}
+                          max={editClass.end_date || editClass.start_date || undefined}
+                          onChange={(e) => {
+                            const next = [...sessions];
+                            const min = editClass.start_date || e.target.value;
+                            const max = editClass.end_date || min;
+                            next[idx] = {
+                              ...next[idx],
+                              date_iso: clampISO(e.target.value, min, max),
+                            };
+                            setSessions(next);
+                          }}
+                        />
+                      </div>
+
                       <div>
                         <label>Session {idx + 1} Start</label>
                         <input
@@ -1638,14 +1685,12 @@ const AdminPanel: React.FC = () => {
                           value={s.start_time}
                           onChange={(e) => {
                             const next = [...sessions];
-                            next[idx] = {
-                              ...next[idx],
-                              start_time: e.target.value,
-                            };
+                            next[idx] = { ...next[idx], start_time: e.target.value };
                             setSessions(next);
                           }}
                         />
                       </div>
+
                       <div>
                         <label>Session {idx + 1} End</label>
                         <input
@@ -1654,10 +1699,7 @@ const AdminPanel: React.FC = () => {
                           value={s.end_time}
                           onChange={(e) => {
                             const next = [...sessions];
-                            next[idx] = {
-                              ...next[idx],
-                              end_time: e.target.value,
-                            };
+                            next[idx] = { ...next[idx], end_time: e.target.value };
                             setSessions(next);
                           }}
                         />

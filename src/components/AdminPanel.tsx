@@ -493,7 +493,7 @@ const AdminPanel: React.FC = () => {
         };
       });
 
-      setClasses(list);
+      // setClasses(list); // not needed (groupedClasses drives UI)
     } catch (err) {
       console.error("Error cargando clases:", err);
     }
@@ -563,10 +563,6 @@ const AdminPanel: React.FC = () => {
   };
 
   /** Booking actions */
-  const openEditBookingModal = (booking: Booking) => {
-    setEditBooking(booking);
-    setShowEditBookingModal(true);
-  };
 
   const saveBookingChanges = async () => {
     if (!editBooking) return;

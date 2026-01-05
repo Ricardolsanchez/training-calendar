@@ -319,9 +319,11 @@ const AdminPanel: React.FC = () => {
     });
   };
 
-  const selectedGroup = expandedGroupCode
-    ? groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null
-    : null;
+  /** ✅ Opción B: selectedGroup SE USA (panel debajo del carrusel) */
+  const selectedGroup = useMemo(() => {
+    if (!expandedGroupCode) return null;
+    return groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null;
+  }, [expandedGroupCode, groupedClasses]);
 
   /** ✅ computed range = min/max de sesiones (para start/end de la clase) */
   const computedRange = useMemo(() => {
@@ -942,7 +944,7 @@ const AdminPanel: React.FC = () => {
                                 className="btn btn-mini"
                                 onClick={() => openEditClassModal(g)}
                               >
-                                {translations[lang].modalEditClass}
+                                {t("modalEditClass")}
                               </button>
 
                               <button
@@ -958,6 +960,38 @@ const AdminPanel: React.FC = () => {
                     );
                   })}
                 </div>
+
+                {/* ✅ OPCIÓN B: Panel de sesiones debajo del carrusel */}
+                {selectedGroup && (
+                  <div style={{ marginTop: 18 }}>
+                    <h3 className="admin-table-title" style={{ marginBottom: 10 }}>
+                      {t("sessionsPanelTitle")} {selectedGroup.title}
+                    </h3>
+
+                    <div className="admin-table-wrapper">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>{t("labelSeats")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedGroup.sessions.map((s, idx) => (
+                            <tr key={s.id}>
+                              <td>{idx + 1}</td>
+                              <td>{formatDate(s.date_iso)}</td>
+                              <td>{s.time_range}</td>
+                              <td>{s.spots_left}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1184,7 +1218,7 @@ const AdminPanel: React.FC = () => {
           </section>
         )}
 
-        {/* STATS (placeholder visual manteniendo tu UI) */}
+        {/* STATS */}
         {activeTab === "stats" && (
           <section className="admin-table-section">
             <div className="enrolled-panel">

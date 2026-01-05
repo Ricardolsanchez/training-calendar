@@ -580,6 +580,21 @@
   color: #cbd5e1;
 }
 
+/* Scroll interno del modal */
+.admin-modal.admin-modal-wide {
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Para que el backdrop no se “mueva” raro en pantallas pequeñas */
+.admin-modal-backdrop {
+  align-items: center; /* o flex-start si lo prefieres */
+  padding: 24px 16px;
+  overflow: hidden;
+}
+
 .form-input,
 .form-select,
 .form-textarea {

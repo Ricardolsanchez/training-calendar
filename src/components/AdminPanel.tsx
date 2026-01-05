@@ -32,8 +32,8 @@ type AvailableClass = {
   trainer_id: number | null;
   trainer_name: string | null;
 
-  start_date: string; // range start
-  end_date: string; // range end
+  start_date: string; // range start (visual hint only)
+  end_date: string; // range end (visual hint only)
 
   start_time: string;
   end_time: string;
@@ -133,20 +133,12 @@ const translations: Record<Lang, Record<string, string>> = {
     colClassDescription: "Description",
     btnEditClass: "Edit",
 
-    modalEditBookingTitle: "Edit booking",
-    modalNameLabel: "Name:",
-    modalNotesLabel: "Notes:",
-    modalCancel: "Cancel",
-    modalSave: "Save changes",
-
     modalNewClass: "New class",
     modalEditClass: "Edit class",
     labelClassTitle: "Class title",
     labelTrainer: "Trainer",
     labelStartDate: "Start Date",
     labelEndDate: "End Date",
-    labelStartTime: "Start Time",
-    labelEndTime: "End Time",
     labelType: "Type",
     labelSeats: "Available Seats",
     labelDescription: "Short description",
@@ -228,7 +220,8 @@ const translations: Record<Lang, Record<string, string>> = {
     btnDelete: "Eliminar",
 
     btnDeleteClass: "Eliminar",
-    confirmDeleteClassGroup: "¿Eliminar este grupo de clases y todas sus sesiones?",
+    confirmDeleteClassGroup:
+      "¿Eliminar este grupo de clases y todas sus sesiones?",
 
     classesTitle: "Clases disponibles",
     colClassTitle: "Título",
@@ -241,20 +234,12 @@ const translations: Record<Lang, Record<string, string>> = {
     colClassDescription: "Descripción",
     btnEditClass: "Editar",
 
-    modalEditBookingTitle: "Editar reserva",
-    modalNameLabel: "Nombre:",
-    modalNotesLabel: "Notas:",
-    modalCancel: "Cancelar",
-    modalSave: "Guardar cambios",
-
     modalNewClass: "Nueva clase",
     modalEditClass: "Editar clase",
     labelClassTitle: "Título de la clase",
     labelTrainer: "Trainer",
     labelStartDate: "Fecha inicio",
     labelEndDate: "Fecha fin",
-    labelStartTime: "Hora inicio",
-    labelEndTime: "Hora fin",
     labelType: "Tipo",
     labelSeats: "Cupos disponibles",
     labelDescription: "Descripción breve",
@@ -289,7 +274,7 @@ const translations: Record<Lang, Record<string, string>> = {
     expand: "Ver",
     collapse: "Ocultar",
     carouselPrev: "Anterior",
-    carouselNext: "Siguiente",
+    carouselNext: "Next",
     sessionsPanelTitle: "Sesiones de",
 
     addSessionsTitle: "Sesiones (editar fechas y horas)",
@@ -380,13 +365,13 @@ const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang>("en");
-  const t = useCallback((key: string) => translations[lang][key] ?? key, [lang]);
+  const t = useCallback(
+    (key: string) => translations[lang][key] ?? key,
+    [lang]
+  );
 
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [editBooking, setEditBooking] = useState<Booking | null>(null);
-  const [showEditBookingModal, setShowEditBookingModal] = useState(false);
 
-  const [classes, setClasses] = useState<AvailableClass[]>([]);
   const [editClass, setEditClass] = useState<AvailableClass | null>(null);
   const [showClassModal, setShowClassModal] = useState(false);
   const [isNewClass, setIsNewClass] = useState(false);
@@ -405,7 +390,9 @@ const AdminPanel: React.FC = () => {
 
   /** Grouped classes */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
-  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
+  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(
+    null
+  );
   const toggleGroup = (code: string) =>
     setExpandedGroupCode((prev) => (prev === code ? null : code));
 
@@ -428,7 +415,8 @@ const AdminPanel: React.FC = () => {
     setSessionsCount(safe);
     setSessions((prev) => {
       const next = [...prev];
-      while (next.length < safe) next.push({ date_iso: "", start_time: "", end_time: "" });
+      while (next.length < safe)
+        next.push({ date_iso: "", start_time: "", end_time: "" });
       return next.slice(0, safe);
     });
   };
@@ -439,7 +427,6 @@ const AdminPanel: React.FC = () => {
 
   /** ✅ Autocompletar fechas sugeridas por sesión */
   useEffect(() => {
-    // Si todavía no hay start/end, no sugerimos.
     if (!editClass?.start_date) return;
 
     const min = editClass.start_date;
@@ -468,32 +455,13 @@ const AdminPanel: React.FC = () => {
     }
   }, []);
 
+  /**
+   * ✅ Se mantiene por compatibilidad (lo llamas después de borrar/guardar),
+   * pero ya NO construye variables 'list' (evita TS6133).
+   */
   const fetchClasses = useCallback(async () => {
     try {
-      const res = await api.get("/api/admin/classes");
-      const data = res.data;
-      const listRaw: any[] = data.classes ?? data;
-
-      const list: AvailableClass[] = listRaw.map((cls) => {
-        const trainer = TRAINERS.find((tt) => tt.name === cls.trainer_name);
-
-        return {
-          id: cls.id,
-          title: cls.title,
-          trainer_id: trainer ? trainer.id : null,
-          trainer_name: cls.trainer_name ?? (trainer ? trainer.name : null),
-          start_date: cls.start_date,
-          end_date: cls.end_date,
-          start_time: cls.start_time,
-          end_time: cls.end_time,
-          modality: cls.modality,
-          spots_left: cls.spots_left,
-          description: cls.description ?? null,
-          group_code: cls.group_code ?? null,
-        };
-      });
-
-      // setClasses(list); // not needed (groupedClasses drives UI)
+      await api.get("/api/admin/classes");
     } catch (err) {
       console.error("Error cargando clases:", err);
     }
@@ -513,8 +481,7 @@ const AdminPanel: React.FC = () => {
   /** Mount */
   useEffect(() => {
     fetchBookings();
-    fetchClasses();
-  }, [fetchBookings, fetchClasses]);
+  }, [fetchBookings]);
 
   /** When entering classes tab */
   useEffect(() => {
@@ -549,13 +516,17 @@ const AdminPanel: React.FC = () => {
   const totalDays = (b: Booking) => {
     if (typeof b.new_training_days === "number" && b.new_training_days > 0)
       return b.new_training_days;
-    if (typeof b.original_training_days === "number" && b.original_training_days > 0)
+    if (
+      typeof b.original_training_days === "number" &&
+      b.original_training_days > 0
+    )
       return b.original_training_days;
 
     try {
       const s = new Date(b.start_date);
       const e = new Date(b.end_date);
-      const diff = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const diff =
+        Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       return diff > 0 ? diff : 1;
     } catch {
       return 1;
@@ -563,18 +534,6 @@ const AdminPanel: React.FC = () => {
   };
 
   /** Booking actions */
-
-  const saveBookingChanges = async () => {
-    if (!editBooking) return;
-    try {
-      await ensureCsrf();
-      setShowEditBookingModal(false);
-    } catch (err) {
-      console.error("Error saving booking changes:", err);
-      setShowEditBookingModal(false);
-    }
-  };
-
   const handleDeleteBooking = async (id: number) => {
     if (!window.confirm(t("confirmDeleteBooking"))) return;
     try {
@@ -591,7 +550,9 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
       await api.put(`/api/admin/bookings/${id}/status`, { status });
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+      setBookings((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, status } : b))
+      );
     } catch (err) {
       console.error("Error updating booking status:", err);
       alert(t("errorUpdateBookingStatus"));
@@ -611,7 +572,9 @@ const AdminPanel: React.FC = () => {
       });
 
       setBookings((prev) =>
-        prev.map((b) => (b.id === booking.id ? { ...b, attendedbutton: next } : b))
+        prev.map((b) =>
+          b.id === booking.id ? { ...b, attendedbutton: next } : b
+        )
       );
     } catch (err) {
       console.error("Error updating attendance:", err);
@@ -674,7 +637,8 @@ const AdminPanel: React.FC = () => {
 
     const code =
       cls.group_code ||
-      groupedClasses.find((g) => g.sessions?.some((s) => s.id === cls.id))?.group_code ||
+      groupedClasses.find((g) => g.sessions?.some((s) => s.id === cls.id))
+        ?.group_code ||
       null;
 
     const group = code ? groupedClasses.find((g) => g.group_code === code) : null;
@@ -689,7 +653,6 @@ const AdminPanel: React.FC = () => {
         }))
       );
 
-      // para poblar start_time/end_time visualmente desde la primera
       const first = group.sessions[0];
       const tr = parseTimeRange(first?.time_range || "");
       setEditClass((prev) =>
@@ -741,13 +704,14 @@ const AdminPanel: React.FC = () => {
       end_time: (s.end_time || "").trim(),
     }));
 
-    const missing = cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
+    const missing = cleanSessions.some(
+      (s) => !s.date_iso || !s.start_time || !s.end_time
+    );
     if (missing) {
       alert("Please set date + start + end time for every session.");
       return;
     }
 
-    // ✅ rango real (min/max)
     const dates = cleanSessions.map((s) => s.date_iso).sort();
     const computedStart = dates[0];
     const computedEnd = dates[dates.length - 1];
@@ -755,7 +719,6 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      // Base time (fallback) — tomamos la primera sesión
       const baseStart = cleanSessions?.[0]?.start_time || editClass.start_time;
       const baseEnd = cleanSessions?.[0]?.end_time || editClass.end_time;
 
@@ -772,11 +735,9 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
-        // 1) crear base
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        // 2) un solo sync con TODAS las sesiones (incluye la base con id)
         await api.put(`/api/admin/classes/${saved.id}/sessions`, {
           sessions: cleanSessions.map((s, idx) => ({
             id: idx === 0 ? saved.id : undefined,
@@ -789,10 +750,8 @@ const AdminPanel: React.FC = () => {
         await fetchClasses();
         await fetchGrouped();
       } else {
-        // Update base (solo metadata general)
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
-        // Sync sesiones (todas con id)
         await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
           sessions: cleanSessions.map((s) => ({
             id: s.id,
@@ -818,7 +777,9 @@ const AdminPanel: React.FC = () => {
   const downloadKpisCsv = async () => {
     try {
       await ensureCsrf();
-      const res = await api.get("/api/admin/stats/kpis.csv", { responseType: "blob" });
+      const res = await api.get("/api/admin/stats/kpis.csv", {
+        responseType: "blob",
+      });
 
       const blob = new Blob([res.data], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
@@ -1036,31 +997,6 @@ const AdminPanel: React.FC = () => {
                 </table>
               </div>
             )}
-
-            {/* Edit booking modal (si lo usas) */}
-            {showEditBookingModal && editBooking && (
-              <div className="admin-modal-backdrop">
-                <div className="admin-modal">
-                  <h3>{t("modalEditBookingTitle")}</h3>
-                  <div className="admin-modal-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setShowEditBookingModal(false)}
-                    >
-                      {t("modalCancel")}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={saveBookingChanges}
-                    >
-                      {t("modalSave")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1079,7 +1015,10 @@ const AdminPanel: React.FC = () => {
             ) : (
               <>
                 <div className="carousel-wrap">
-                  <button className="carousel-btn" onClick={() => scrollCarousel(-1)}>
+                  <button
+                    className="carousel-btn"
+                    onClick={() => scrollCarousel(-1)}
+                  >
                     {t("carouselPrev")}
                   </button>
 
@@ -1095,11 +1034,14 @@ const AdminPanel: React.FC = () => {
 
                         <div className="carousel-meta">
                           <div>
-                            <strong>{t("sessionsCount")}:</strong> {g.sessions_count}
+                            <strong>{t("sessionsCount")}:</strong>{" "}
+                            {g.sessions_count}
                           </div>
                           <div>
                             <strong>{t("colClassStart")}:</strong>{" "}
-                            {formatDate(g.start_date_iso || g.sessions?.[0]?.date_iso || "")}
+                            {formatDate(
+                              g.start_date_iso || g.sessions?.[0]?.date_iso || ""
+                            )}
                           </div>
                           <div>
                             <strong>{t("colClassEnd")}:</strong>{" "}
@@ -1116,10 +1058,11 @@ const AdminPanel: React.FC = () => {
                             className="btn btn-mini btn-secondary"
                             onClick={() => toggleGroup(g.group_code)}
                           >
-                            {expandedGroupCode === g.group_code ? t("collapse") : t("expand")}
+                            {expandedGroupCode === g.group_code
+                              ? t("collapse")
+                              : t("expand")}
                           </button>
 
-                          {/* Edit abre con la primera sesión como base */}
                           <button
                             className="btn btn-mini btn-primary"
                             onClick={() => {
@@ -1155,12 +1098,14 @@ const AdminPanel: React.FC = () => {
                     ))}
                   </div>
 
-                  <button className="carousel-btn" onClick={() => scrollCarousel(1)}>
+                  <button
+                    className="carousel-btn"
+                    onClick={() => scrollCarousel(1)}
+                  >
                     {t("carouselNext")}
                   </button>
                 </div>
 
-                {/* Expanded group sessions */}
                 {selectedGroup && (
                   <div className="sessions-panel">
                     <h3 className="sessions-title">
@@ -1207,7 +1152,9 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.title}
                         onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))
+                          setEditClass((prev) =>
+                            prev ? { ...prev, title: e.target.value } : prev
+                          )
                         }
                       />
                     </div>
@@ -1219,7 +1166,9 @@ const AdminPanel: React.FC = () => {
                         value={editClass.trainer_name ?? ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev ? { ...prev, trainer_name: e.target.value || null } : prev
+                            prev
+                              ? { ...prev, trainer_name: e.target.value || null }
+                              : prev
                           )
                         }
                       >
@@ -1232,7 +1181,7 @@ const AdminPanel: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Estos inputs quedan para sugerencias visuales, pero el rango final se calcula de sesiones */}
+                    {/* Visual hints only; final range comes from sessions */}
                     <div>
                       <label>{t("labelStartDate")} (optional)</label>
                       <input
@@ -1269,7 +1218,12 @@ const AdminPanel: React.FC = () => {
                         onChange={(e) =>
                           setEditClass((prev) =>
                             prev
-                              ? { ...prev, modality: e.target.value as "Online" | "Presencial" }
+                              ? {
+                                  ...prev,
+                                  modality: e.target.value as
+                                    | "Online"
+                                    | "Presencial",
+                                }
                               : prev
                           )
                         }
@@ -1287,7 +1241,9 @@ const AdminPanel: React.FC = () => {
                         value={editClass.spots_left}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev ? { ...prev, spots_left: Number(e.target.value) } : prev
+                            prev
+                              ? { ...prev, spots_left: Number(e.target.value) }
+                              : prev
                           )
                         }
                       />
@@ -1301,7 +1257,12 @@ const AdminPanel: React.FC = () => {
                         value={editClass.description ?? ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev ? { ...prev, description: e.target.value || null } : prev
+                            prev
+                              ? {
+                                  ...prev,
+                                  description: e.target.value || null,
+                                }
+                              : prev
                           )
                         }
                       />
@@ -1330,7 +1291,9 @@ const AdminPanel: React.FC = () => {
                           value={sessionsCount}
                           min={1}
                           max={20}
-                          onChange={(e) => setCount(parseInt(e.target.value || "1", 10))}
+                          onChange={(e) =>
+                            setCount(parseInt(e.target.value || "1", 10))
+                          }
                         />
                       </div>
                     </div>
@@ -1365,7 +1328,10 @@ const AdminPanel: React.FC = () => {
                               value={s.start_time}
                               onChange={(e) => {
                                 const next = [...sessions];
-                                next[idx] = { ...next[idx], start_time: e.target.value };
+                                next[idx] = {
+                                  ...next[idx],
+                                  start_time: e.target.value,
+                                };
                                 setSessions(next);
                               }}
                             />
@@ -1379,7 +1345,10 @@ const AdminPanel: React.FC = () => {
                               value={s.end_time}
                               onChange={(e) => {
                                 const next = [...sessions];
-                                next[idx] = { ...next[idx], end_time: e.target.value };
+                                next[idx] = {
+                                  ...next[idx],
+                                  end_time: e.target.value,
+                                };
                                 setSessions(next);
                               }}
                             />
@@ -1397,7 +1366,11 @@ const AdminPanel: React.FC = () => {
                     >
                       {t("modalCancelDark")}
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={saveClassChanges}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={saveClassChanges}
+                    >
                       {t("modalSaveDark")}
                     </button>
                   </div>
@@ -1481,7 +1454,11 @@ const AdminPanel: React.FC = () => {
                   </div>
 
                   <div className="pagination">
-                    <button className="btn btn-secondary" onClick={goPrev} disabled={enrolledPage <= 1}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={goPrev}
+                      disabled={enrolledPage <= 1}
+                    >
                       {t("paginationPrev")}
                     </button>
                     <div className="pagination-info">

@@ -418,9 +418,13 @@ const AdminPanel: React.FC = () => {
   const updateBookingStatus = async (id: number, status: BookingStatus) => {
     try {
       await ensureCsrf();
-      await api.put(`/api/admin/bookings/${id}/status`, { status });
+
+      const res = await api.put(`/api/admin/bookings/${id}/status`, { status });
+
+      const updated: Booking = res.data?.booking ?? res.data?.data ?? res.data;
+
       setBookings((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, status } : b))
+        prev.map((b) => (b.id === id ? { ...b, ...updated } : b))
       );
     } catch (err) {
       console.error("Error updating booking status:", err);
@@ -827,10 +831,12 @@ const AdminPanel: React.FC = () => {
                               <button
                                 type="button"
                                 className={
-                                  "attendance-switch" +
+                                  "attendance-switch " +
                                   (b.attendedbutton === true
-                                    ? " attendance-switch--active"
-                                    : "")
+                                    ? "attendance-switch--yes"
+                                    : b.attendedbutton === false
+                                    ? "attendance-switch--no"
+                                    : "attendance-switch--neutral")
                                 }
                                 onClick={() => toggleAttendance(b)}
                                 aria-label="toggle attendance"

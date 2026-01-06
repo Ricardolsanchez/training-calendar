@@ -53,6 +53,7 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Highlighted: days with classes",
     includesLabel: "Includes",
     mandatoryLabel: "mandatory",
+    errorNoDates: "This class has no valid dates configured.",
   },
   es: {
     updatedTag: "Actualizado",
@@ -80,9 +81,11 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Resaltado: días con clases",
     includesLabel: "Incluye",
     mandatoryLabel: "obligatorias",
+    errorNoDates: "Esta clase no tiene fechas válidas configuradas.",
   },
 };
 
+/** ✅ evita bug UTC con YYYY-MM-DD */
 const parseLocalDate = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
@@ -110,10 +113,10 @@ const getGroupRange = (g: AvailableClassGroup) => {
   const startFromApi = g.start_date_iso ?? "";
   const endFromApi = g.end_date_iso ?? "";
 
-  if (startFromApi) {
-    return { start: startFromApi, end: endFromApi || startFromApi };
-  }
+  // ✅ prefer backend range
+  if (startFromApi) return { start: startFromApi, end: endFromApi || startFromApi };
 
+  // ⛑️ fallback: derive from sessions
   const dates = (g.sessions ?? [])
     .map((s) => s.date_iso)
     .filter(Boolean)
@@ -169,7 +172,7 @@ const MiniCalendar: React.FC<{
   const daysWithSessions = useMemo(() => {
     const set = new Set<string>();
     for (const g of groups) {
-      for (const s of g.sessions) {
+      for (const s of g.sessions ?? []) {
         const dt = parseLocalDate(s.date_iso);
         if (!Number.isNaN(dt.getTime()) && dt.getFullYear() === year && dt.getMonth() === month) {
           set.add(makeKey(dt));
@@ -189,9 +192,8 @@ const MiniCalendar: React.FC<{
   const locale = lang === "en" ? "en-US" : "es-ES";
   const monthLabel = monthStart.toLocaleDateString(locale, { month: "long", year: "numeric" });
 
-  const weekdayLabels = lang === "en"
-    ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    : ["D", "L", "M", "X", "J", "V", "S"];
+  const weekdayLabels =
+    lang === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["D", "L", "M", "X", "J", "V", "S"];
 
   const t = (k: string) => translations[lang][k] ?? k;
 
@@ -204,7 +206,9 @@ const MiniCalendar: React.FC<{
 
       <div className="mini-calendar-grid">
         {weekdayLabels.map((w) => (
-          <div key={w} className="mini-calendar-weekday">{w}</div>
+          <div key={w} className="mini-calendar-weekday">
+            {w}
+          </div>
         ))}
 
         {Array.from({ length: firstWeekday }).map((_, idx) => (
@@ -216,8 +220,10 @@ const MiniCalendar: React.FC<{
           const hasSession = daysWithSessions.has(key);
           const inRange = selectedRange.has(key);
 
-          const prev = new Date(d); prev.setDate(prev.getDate() - 1);
-          const next = new Date(d); next.setDate(next.getDate() + 1);
+          const prev = new Date(d);
+          prev.setDate(prev.getDate() - 1);
+          const next = new Date(d);
+          next.setDate(next.getDate() + 1);
 
           const prevInRange = selectedRange.has(makeKey(prev));
           const nextInRange = selectedRange.has(makeKey(next));
@@ -276,7 +282,7 @@ const BookingCalendar: React.FC = () => {
     el.scrollBy({ left: dir * 460, behavior: "smooth" });
   };
 
-  // ✅ Fetch ONCE (no depende del idioma)
+  // ✅ Fetch once
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -289,7 +295,6 @@ const BookingCalendar: React.FC = () => {
         const normalized = Array.isArray(list) ? list : [];
         setAvailableGroups(normalized);
 
-        // ✅ si no hay selección o la selección ya no existe, selecciona la primera
         setSelectedGroup((prev) => {
           if (prev && normalized.some((g) => g.group_code === prev.group_code)) return prev;
           return normalized[0] ?? null;
@@ -328,7 +333,6 @@ const BookingCalendar: React.FC = () => {
       Number.POSITIVE_INFINITY
     );
     const spots = Number.isFinite(minSpots) ? minSpots : 0;
-
     return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t("seatsAvailable")}`;
   };
 
@@ -346,17 +350,30 @@ const BookingCalendar: React.FC = () => {
       return;
     }
 
+    const { start, end } = getGroupRange(selectedGroup);
+
+    // ✅ hard stop si no hay fechas válidas
+    if (!start || !end) {
+      setStatus("error");
+      setErrorMessage(t("errorNoDates"));
+      return;
+    }
+
     setStatus("loading");
     setErrorMessage("");
 
     try {
-      const { start, end } = getGroupRange(selectedGroup);
-
+      // ✅ IMPORTANTÍSIMO: esto es lo que tu BookingController valida
       await api.post("/api/bookings", {
-        group_code: selectedGroup.group_code,
-        name: email.split("@")[0],
+        // tu backend usa `name` como title de la clase cuando NO envías class_id
+        name: selectedGroup.title,
         email,
+        start_date: start,
+        end_date: end,
+        trainer_name: selectedGroup.trainer_name ?? null,
         notes: `Enrollment for "${selectedGroup.title}" from ${start} to ${end}. (All sessions mandatory)`,
+        // class_id: opcional -> si quieres amarrarlo, envíalo:
+        // class_id: selectedGroup.sessions?.[0]?.id ?? null,
       });
 
       setStatus("success");
@@ -485,7 +502,7 @@ const BookingCalendar: React.FC = () => {
                     </div>
 
                     <div className="class-sessions-list">
-                      {selectedGroup.sessions.map((s) => (
+                      {(selectedGroup.sessions ?? []).map((s) => (
                         <div
                           key={s.id}
                           className="class-session-row class-session-row--readonly"
@@ -524,9 +541,7 @@ const BookingCalendar: React.FC = () => {
                       Trainer: {selectedGroup.trainer_name} · {selectedGroup.level} · {selectedGroup.modality}
                     </p>
 
-                    {selectedGroup.description ? (
-                      <p className="booking-detail-desc">{selectedGroup.description}</p>
-                    ) : null}
+                    {selectedGroup.description ? <p className="booking-detail-desc">{selectedGroup.description}</p> : null}
                   </div>
 
                   <p className="booking-detail-meta">

@@ -1,4 +1,4 @@
-/* ===========================
+/* =========================== 
   LAYOUT GENERAL
 =========================== */
 
@@ -250,6 +250,15 @@
   font-size: 0.82rem;
 }
 
+/* ✅ NUEVO: encabezado sticky para tablas (mejor UX) */
+.admin-table th {
+  position: sticky;
+  top: 0;
+  background: rgba(2, 6, 23, 0.95);
+  backdrop-filter: blur(6px);
+  z-index: 1;
+}
+
 .th-center {
   text-align: center;
 }
@@ -436,13 +445,12 @@
   justify-content: center;
 }
 
-.attendance-switch--yes{
-  background: rgba(34,197,94,0.25);
+.attendance-switch--yes {
+  background: rgba(34, 197, 94, 0.25);
 }
-.attendance-switch--yes::after{
+.attendance-switch--yes::after {
   left: calc(100% - 15px);
 }
-/* NEUTRAL (gris - centro) */
 
 /* mini pill */
 .mini-pill {
@@ -469,22 +477,54 @@
 }
 
 /* ===========================
-  KPI GRID
+  ✅ STATS / DASHBOARD LOOK (NUEVO)
+=========================== */
+
+.enrolled-panel {
+  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.enrolled-panel h3 {
+  margin: 6px 0 4px;
+  font-size: 1.15rem;
+  font-weight: 950;
+  color: #f9fafb;
+}
+
+.muted {
+  margin: 0 0 14px;
+  color: rgba(156, 163, 175, 0.92);
+  font-size: 0.95rem;
+}
+
+.empty {
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  padding: 14px 12px;
+  color: rgba(156, 163, 175, 0.95);
+  background: rgba(2, 6, 23, 0.28);
+}
+
+/* ===========================
+  KPI GRID (MEJORADO - REEMPLAZA EL ANTERIOR)
 =========================== */
 
 .admin-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin: 10px 0 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 4px 0 18px;
 }
 
 @media (max-width: 1000px) {
   .admin-kpi-grid {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .admin-kpi-grid {
     grid-template-columns: 1fr;
   }
@@ -493,19 +533,68 @@
 .admin-kpi-card {
   border-radius: 18px;
   padding: 14px 16px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.82),
+    rgba(2, 6, 23, 0.55)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.admin-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(250, 204, 21, 0.28);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
 
 .admin-kpi-label {
-  font-size: 12px;
-  opacity: 0.75;
-  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: rgba(203, 213, 225, 0.8);
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .admin-kpi-value {
-  font-size: 26px;
-  font-weight: 700;
+  margin-top: 8px;
+  font-size: 2rem;
+  font-weight: 950;
+  color: #f9fafb;
+  letter-spacing: -0.02em;
+}
+
+/* Tabla dentro del panel stats */
+.table-wrap {
+  border-radius: 18px;
+  border: 1px solid rgba(31, 41, 55, 0.8);
+  background: radial-gradient(circle at top left, #020617 0%, #000 70%);
+  overflow-x: auto;
+}
+
+.table-wrap .admin-table {
+  min-width: 880px;
+}
+
+.table-wrap .admin-table tbody tr:hover {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+/* Paginación en stats */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pagination-info {
+  font-weight: 900;
+  color: rgba(226, 232, 240, 0.9);
+  min-width: 70px;
+  text-align: center;
 }
 
 /* ===== DIVIDER ===== */

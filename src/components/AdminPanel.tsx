@@ -169,6 +169,7 @@ const translations: Record<Lang, Record<string, string>> = {
     howManyCompleted: "How many people completed it",
     kpiAccepted: "Accepted",
     kpiNotMarked: "Not marked",
+    kpiDidNotAttend: "How many people did not attend",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -264,6 +265,7 @@ const translations: Record<Lang, Record<string, string>> = {
     howManyCompleted: "¿Cuántas personas lo completaron?",
     kpiAccepted: "Aceptados",
     kpiNotMarked: "Sin marcar",
+    kpiDidNotAttend: "¿Cuántas personas no asistieron?",
   },
 };
 
@@ -693,6 +695,12 @@ const AdminPanel: React.FC = () => {
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
+  }, [bookings]);
+
+  const didNotAttendCount = useMemo(() => {
+    return bookings.filter(
+      (b) => b.status === "accepted" && b.attendedbutton === false
+    ).length;
   }, [bookings]);
 
   /** ✅ KPIs para STATS (NEW) */

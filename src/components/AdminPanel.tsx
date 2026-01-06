@@ -163,6 +163,12 @@ const translations: Record<Lang, Record<string, string>> = {
     enrolledSubtitle: "Accepted bookings (inscribed users).",
 
     kpiLoadError: "Could not load KPIs.",
+
+    // ✅ KPI labels (NEW)
+    howManyAttended: "How many employees attended",
+    howManyCompleted: "How many people completed it",
+    kpiAccepted: "Accepted",
+    kpiNotMarked: "Not marked",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -252,6 +258,12 @@ const translations: Record<Lang, Record<string, string>> = {
     enrolledSubtitle: "Reservas aceptadas (inscritos).",
 
     kpiLoadError: "No se pudieron cargar los KPIs.",
+
+    // ✅ KPI labels (NEW)
+    howManyAttended: "¿Cuántos empleados asistieron?",
+    howManyCompleted: "¿Cuántas personas lo completaron?",
+    kpiAccepted: "Aceptados",
+    kpiNotMarked: "Sin marcar",
   },
 };
 
@@ -445,7 +457,6 @@ const AdminPanel: React.FC = () => {
   };
 
   /** ✅ Toggle attendance (solo accepted) */
-  // ✅ helper tri-estado (neutral → yes → no → neutral)
   const nextAttendance = (
     current: boolean | null | undefined
   ): boolean | null => {
@@ -454,7 +465,6 @@ const AdminPanel: React.FC = () => {
     return null;
   };
 
-  // ✅ toggle asistencia (solo para accepted)
   const toggleAttendance = async (booking: Booking) => {
     if (booking.status !== "accepted") return;
 
@@ -477,6 +487,7 @@ const AdminPanel: React.FC = () => {
       alert("Could not update attendance");
     }
   };
+
   const attendanceLabel = (b: Booking) => {
     if (b.attendedbutton === true) return t("attendanceYes");
     if (b.attendedbutton === false) return t("attendanceNo");
@@ -578,12 +589,7 @@ const AdminPanel: React.FC = () => {
       return;
     }
 
-    // ✅ si start/end están vacíos, los calculamos desde las sesiones
-    const rangeStart = (
-      editClass.start_date ||
-      computedRange.start ||
-      ""
-    ).trim();
+    const rangeStart = (editClass.start_date || computedRange.start || "").trim();
     const rangeEnd = (
       editClass.end_date ||
       computedRange.end ||
@@ -591,7 +597,6 @@ const AdminPanel: React.FC = () => {
       ""
     ).trim();
 
-    // ✅ validar sesiones dentro del rango
     if (rangeStart && rangeEnd) {
       const out = cleanSessions.some(
         (s) => s.date_iso < rangeStart || s.date_iso > rangeEnd
@@ -618,11 +623,9 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
-        // crea primera sesión/base
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        // crea el resto de sesiones (incluye date_iso)
         const extra = cleanSessions.slice(1);
         if (extra.length > 0) {
           await api.post(`/api/admin/classes/${saved.id}/sessions`, {
@@ -634,7 +637,6 @@ const AdminPanel: React.FC = () => {
           });
         }
 
-        // ajusta la primera sesión a su date_iso exacto
         await api.put(`/api/admin/classes/${saved.id}/sessions`, {
           sessions: [
             {
@@ -646,10 +648,8 @@ const AdminPanel: React.FC = () => {
           ],
         });
       } else {
-        // actualiza base (rango)
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
-        // sync sesiones con date_iso
         await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
           sessions: cleanSessions.map((s) => ({
             id: s.id,
@@ -681,7 +681,7 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  /** inscritos + paginación (para stats, si luego lo conectas) */
+  /** inscritos + paginación */
   const enrolled = useMemo(() => {
     return [...bookings]
       .filter((b) => b.status === "accepted")
@@ -689,6 +689,28 @@ const AdminPanel: React.FC = () => {
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
+  }, [bookings]);
+
+  /** ✅ KPIs para STATS (NEW) */
+  const statsKPIs = useMemo(() => {
+    const accepted = bookings.filter((b) => b.status === "accepted");
+
+    const attended = accepted.filter((b) => b.attendedbutton === true).length;
+
+    const notMarked = accepted.filter(
+      (b) => b.attendedbutton === null || typeof b.attendedbutton === "undefined"
+    ).length;
+
+    // ✅ "completed" real no existe aún en tu modelo.
+    // Por ahora lo igualamos a attended.
+    const completed = attended;
+
+    return {
+      acceptedTotal: accepted.length,
+      attended,
+      completed,
+      notMarked,
+    };
   }, [bookings]);
 
   const ENROLLED_PAGE_SIZE = 8;
@@ -803,9 +825,7 @@ const AdminPanel: React.FC = () => {
                       <th>{t("columnTrainer")}</th>
                       <th>{t("columnNotes")}</th>
                       <th>{t("columnCreatedAt")}</th>
-                      <th className="th-center">
-                        {t("statsColumnAttendance")}
-                      </th>
+                      <th className="th-center">{t("statsColumnAttendance")}</th>
                       <th>{t("columnStatus")}</th>
                       <th>{t("columnActions")}</th>
                     </tr>
@@ -820,9 +840,7 @@ const AdminPanel: React.FC = () => {
                         <td>{formatDate(b.end_date)}</td>
                         <td>{totalDays(b)}</td>
                         <td>{b.trainer_name || "—"}</td>
-                        <td className="admin-description-cell">
-                          {b.notes || "—"}
-                        </td>
+                        <td className="admin-description-cell">{b.notes || "—"}</td>
                         <td>{formatDateTime(b.created_at)}</td>
 
                         <td className="attendance-cell">
@@ -885,18 +903,14 @@ const AdminPanel: React.FC = () => {
                           <div className="admin-actions">
                             <button
                               className="btn btn-mini"
-                              onClick={() =>
-                                updateBookingStatus(b.id, "accepted")
-                              }
+                              onClick={() => updateBookingStatus(b.id, "accepted")}
                               disabled={b.status === "accepted"}
                             >
                               {t("btnAccept")}
                             </button>
                             <button
                               className="btn btn-mini btn-secondary"
-                              onClick={() =>
-                                updateBookingStatus(b.id, "denied")
-                              }
+                              onClick={() => updateBookingStatus(b.id, "denied")}
                               disabled={b.status === "denied"}
                             >
                               {t("btnDeny")}
@@ -973,10 +987,7 @@ const AdminPanel: React.FC = () => {
                             <div className="admin-class-title">{g.title}</div>
                             <div className="admin-class-sub">
                               <span className="mini-pill">{g.modality}</span>
-                              <span
-                                className="mini-pill"
-                                style={{ marginLeft: 8 }}
-                              >
+                              <span className="mini-pill" style={{ marginLeft: 8 }}>
                                 {t("sessionsCount")}: {g.sessions_count}
                               </span>
                             </div>
@@ -997,9 +1008,7 @@ const AdminPanel: React.FC = () => {
                             {g.trainer_name || t("statsNoTrainer")}
                           </div>
                           {g.description && (
-                            <div className="admin-class-desc">
-                              {g.description}
-                            </div>
+                            <div className="admin-class-desc">{g.description}</div>
                           )}
                         </div>
 
@@ -1010,19 +1019,13 @@ const AdminPanel: React.FC = () => {
                             {g.sessions.map((s) => (
                               <div key={s.id} className="admin-session-pill">
                                 <span className="mini-pill">{s.date_iso}</span>
-                                <span
-                                  className="mini-pill"
-                                  style={{ marginLeft: 8 }}
-                                >
+                                <span className="mini-pill" style={{ marginLeft: 8 }}>
                                   {s.time_range}
                                 </span>
                               </div>
                             ))}
 
-                            <div
-                              className="admin-actions"
-                              style={{ marginTop: 12 }}
-                            >
+                            <div className="admin-actions" style={{ marginTop: 12 }}>
                               <button
                                 className="btn btn-mini"
                                 onClick={() => openEditClassModal(g)}
@@ -1044,13 +1047,9 @@ const AdminPanel: React.FC = () => {
                   })}
                 </div>
 
-                {/* ✅ OPCIÓN B: Panel de sesiones debajo del carrusel */}
                 {selectedGroup && (
                   <div style={{ marginTop: 18 }}>
-                    <h3
-                      className="admin-table-title"
-                      style={{ marginBottom: 10 }}
-                    >
+                    <h3 className="admin-table-title" style={{ marginBottom: 10 }}>
                       {t("sessionsPanelTitle")} {selectedGroup.title}
                     </h3>
 
@@ -1081,13 +1080,10 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {/* New/Edit class modal */}
             {showClassModal && editClass && (
               <div className="admin-modal-backdrop">
                 <div className="admin-modal admin-modal-wide">
-                  <h3>
-                    {isNewClass ? t("modalNewClass") : t("modalEditClass")}
-                  </h3>
+                  <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
 
                   <div className="admin-form-grid">
                     <div className="full">
@@ -1111,10 +1107,7 @@ const AdminPanel: React.FC = () => {
                         onChange={(e) =>
                           setEditClass((prev) =>
                             prev
-                              ? {
-                                  ...prev,
-                                  trainer_name: e.target.value || null,
-                                }
+                              ? { ...prev, trainer_name: e.target.value || null }
                               : prev
                           )
                         }
@@ -1136,9 +1129,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.start_date || ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, start_date: e.target.value }
-                              : prev
+                            prev ? { ...prev, start_date: e.target.value } : prev
                           )
                         }
                       />
@@ -1168,9 +1159,7 @@ const AdminPanel: React.FC = () => {
                             prev
                               ? {
                                   ...prev,
-                                  modality: e.target.value as
-                                    | "Online"
-                                    | "Presencial",
+                                  modality: e.target.value as "Online" | "Presencial",
                                 }
                               : prev
                           )
@@ -1189,9 +1178,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.spots_left}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, spots_left: Number(e.target.value) }
-                              : prev
+                            prev ? { ...prev, spots_left: Number(e.target.value) } : prev
                           )
                         }
                       />
@@ -1205,9 +1192,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.description ?? ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, description: e.target.value || null }
-                              : prev
+                            prev ? { ...prev, description: e.target.value || null } : prev
                           )
                         }
                       />
@@ -1223,10 +1208,7 @@ const AdminPanel: React.FC = () => {
                     {t("addSessionsHint")}
                   </p>
 
-                  <p
-                    className="admin-message"
-                    style={{ marginTop: 0, opacity: 0.85 }}
-                  >
+                  <p className="admin-message" style={{ marginTop: 0, opacity: 0.85 }}>
                     <strong>Computed range:</strong>{" "}
                     {computedRange.start && computedRange.end
                       ? `${computedRange.start} → ${computedRange.end}`
@@ -1258,10 +1240,7 @@ const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  <div
-                    className="admin-sessions-grid"
-                    style={{ marginTop: 12 }}
-                  >
+                  <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
                     {sessions.map((s, idx) => (
                       <div key={idx} className="admin-session-row">
                         <div>
@@ -1274,10 +1253,7 @@ const AdminPanel: React.FC = () => {
                             value={s.date_iso}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                date_iso: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], date_iso: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1291,10 +1267,7 @@ const AdminPanel: React.FC = () => {
                             value={s.start_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                start_time: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], start_time: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1308,10 +1281,7 @@ const AdminPanel: React.FC = () => {
                             value={s.end_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                end_time: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], end_time: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1347,6 +1317,29 @@ const AdminPanel: React.FC = () => {
         {activeTab === "stats" && (
           <section className="admin-table-section">
             <div className="enrolled-panel">
+              {/* ✅ KPI CARDS (NEW) */}
+              <div className="kpi-grid" style={{ marginBottom: 16 }}>
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiAccepted")}</div>
+                  <div className="kpi-value">{statsKPIs.acceptedTotal}</div>
+                </div>
+
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("howManyAttended")}</div>
+                  <div className="kpi-value">{statsKPIs.attended}</div>
+                </div>
+
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("howManyCompleted")}</div>
+                  <div className="kpi-value">{statsKPIs.completed}</div>
+                </div>
+
+                <div className="kpi-card">
+                  <div className="kpi-label">{t("kpiNotMarked")}</div>
+                  <div className="kpi-value">{statsKPIs.notMarked}</div>
+                </div>
+              </div>
+
               <h3>{t("enrolledTitle")}</h3>
               <p className="muted">{t("enrolledSubtitle")}</p>
 

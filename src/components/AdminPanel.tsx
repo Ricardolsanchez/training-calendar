@@ -1404,6 +1404,10 @@ const AdminPanel: React.FC = () => {
                   <div className="admin-kpi-value">{statsKPIs.notMarked}</div>
                 </div>
               </div>
+              <div className="admin-kpi-card">
+                <div className="admin-kpi-label">{t("kpiDidNotAttend")}</div>
+                <div className="admin-kpi-value">{didNotAttendCount}</div>
+              </div>
 
               <h3>{t("enrolledTitle")}</h3>
               <p className="muted">{t("enrolledSubtitle")}</p>

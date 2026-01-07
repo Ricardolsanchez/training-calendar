@@ -25,14 +25,19 @@ type Booking = {
 
   // legacy (si aún llega, lo soportamos)
   attendedbutton?: boolean | null;
+
+  // opcional (si existe en tu modelo)
+  class_id?: number | null;
 };
 
 type BookingSession = {
   id: number; // class_sessions.id
   date_iso: string; // YYYY-MM-DD
   time_range: string; // "HH:mm - HH:mm"
-  calendar_url?: string | null; // link por sesión (opcional)
-  attended?: boolean | null; // pivot booking_sessions.attended
+  calendar_url?: string | null;
+  // tu backend puede venir como attended directo o como pivot.attended
+  attended?: boolean | null;
+  pivot?: { attended?: boolean | null };
 };
 
 type BookingWithSessions = Booking & {
@@ -56,8 +61,8 @@ type AvailableClass = {
 
 type GroupedSession = {
   id: number;
-  date_iso: string; // YYYY-MM-DD
-  time_range: string; // "HH:mm - HH:mm"
+  date_iso: string;
+  time_range: string;
   spots_left: number;
 };
 
@@ -177,17 +182,17 @@ const translations: Record<Lang, Record<string, string>> = {
 
     kpiLoadError: "Could not load KPIs.",
 
-    // ✅ KPI labels
     howManyAttended: "How many sessions were attended",
     howManyCompleted: "How many sessions were completed",
     kpiAccepted: "Accepted",
     kpiNotMarked: "Not marked",
     kpiDidNotAttend: "How many sessions were not attended",
 
-    // ✅ New table columns for sessions
     sessionCol: "Session",
     sessionDateCol: "Session date",
     sessionTimeCol: "Session time",
+
+    locked: "Locked",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -278,17 +283,17 @@ const translations: Record<Lang, Record<string, string>> = {
 
     kpiLoadError: "No se pudieron cargar los KPIs.",
 
-    // ✅ KPI labels
     howManyAttended: "¿Cuántas sesiones asistieron?",
     howManyCompleted: "¿Cuántas sesiones completaron?",
     kpiAccepted: "Aceptados",
     kpiNotMarked: "Sin marcar",
     kpiDidNotAttend: "¿Cuántas sesiones no asistieron?",
 
-    // ✅ New table columns for sessions
     sessionCol: "Sesión",
     sessionDateCol: "Fecha sesión",
     sessionTimeCol: "Hora sesión",
+
+    locked: "Bloqueado",
   },
 };
 
@@ -298,7 +303,7 @@ async function ensureCsrf() {
 
 type SessionDraft = {
   id?: number;
-  date_iso: string; // YYYY-MM-DD
+  date_iso: string;
   start_time: string;
   end_time: string;
 };
@@ -313,16 +318,17 @@ type BookingSessionRow = {
   session: BookingSession;
   sessionIndex: number;
   sessionsCount: number;
+  // para bloqueo en UI
+  locked: boolean;
+  // attended normalizado
+  attended: boolean | null | undefined;
 };
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang>("en");
-  const t = useCallback(
-    (key: string) => translations[lang][key] ?? key,
-    [lang]
-  );
+  const t = useCallback((key: string) => translations[lang][key] ?? key, [lang]);
 
   const [activeTab, setActiveTab] = useState<Tab>("bookings");
 
@@ -368,20 +374,13 @@ const AdminPanel: React.FC = () => {
     });
   };
 
-  /** ✅ Opción B: selectedGroup SE USA (panel debajo del carrusel) */
   const selectedGroup = useMemo(() => {
     if (!expandedGroupCode) return null;
-    return (
-      groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null
-    );
+    return groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null;
   }, [expandedGroupCode, groupedClasses]);
 
-  /** ✅ computed range = min/max de sesiones (para start/end de la clase) */
   const computedRange = useMemo(() => {
-    const dates = sessions
-      .map((s) => s.date_iso)
-      .filter(Boolean)
-      .sort();
+    const dates = sessions.map((s) => s.date_iso).filter(Boolean).sort();
     if (dates.length === 0) return { start: "", end: "" };
     return { start: dates[0], end: dates[dates.length - 1] };
   }, [sessions]);
@@ -391,7 +390,7 @@ const AdminPanel: React.FC = () => {
     try {
       const res = await api.get("/api/admin/bookings");
       const data = res.data;
-      const list: BookingWithSessions[] = data.bookings ?? data;
+      const list: BookingWithSessions[] = data.bookings ?? data ?? [];
       setBookings(list);
     } catch (err) {
       console.error("Error cargando reservas:", err);
@@ -409,12 +408,10 @@ const AdminPanel: React.FC = () => {
     }
   }, []);
 
-  /** Mount */
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
 
-  /** When entering classes tab */
   useEffect(() => {
     if (activeTab !== "classes") return;
     fetchGrouped();
@@ -459,47 +456,55 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  /** ✅ Attendance label helpers */
+  /** Attendance label helpers */
   const attendanceLabelFromValue = (val: boolean | null | undefined) => {
     if (val === true) return t("attendanceYes");
     if (val === false) return t("attendanceNo");
     return t("attendanceNotMarked");
   };
 
-  // Deriva “attendance general” por booking para stats/enrolled (sin romper si aún llega attendedbutton)
+  // Normaliza attended por sesión (soporta pivot.attended o attended directo)
+  const getSessionAttended = (s: BookingSession): boolean | null | undefined => {
+    if (typeof s?.attended !== "undefined") return s.attended;
+    if (typeof s?.pivot?.attended !== "undefined") return s.pivot.attended;
+    return undefined;
+  };
+
+  // Deriva attendance general por booking (para stats), sin romper legacy
   const deriveBookingAttendance = (b: BookingWithSessions): boolean | null => {
-    const sess = (b.sessions ?? []).filter((s) => s && typeof s.id === "number" && s.id > 0);
+    const sess = (b.sessions ?? []).filter(
+      (s) => s && typeof s.id === "number" && s.id > 0
+    );
 
     if (sess.length === 0) {
-      // fallback legacy
       return typeof b.attendedbutton === "undefined" ? null : b.attendedbutton ?? null;
     }
 
-    // Regla práctica:
-    // - si alguna sesión es false => false
-    // - si no hay false pero hay true => true
-    // - si todas null/undefined => null
-    if (sess.some((s) => s.attended === false)) return false;
-    if (sess.some((s) => s.attended === true)) return true;
+    const vals = sess.map((s) => getSessionAttended(s));
+    if (vals.some((v) => v === false)) return false;
+    if (vals.some((v) => v === true)) return true;
     return null;
   };
 
   const attendanceLabelBooking = (b: BookingWithSessions) =>
     attendanceLabelFromValue(deriveBookingAttendance(b));
 
-  /** ✅ Rows por sesión (flatten) */
+  /** ✅ Flatten rows + bloqueo: si alguna anterior NO es true => bloquea siguiente */
   const bookingSessionRows = useMemo<BookingSessionRow[]>(() => {
     const rows: BookingSessionRow[] = [];
 
     for (const b of bookings) {
-      const sess = (b.sessions ?? []).slice().sort((a, c) => {
-        const d = (a.date_iso || "").localeCompare(c.date_iso || "");
-        if (d !== 0) return d;
-        return (a.time_range || "").localeCompare(c.time_range || "");
-      });
+      const sessSorted = (b.sessions ?? [])
+        .slice()
+        .filter((s) => s && typeof s.id === "number")
+        .sort((a, c) => {
+          const d = (a.date_iso || "").localeCompare(c.date_iso || "");
+          if (d !== 0) return d;
+          return (a.time_range || "").localeCompare(c.time_range || "");
+        });
 
-      // si no trae sessions, mostramos 1 fila “placeholder” (no rompe UI)
-      if (sess.length === 0) {
+      // si no vienen sesiones aún, mostramos 1 fila placeholder (no rompe)
+      if (sessSorted.length === 0) {
         rows.push({
           booking: b,
           session: {
@@ -510,16 +515,30 @@ const AdminPanel: React.FC = () => {
           },
           sessionIndex: 0,
           sessionsCount: 0,
+          locked: false,
+          attended: deriveBookingAttendance(b),
         });
         continue;
       }
 
-      sess.forEach((s, idx) => {
+      // precomputar bloqueo por índice
+      const attendedByIndex = sessSorted.map((s) => getSessionAttended(s));
+      const lockedByIndex = sessSorted.map((_, idx) => {
+        if (idx === 0) return false; // primera siempre habilitada
+        for (let i = 0; i < idx; i++) {
+          if (attendedByIndex[i] !== true) return true; // null/undefined/false bloquea
+        }
+        return false;
+      });
+
+      sessSorted.forEach((s, idx) => {
         rows.push({
           booking: b,
           session: s,
           sessionIndex: idx,
-          sessionsCount: sess.length,
+          sessionsCount: sessSorted.length,
+          locked: lockedByIndex[idx],
+          attended: attendedByIndex[idx],
         });
       });
     }
@@ -531,14 +550,10 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      const res = await api.put(`/api/admin/bookings/${id}/status`, { status });
+      await api.put(`/api/admin/bookings/${id}/status`, { status });
 
-      const updated: BookingWithSessions =
-        res.data?.booking ?? res.data?.data ?? res.data;
-
-      setBookings((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, ...updated } : b))
-      );
+      // ✅ IMPORTANT: refetch para traer sessions/pivot si updateStatus no los devuelve
+      await fetchBookings();
     } catch (err) {
       console.error("Error updating booking status:", err);
       alert(t("errorUpdateBookingStatus"));
@@ -557,8 +572,10 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  /** ✅ Toggle attendance por sesión */
-  const nextAttendance = (current: boolean | null | undefined): boolean | null => {
+  /** Toggle por sesión */
+  const nextAttendance = (
+    current: boolean | null | undefined
+  ): boolean | null => {
     if (current === null || typeof current === "undefined") return true;
     if (current === true) return false;
     return null;
@@ -574,27 +591,23 @@ const AdminPanel: React.FC = () => {
 
       const next = nextAttendance(current);
 
+      // ✅ tu backend usa Route Model Binding:
+      // PUT /api/admin/bookings/{booking}/sessions/{session}/attendance
+      // y el método setSessionAttendance
       await api.put(
         `/api/admin/bookings/${bookingId}/sessions/${sessionId}/attendance`,
         { attended: next }
       );
 
-      setBookings((prev) =>
-        prev.map((b) => {
-          if (b.id !== bookingId) return b;
-          const sessions = (b.sessions ?? []).map((s) =>
-            s.id === sessionId ? { ...s, attended: next } : s
-          );
-          return { ...b, sessions };
-        })
-      );
+      // ✅ refrescar para recalcular locks, y si backend cambia algo más (unlock + mail)
+      await fetchBookings();
     } catch (err) {
       console.error("Error updating session attendance:", err);
       alert("Could not update session attendance");
     }
   };
 
-  /** ✅ DELETE group (all sessions) */
+  /** DELETE group */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
     if (!ok) return;
@@ -689,17 +702,8 @@ const AdminPanel: React.FC = () => {
       return;
     }
 
-    const rangeStart = (
-      editClass.start_date ||
-      computedRange.start ||
-      ""
-    ).trim();
-    const rangeEnd = (
-      editClass.end_date ||
-      computedRange.end ||
-      rangeStart ||
-      ""
-    ).trim();
+    const rangeStart = (editClass.start_date || computedRange.start || "").trim();
+    const rangeEnd = (editClass.end_date || computedRange.end || rangeStart || "").trim();
 
     if (rangeStart && rangeEnd) {
       const out = cleanSessions.some(
@@ -795,7 +799,7 @@ const AdminPanel: React.FC = () => {
       );
   }, [bookings]);
 
-  /** ✅ KPIs (ahora por sesiones, sin romper si no vienen sessions) */
+  /** KPIs por sesiones */
   const sessionStats = useMemo(() => {
     const acceptedBookings = bookings.filter((b) => b.status === "accepted");
 
@@ -808,7 +812,6 @@ const AdminPanel: React.FC = () => {
       const sess = (b.sessions ?? []).filter((s) => s && s.id && s.id > 0);
 
       if (sess.length === 0) {
-        // fallback: 1 “sesión lógica”
         totalSessions += 1;
         const v = deriveBookingAttendance(b);
         if (v === true) attendedSessions += 1;
@@ -820,13 +823,13 @@ const AdminPanel: React.FC = () => {
       totalSessions += sess.length;
 
       for (const s of sess) {
-        if (s.attended === true) attendedSessions += 1;
-        else if (s.attended === false) notAttendedSessions += 1;
+        const v = getSessionAttended(s);
+        if (v === true) attendedSessions += 1;
+        else if (v === false) notAttendedSessions += 1;
         else notMarkedSessions += 1;
       }
     }
 
-    // “completed” real aún no existe -> lo igualamos a attended
     const completedSessions = attendedSessions;
 
     return {
@@ -867,8 +870,7 @@ const AdminPanel: React.FC = () => {
   }, [enrolled, enrolledPageSafe]);
 
   const goPrev = () => setEnrolledPage((p) => Math.max(1, p - 1));
-  const goNext = () =>
-    setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
+  const goNext = () => setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
 
   return (
     <div className="admin-page">
@@ -947,9 +949,7 @@ const AdminPanel: React.FC = () => {
           <section className="admin-table-section">
             <h2 className="admin-table-title">{t("bookingListTitle")}</h2>
 
-            {bookings.length === 0 && (
-              <p className="admin-message">{t("noBookings")}</p>
-            )}
+            {bookings.length === 0 && <p className="admin-message">{t("noBookings")}</p>}
 
             {bookings.length > 0 && (
               <div className="admin-table-wrapper">
@@ -965,7 +965,6 @@ const AdminPanel: React.FC = () => {
                       <th>{t("columnNotes")}</th>
                       <th>{t("columnCreatedAt")}</th>
 
-                      {/* ✅ NUEVO: columnas por sesión */}
                       <th>{t("sessionCol")}</th>
                       <th>{t("sessionDateCol")}</th>
                       <th>{t("sessionTimeCol")}</th>
@@ -977,133 +976,126 @@ const AdminPanel: React.FC = () => {
                   </thead>
 
                   <tbody>
-                    {bookingSessionRows.map(
-                      ({ booking: b, session, sessionIndex, sessionsCount }) => {
-                        const rowSpan = Math.max(sessionsCount, 1);
+                    {bookingSessionRows.map((row) => {
+                      const { booking: b, session, sessionIndex, sessionsCount, locked, attended } =
+                        row;
+                      const rowSpan = Math.max(sessionsCount, 1);
+                      const canShowBookingCells = sessionIndex === 0;
 
-                        return (
-                          <tr key={`${b.id}-${session.id}-${sessionIndex}`}>
-                            {/* columnas del booking solo en la primera fila */}
-                            {sessionIndex === 0 ? (
-                              <>
-                                <td rowSpan={rowSpan}>{b.name}</td>
-                                <td rowSpan={rowSpan}>{b.email}</td>
-                                <td rowSpan={rowSpan}>{formatDate(b.start_date)}</td>
-                                <td rowSpan={rowSpan}>{formatDate(b.end_date)}</td>
-                                <td rowSpan={rowSpan}>{totalDays(b)}</td>
-                                <td rowSpan={rowSpan}>{b.trainer_name || "—"}</td>
-                                <td rowSpan={rowSpan} className="admin-description-cell">
-                                  {b.notes || "—"}
-                                </td>
-                                <td rowSpan={rowSpan}>{formatDateTime(b.created_at)}</td>
-                              </>
-                            ) : null}
+                      return (
+                        <tr key={`${b.id}-${session.id}-${sessionIndex}`}>
+                          {canShowBookingCells ? (
+                            <>
+                              <td rowSpan={rowSpan}>{b.name}</td>
+                              <td rowSpan={rowSpan}>{b.email}</td>
+                              <td rowSpan={rowSpan}>{formatDate(b.start_date)}</td>
+                              <td rowSpan={rowSpan}>{formatDate(b.end_date)}</td>
+                              <td rowSpan={rowSpan}>{totalDays(b)}</td>
+                              <td rowSpan={rowSpan}>{b.trainer_name || "—"}</td>
+                              <td rowSpan={rowSpan} className="admin-description-cell">
+                                {b.notes || "—"}
+                              </td>
+                              <td rowSpan={rowSpan}>{formatDateTime(b.created_at)}</td>
+                            </>
+                          ) : null}
 
-                            {/* ✅ columnas por sesión (cada fila) */}
-                            <td>{sessionsCount > 0 ? `${sessionIndex + 1}/${sessionsCount}` : "—"}</td>
-                            <td>{formatDate(session.date_iso)}</td>
-                            <td>{session.time_range || "—"}</td>
+                          <td>{sessionsCount > 0 ? `${sessionIndex + 1}/${sessionsCount}` : "—"}</td>
+                          <td>{formatDate(session.date_iso)}</td>
+                          <td>{session.time_range || "—"}</td>
 
-                            {/* ✅ toggle por sesión */}
-                            <td className="attendance-cell">
-                              {b.status === "accepted" && session.id ? (
+                          <td className="attendance-cell">
+                            {b.status === "accepted" && session.id ? (
+                              locked ? (
+                                <span className="mini-pill mini-pill--neutral">{t("locked")}</span>
+                              ) : (
                                 <>
                                   <button
                                     type="button"
                                     className={
                                       "attendance-switch " +
-                                      (session.attended === true
+                                      (attended === true
                                         ? "attendance-switch--yes"
-                                        : session.attended === false
+                                        : attended === false
                                         ? "attendance-switch--no"
                                         : "attendance-switch--neutral")
                                     }
                                     onClick={() =>
-                                      toggleSessionAttendance(
-                                        b.id,
-                                        session.id,
-                                        session.attended
-                                      )
+                                      toggleSessionAttendance(b.id, session.id, attended)
                                     }
                                     aria-label="toggle attendance"
-                                    title={attendanceLabelFromValue(session.attended)}
+                                    title={attendanceLabelFromValue(attended)}
                                   />
                                   <span
                                     className={
                                       "mini-pill " +
-                                      (session.attended === true
+                                      (attended === true
                                         ? "mini-pill--ok"
-                                        : session.attended === false
+                                        : attended === false
                                         ? "mini-pill--off"
                                         : "mini-pill--neutral")
                                     }
                                   >
-                                    {attendanceLabelFromValue(session.attended)}
+                                    {attendanceLabelFromValue(attended)}
                                   </span>
                                 </>
-                              ) : (
-                                <div className="mini-pill" style={{ opacity: 0.7 }}>
-                                  —
-                                </div>
-                              )}
-                            </td>
+                              )
+                            ) : (
+                              <div className="mini-pill" style={{ opacity: 0.7 }}>
+                                —
+                              </div>
+                            )}
+                          </td>
 
-                            {/* status/actions solo en la primera fila */}
-                            {sessionIndex === 0 ? (
-                              <>
-                                <td rowSpan={rowSpan}>
-                                  <span
-                                    className={
-                                      "status-pill " +
-                                      (b.status === "accepted"
-                                        ? "status-accepted"
-                                        : b.status === "denied"
-                                        ? "status-denied"
-                                        : "status-pending")
-                                    }
-                                  >
-                                    {b.status === "accepted"
-                                      ? t("statusAccepted")
+                          {canShowBookingCells ? (
+                            <>
+                              <td rowSpan={rowSpan}>
+                                <span
+                                  className={
+                                    "status-pill " +
+                                    (b.status === "accepted"
+                                      ? "status-accepted"
                                       : b.status === "denied"
-                                      ? t("statusDenied")
-                                      : t("statusPending")}
-                                  </span>
-                                </td>
+                                      ? "status-denied"
+                                      : "status-pending")
+                                  }
+                                >
+                                  {b.status === "accepted"
+                                    ? t("statusAccepted")
+                                    : b.status === "denied"
+                                    ? t("statusDenied")
+                                    : t("statusPending")}
+                                </span>
+                              </td>
 
-                                <td rowSpan={rowSpan}>
-                                  <div className="admin-actions">
-                                    <button
-                                      className="btn btn-mini"
-                                      onClick={() =>
-                                        updateBookingStatus(b.id, "accepted")
-                                      }
-                                      disabled={b.status === "accepted"}
-                                    >
-                                      {t("btnAccept")}
-                                    </button>
-                                    <button
-                                      className="btn btn-mini btn-secondary"
-                                      onClick={() =>
-                                        updateBookingStatus(b.id, "denied")
-                                      }
-                                      disabled={b.status === "denied"}
-                                    >
-                                      {t("btnDeny")}
-                                    </button>
-                                    <button
-                                      className="btn btn-mini btn-danger"
-                                      onClick={() => handleDeleteBooking(b.id)}
-                                    >
-                                      {t("btnDelete")}
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            ) : null}
-                          </tr>
-                        );
-                      }
-                    )}
+                              <td rowSpan={rowSpan}>
+                                <div className="admin-actions">
+                                  <button
+                                    className="btn btn-mini"
+                                    onClick={() => updateBookingStatus(b.id, "accepted")}
+                                    disabled={b.status === "accepted"}
+                                  >
+                                    {t("btnAccept")}
+                                  </button>
+                                  <button
+                                    className="btn btn-mini btn-secondary"
+                                    onClick={() => updateBookingStatus(b.id, "denied")}
+                                    disabled={b.status === "denied"}
+                                  >
+                                    {t("btnDeny")}
+                                  </button>
+                                  <button
+                                    className="btn btn-mini btn-danger"
+                                    onClick={() => handleDeleteBooking(b.id)}
+                                  >
+                                    {t("btnDelete")}
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : null}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1117,18 +1109,12 @@ const AdminPanel: React.FC = () => {
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("classesTitle")}</h2>
 
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={openNewClassModal}
-              >
+              <button type="button" className="btn btn-primary" onClick={openNewClassModal}>
                 {t("addNewClass")}
               </button>
             </div>
 
-            {groupedClasses.length === 0 && (
-              <p className="admin-message">{t("noClasses")}</p>
-            )}
+            {groupedClasses.length === 0 && <p className="admin-message">{t("noClasses")}</p>}
 
             {groupedClasses.length > 0 && (
               <div className="admin-carousel-wrap">
@@ -1156,20 +1142,14 @@ const AdminPanel: React.FC = () => {
                     return (
                       <div
                         key={g.group_code}
-                        className={
-                          "admin-class-card" +
-                          (expanded ? " admin-class-card--active" : "")
-                        }
+                        className={"admin-class-card" + (expanded ? " admin-class-card--active" : "")}
                       >
                         <div className="admin-class-card-head">
                           <div>
                             <div className="admin-class-title">{g.title}</div>
                             <div className="admin-class-sub">
                               <span className="mini-pill">{g.modality}</span>
-                              <span
-                                className="mini-pill"
-                                style={{ marginLeft: 8 }}
-                              >
+                              <span className="mini-pill" style={{ marginLeft: 8 }}>
                                 {t("sessionsCount")}: {g.sessions_count}
                               </span>
                             </div>
@@ -1189,11 +1169,7 @@ const AdminPanel: React.FC = () => {
                             <strong>{t("columnTrainer")}:</strong>{" "}
                             {g.trainer_name || t("statsNoTrainer")}
                           </div>
-                          {g.description && (
-                            <div className="admin-class-desc">
-                              {g.description}
-                            </div>
-                          )}
+                          {g.description && <div className="admin-class-desc">{g.description}</div>}
                         </div>
 
                         {expanded && <div className="admin-divider" />}
@@ -1203,23 +1179,14 @@ const AdminPanel: React.FC = () => {
                             {g.sessions.map((s) => (
                               <div key={s.id} className="admin-session-pill">
                                 <span className="mini-pill">{s.date_iso}</span>
-                                <span
-                                  className="mini-pill"
-                                  style={{ marginLeft: 8 }}
-                                >
+                                <span className="mini-pill" style={{ marginLeft: 8 }}>
                                   {s.time_range}
                                 </span>
                               </div>
                             ))}
 
-                            <div
-                              className="admin-actions"
-                              style={{ marginTop: 12 }}
-                            >
-                              <button
-                                className="btn btn-mini"
-                                onClick={() => openEditClassModal(g)}
-                              >
+                            <div className="admin-actions" style={{ marginTop: 12 }}>
+                              <button className="btn btn-mini" onClick={() => openEditClassModal(g)}>
                                 {t("modalEditClass")}
                               </button>
 
@@ -1239,10 +1206,7 @@ const AdminPanel: React.FC = () => {
 
                 {selectedGroup && (
                   <div style={{ marginTop: 18 }}>
-                    <h3
-                      className="admin-table-title"
-                      style={{ marginBottom: 10 }}
-                    >
+                    <h3 className="admin-table-title" style={{ marginBottom: 10 }}>
                       {t("sessionsPanelTitle")} {selectedGroup.title}
                     </h3>
 
@@ -1285,9 +1249,7 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.title}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, title: e.target.value } : prev
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))
                         }
                       />
                     </div>
@@ -1299,12 +1261,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.trainer_name || ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  trainer_name: e.target.value || null,
-                                }
-                              : prev
+                            prev ? { ...prev, trainer_name: e.target.value || null } : prev
                           )
                         }
                       >
@@ -1355,9 +1312,7 @@ const AdminPanel: React.FC = () => {
                             prev
                               ? {
                                   ...prev,
-                                  modality: e.target.value as
-                                    | "Online"
-                                    | "Presencial",
+                                  modality: e.target.value as "Online" | "Presencial",
                                 }
                               : prev
                           )
@@ -1390,9 +1345,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.description ?? ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, description: e.target.value || null }
-                              : prev
+                            prev ? { ...prev, description: e.target.value || null } : prev
                           )
                         }
                       />
@@ -1401,17 +1354,12 @@ const AdminPanel: React.FC = () => {
 
                   <div className="admin-divider" />
 
-                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>
-                    {t("addSessionsTitle")}
-                  </h4>
+                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>{t("addSessionsTitle")}</h4>
                   <p className="admin-message" style={{ marginTop: 0 }}>
                     {t("addSessionsHint")}
                   </p>
 
-                  <p
-                    className="admin-message"
-                    style={{ marginTop: 0, opacity: 0.85 }}
-                  >
+                  <p className="admin-message" style={{ marginTop: 0, opacity: 0.85 }}>
                     <strong>Computed range:</strong>{" "}
                     {computedRange.start && computedRange.end
                       ? `${computedRange.start} → ${computedRange.end}`
@@ -1456,10 +1404,7 @@ const AdminPanel: React.FC = () => {
                             value={s.date_iso}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                date_iso: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], date_iso: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1473,10 +1418,7 @@ const AdminPanel: React.FC = () => {
                             value={s.start_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                start_time: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], start_time: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1490,10 +1432,7 @@ const AdminPanel: React.FC = () => {
                             value={s.end_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                end_time: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], end_time: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1511,11 +1450,7 @@ const AdminPanel: React.FC = () => {
                       {t("modalCancelDark")}
                     </button>
 
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={saveClassChanges}
-                    >
+                    <button type="button" className="btn btn-primary" onClick={saveClassChanges}>
                       {t("modalSaveDark")}
                     </button>
                   </div>
@@ -1529,7 +1464,6 @@ const AdminPanel: React.FC = () => {
         {activeTab === "stats" && (
           <section className="admin-table-section">
             <div className="enrolled-panel">
-              {/* ✅ KPI CARDS */}
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiAccepted")}</div>

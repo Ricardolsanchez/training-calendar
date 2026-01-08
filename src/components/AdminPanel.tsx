@@ -188,6 +188,8 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionTimeCol: "Session time",
 
     locked: "Locked",
+
+    downloadCsv: "Download CSV",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -289,6 +291,8 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionTimeCol: "Hora sesión",
 
     locked: "Bloqueada",
+
+    downloadCsv: "Descargar CSV",
   },
 };
 
@@ -623,7 +627,6 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-
   /** DELETE group (all sessions) */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
@@ -876,6 +879,112 @@ const AdminPanel: React.FC = () => {
   const didNotAttendCount = useMemo(() => {
     return sessionStats.notAttendedSessions;
   }, [sessionStats]);
+
+  // ✅ CSV EXPORT (STATS)
+  const csvEscape = (v: any) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const downloadCsv = (filename: string, rows: string[][]) => {
+    const content = rows.map((r) => r.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadStatsCsv = () => {
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    const kpiRows: string[][] = [
+      ["KPI", "Value"],
+      [t("kpiAccepted"), String(statsKPIs.acceptedTotal)],
+      [t("howManyAttended"), String(statsKPIs.attended)],
+      [t("howManyCompleted"), String(statsKPIs.completed)],
+      [t("kpiNotMarked"), String(statsKPIs.notMarked)],
+      [t("kpiDidNotAttend"), String(didNotAttendCount)],
+    ];
+
+    const detailRows: string[][] = [
+      [
+        "booking_id",
+        "name",
+        "email",
+        "trainer",
+        "status",
+        "session_number",
+        "sessions_total",
+        "date_iso",
+        "time_range",
+        "attended",
+      ],
+    ];
+
+    const accepted = bookings.filter((b) => b.status === "accepted");
+
+    for (const b of accepted) {
+      const sess = (b.sessions ?? []).filter((s) => s && s.id && s.id > 0);
+
+      if (sess.length === 0) {
+        const v = deriveBookingAttendance(b);
+        detailRows.push([
+          String(b.id),
+          b.name,
+          b.email,
+          b.trainer_name ?? "",
+          b.status,
+          "1",
+          "1",
+          b.start_date ?? "",
+          "",
+          v === true ? "true" : v === false ? "false" : "",
+        ]);
+        continue;
+      }
+
+      const sorted = [...sess].sort((a, c) => {
+        const d = (a.date_iso || "").localeCompare(c.date_iso || "");
+        if (d !== 0) return d;
+        return (a.time_range || "").localeCompare(c.time_range || "");
+      });
+
+      sorted.forEach((s, idx) => {
+        detailRows.push([
+          String(b.id),
+          b.name,
+          b.email,
+          b.trainer_name ?? "",
+          b.status,
+          String(idx + 1),
+          String(sorted.length),
+          s.date_iso ?? "",
+          s.time_range ?? "",
+          s.attended === true ? "true" : s.attended === false ? "false" : "",
+        ]);
+      });
+    }
+
+    const rows: string[][] = [
+      ["STATS EXPORT", stamp],
+      [],
+      ...kpiRows,
+      [],
+      ["DETAIL (accepted bookings - per session)"],
+      [],
+      ...detailRows,
+    ];
+
+    downloadCsv(`stats_export_${stamp}.csv`, rows);
+  };
 
   const ENROLLED_PAGE_SIZE = 8;
   const [enrolledPage, setEnrolledPage] = useState(1);
@@ -1604,6 +1713,22 @@ const AdminPanel: React.FC = () => {
         {activeTab === "stats" && (
           <section className="admin-table-section">
             <div className="enrolled-panel">
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginBottom: 12,
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleDownloadStatsCsv}
+                >
+                  ⬇ {t("downloadCsv")}
+                </button>
+              </div>
+
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiAccepted")}</div>

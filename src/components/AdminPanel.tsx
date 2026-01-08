@@ -92,8 +92,7 @@ const translations: Record<Lang, Record<string, string>> = {
   en: {
     adminBadge: "Admin Panel",
     adminTitle: "Training Management",
-    adminSubtitle:
-      "Review the reservations received and manage the available classes.",
+    adminSubtitle: "Review the reservations received and manage the available classes.",
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabBookings: "Bookings",
@@ -156,8 +155,7 @@ const translations: Record<Lang, Record<string, string>> = {
     errorSaveClass: "Could not save class.",
 
     addSessionsTitle: "Sessions (edit dates & hours)",
-    addSessionsHint:
-      "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
+    addSessionsHint: "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
     sessionsCountLabel: "Number of sessions",
     sessionDateLabel: "Session date",
 
@@ -187,14 +185,12 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionDateCol: "Session date",
     sessionTimeCol: "Session time",
 
-    // ✅ NEW
     locked: "Locked",
   },
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-    adminSubtitle:
-      "Revisa las reservas recibidas y administra las clases disponibles.",
+    adminSubtitle: "Revisa las reservas recibidas y administra las clases disponibles.",
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabBookings: "Reservas",
@@ -230,8 +226,7 @@ const translations: Record<Lang, Record<string, string>> = {
     btnDelete: "Eliminar",
 
     btnDeleteClass: "Eliminar",
-    confirmDeleteClassGroup:
-      "¿Eliminar este grupo de clases y todas sus sesiones?",
+    confirmDeleteClassGroup: "¿Eliminar este grupo de clases y todas sus sesiones?",
 
     classesTitle: "Clases disponibles",
     sessionsCount: "Sesiones",
@@ -258,8 +253,7 @@ const translations: Record<Lang, Record<string, string>> = {
     errorSaveClass: "No se pudo guardar la clase.",
 
     addSessionsTitle: "Sesiones (editar fechas y horas)",
-    addSessionsHint:
-      "Define la fecha y hora inicio/fin por sesión. Sube/baja la cantidad de sesiones y guarda.",
+    addSessionsHint: "Define la fecha y hora inicio/fin por sesión. Sube/baja la cantidad de sesiones y guarda.",
     sessionsCountLabel: "Número de sesiones",
     sessionDateLabel: "Fecha de la sesión",
 
@@ -289,7 +283,6 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionDateCol: "Fecha sesión",
     sessionTimeCol: "Hora sesión",
 
-    // ✅ NEW
     locked: "Bloqueada",
   },
 };
@@ -331,8 +324,7 @@ const AdminPanel: React.FC = () => {
   /** CLASSES (grouped) */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
   const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
-  const toggleGroup = (code: string) =>
-    setExpandedGroupCode((prev) => (prev === code ? null : code));
+  const toggleGroup = (code: string) => setExpandedGroupCode((prev) => (prev === code ? null : code));
 
   /** Carousel */
   const carouselRef = useRef<HTMLDivElement | null>(null);
@@ -349,9 +341,7 @@ const AdminPanel: React.FC = () => {
 
   /** Sessions Draft */
   const [sessionsCount, setSessionsCount] = useState<number>(1);
-  const [sessions, setSessions] = useState<SessionDraft[]>([
-    { date_iso: "", start_time: "", end_time: "" },
-  ]);
+  const [sessions, setSessions] = useState<SessionDraft[]>([{ date_iso: "", start_time: "", end_time: "" }]);
 
   const setCount = (n: number) => {
     const safe = Math.max(1, Math.min(20, Number.isFinite(n) ? n : 1));
@@ -380,9 +370,10 @@ const AdminPanel: React.FC = () => {
       const res = await api.get("/api/admin/bookings");
       const data = res.data;
       const list: BookingWithSessions[] = data.bookings ?? data;
-      setBookings(list);
+      setBookings(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error("Error cargando reservas:", err);
+      setBookings([]);
     }
   }, []);
 
@@ -390,7 +381,7 @@ const AdminPanel: React.FC = () => {
     try {
       const res = await api.get("/api/classes-grouped");
       const list: GroupedClass[] = res.data?.classes ?? res.data ?? [];
-      setGroupedClasses(list);
+      setGroupedClasses(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error("Error cargando clases agrupadas:", err);
       setGroupedClasses([]);
@@ -458,8 +449,7 @@ const AdminPanel: React.FC = () => {
     return null;
   };
 
-  const attendanceLabelBooking = (b: BookingWithSessions) =>
-    attendanceLabelFromValue(deriveBookingAttendance(b));
+  const attendanceLabelBooking = (b: BookingWithSessions) => attendanceLabelFromValue(deriveBookingAttendance(b));
 
   /** ✅ Rows por sesión (flatten) */
   const bookingSessionRows = useMemo<BookingSessionRow[]>(() => {
@@ -511,7 +501,6 @@ const AdminPanel: React.FC = () => {
     if (sess.length === 0) return false;
     if (sessionIndex <= 0) return false;
 
-    // si alguna previa es false => lock
     for (let i = 0; i < sessionIndex; i++) {
       if (sess[i]?.attended === false) return true;
     }
@@ -526,7 +515,7 @@ const AdminPanel: React.FC = () => {
 
       setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated } : b)));
 
-      // ✅ IMPORTANT: si al aceptar el backend adjunta sessions, vuelve a traer la lista
+      // ✅ si aceptas: backend puede adjuntar sessions -> refrescar
       if (status === "accepted") {
         await fetchBookings();
       }
@@ -555,28 +544,19 @@ const AdminPanel: React.FC = () => {
     return null;
   };
 
-  const toggleSessionAttendance = async (
-    bookingId: number,
-    sessionId: number,
-    current: boolean | null | undefined
-  ) => {
+  const toggleSessionAttendance = async (bookingId: number, sessionId: number, current: boolean | null | undefined) => {
     try {
       await ensureCsrf();
-
       const next = nextAttendance(current);
 
-      await api.put(
-        `/api/admin/bookings/${bookingId}/sessions/${sessionId}/attendance`,
-        { attended: next }
-      );
+      await api.put(`/api/admin/bookings/${bookingId}/sessions/${sessionId}/attendance`, {
+        attended: next,
+      });
 
-      // ✅ update local state (optimistic-ish)
       setBookings((prev) =>
         prev.map((b) => {
           if (b.id !== bookingId) return b;
-          const updatedSessions = (b.sessions ?? []).map((s) =>
-            s.id === sessionId ? { ...s, attended: next } : s
-          );
+          const updatedSessions = (b.sessions ?? []).map((s) => (s.id === sessionId ? { ...s, attended: next } : s));
           return { ...b, sessions: updatedSessions };
         })
       );
@@ -662,7 +642,7 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
-  /** Save class */
+  /** ✅ SAVE class (FIX: no borra sesiones al crear) */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
@@ -706,20 +686,11 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
+        // 1) crear base
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        const extra = cleanSessions.slice(1);
-        if (extra.length > 0) {
-          await api.post(`/api/admin/classes/${saved.id}/sessions`, {
-            sessions: extra.map((s) => ({
-              date_iso: s.date_iso,
-              start_time: s.start_time,
-              end_time: s.end_time,
-            })),
-          });
-        }
-
+        // ✅ 2) UN SOLO PUT con TODAS las sesiones (no POST extra + PUT 1 sesión)
         await api.put(`/api/admin/classes/${saved.id}/sessions`, {
           sessions: [
             {
@@ -728,9 +699,15 @@ const AdminPanel: React.FC = () => {
               start_time: cleanSessions[0].start_time,
               end_time: cleanSessions[0].end_time,
             },
+            ...cleanSessions.slice(1).map((s) => ({
+              date_iso: s.date_iso,
+              start_time: s.start_time,
+              end_time: s.end_time,
+            })),
           ],
         });
       } else {
+        // editar
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
         await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
@@ -851,11 +828,7 @@ const AdminPanel: React.FC = () => {
           </div>
 
           <div className="admin-header-actions">
-            <button
-              type="button"
-              className="admin-lang-toggle"
-              onClick={() => setLang(lang === "en" ? "es" : "en")}
-            >
+            <button type="button" className="admin-lang-toggle" onClick={() => setLang(lang === "en" ? "es" : "en")}>
               {lang === "en" ? "ES" : "EN"}
             </button>
 
@@ -872,9 +845,7 @@ const AdminPanel: React.FC = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={
-              "admin-tab-button" + (activeTab === "bookings" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "bookings" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("bookings")}
           >
             {t("tabBookings")}
@@ -882,9 +853,7 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={
-              "admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
@@ -934,9 +903,8 @@ const AdminPanel: React.FC = () => {
                     {bookingSessionRows.map(({ booking: b, session, sessionIndex, sessionsCount }) => {
                       const rowSpan = Math.max(sessionsCount, 1);
 
-                      const locked = b.status === "accepted" && sessionsCount > 0
-                        ? isSessionLocked(b, sessionIndex)
-                        : false;
+                      const locked =
+                        b.status === "accepted" && sessionsCount > 0 ? isSessionLocked(b, sessionIndex) : false;
 
                       return (
                         <tr key={`${b.id}-${session.id}-${sessionIndex}`}>
@@ -978,9 +946,7 @@ const AdminPanel: React.FC = () => {
                                     toggleSessionAttendance(b.id, session.id, session.attended);
                                   }}
                                   aria-label="toggle attendance"
-                                  title={
-                                    locked ? t("locked") : attendanceLabelFromValue(session.attended)
-                                  }
+                                  title={locked ? t("locked") : attendanceLabelFromValue(session.attended)}
                                   disabled={locked}
                                 />
                                 <span
@@ -1042,10 +1008,7 @@ const AdminPanel: React.FC = () => {
                                   >
                                     {t("btnDeny")}
                                   </button>
-                                  <button
-                                    className="btn btn-mini btn-danger"
-                                    onClick={() => handleDeleteBooking(b.id)}
-                                  >
+                                  <button className="btn btn-mini btn-danger" onClick={() => handleDeleteBooking(b.id)}>
                                     {t("btnDelete")}
                                   </button>
                                 </div>
@@ -1191,9 +1154,7 @@ const AdminPanel: React.FC = () => {
                       <input
                         className="form-input"
                         value={editClass.title}
-                        onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))}
                       />
                     </div>
 
@@ -1203,9 +1164,7 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.trainer_name || ""}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, trainer_name: e.target.value || null } : prev
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, trainer_name: e.target.value || null } : prev))
                         }
                       >
                         <option value="">{t("optionSelectTrainer")}</option>
@@ -1223,9 +1182,7 @@ const AdminPanel: React.FC = () => {
                         type="date"
                         className="form-input"
                         value={editClass.start_date || ""}
-                        onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, start_date: e.target.value } : prev))
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, start_date: e.target.value } : prev))}
                       />
                     </div>
 
@@ -1235,9 +1192,7 @@ const AdminPanel: React.FC = () => {
                         type="date"
                         className="form-input"
                         value={editClass.end_date || ""}
-                        onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, end_date: e.target.value } : prev))
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, end_date: e.target.value } : prev))}
                       />
                     </div>
 
@@ -1264,9 +1219,7 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.spots_left}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, spots_left: Number(e.target.value) } : prev
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, spots_left: Number(e.target.value) } : prev))
                         }
                       />
                     </div>
@@ -1293,9 +1246,7 @@ const AdminPanel: React.FC = () => {
 
                   <p className="admin-message" style={{ marginTop: 0, opacity: 0.85 }}>
                     <strong>Computed range:</strong>{" "}
-                    {computedRange.start && computedRange.end
-                      ? `${computedRange.start} → ${computedRange.end}`
-                      : "—"}
+                    {computedRange.start && computedRange.end ? `${computedRange.start} → ${computedRange.end}` : "—"}
                   </p>
 
                   <label>{t("sessionsCountLabel")}</label>

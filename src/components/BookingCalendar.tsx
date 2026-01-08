@@ -282,7 +282,6 @@ const BookingCalendar: React.FC = () => {
     el.scrollBy({ left: dir * 460, behavior: "smooth" });
   };
 
-  // ✅ Fetch once
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -327,11 +326,10 @@ const BookingCalendar: React.FC = () => {
     setErrorMessage("");
   };
 
+  const getSessionsCount = (g: AvailableClassGroup) => (g.sessions?.length ?? 0) || g.sessions_count || 0;
+
   const getGroupSpotsLabel = (g: AvailableClassGroup) => {
-    const minSpots = (g.sessions ?? []).reduce(
-      (acc, s) => Math.min(acc, s.spots_left),
-      Number.POSITIVE_INFINITY
-    );
+    const minSpots = (g.sessions ?? []).reduce((acc, s) => Math.min(acc, s.spots_left), Number.POSITIVE_INFINITY);
     const spots = Number.isFinite(minSpots) ? minSpots : 0;
     return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t("seatsAvailable")}`;
   };
@@ -352,7 +350,6 @@ const BookingCalendar: React.FC = () => {
 
     const { start, end } = getGroupRange(selectedGroup);
 
-    // ✅ hard stop si no hay fechas válidas
     if (!start || !end) {
       setStatus("error");
       setErrorMessage(t("errorNoDates"));
@@ -363,17 +360,13 @@ const BookingCalendar: React.FC = () => {
     setErrorMessage("");
 
     try {
-      // ✅ IMPORTANTÍSIMO: esto es lo que tu BookingController valida
       await api.post("/api/bookings", {
-        // tu backend usa `name` como title de la clase cuando NO envías class_id
         name: selectedGroup.title,
         email,
         start_date: start,
         end_date: end,
         trainer_name: selectedGroup.trainer_name ?? null,
         notes: `Enrollment for "${selectedGroup.title}" from ${start} to ${end}. (All sessions mandatory)`,
-        // class_id: opcional -> si quieres amarrarlo, envíalo:
-        // class_id: selectedGroup.sessions?.[0]?.id ?? null,
       });
 
       setStatus("success");
@@ -381,10 +374,7 @@ const BookingCalendar: React.FC = () => {
       console.error("Error creando booking:", err);
       setStatus("error");
 
-      const backendMsg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        "Error sending booking.";
+      const backendMsg = err?.response?.data?.message || err?.response?.data?.error || "Error sending booking.";
 
       const fieldErrors = err?.response?.data?.errors
         ? Object.values(err.response.data.errors).flat().join(" ")
@@ -408,11 +398,7 @@ const BookingCalendar: React.FC = () => {
               <span>{t("updatedTag")}</span>
             </div>
 
-            <button
-              type="button"
-              className="booking-lang-toggle"
-              onClick={() => setLang(lang === "en" ? "es" : "en")}
-            >
+            <button type="button" className="booking-lang-toggle" onClick={() => setLang(lang === "en" ? "es" : "en")}>
               {lang === "en" ? "ES" : "EN"}
             </button>
 
@@ -498,16 +484,12 @@ const BookingCalendar: React.FC = () => {
                 {selectedGroup && (
                   <div className="class-sessions class-sessions--below">
                     <div className="class-sessions-title">
-                      {t("sessions")} ({selectedGroup.sessions_count})
+                      {t("sessions")} ({getSessionsCount(selectedGroup)})
                     </div>
 
                     <div className="class-sessions-list">
                       {(selectedGroup.sessions ?? []).map((s) => (
-                        <div
-                          key={s.id}
-                          className="class-session-row class-session-row--readonly"
-                          role="listitem"
-                        >
+                        <div key={s.id} className="class-session-row class-session-row--readonly" role="listitem">
                           <span className="class-session-date">{formatDateLabel(s.date_iso, lang)}</span>
                           <span className="class-session-time">{s.time_range}</span>
                           <span className="class-session-spots">
@@ -545,7 +527,7 @@ const BookingCalendar: React.FC = () => {
                   </div>
 
                   <p className="booking-detail-meta">
-                    <strong>{t("includesLabel")}:</strong> {selectedGroup.sessions_count} {t("sessions")} ({t("mandatoryLabel")}).
+                    <strong>{t("includesLabel")}:</strong> {getSessionsCount(selectedGroup)} {t("sessions")} ({t("mandatoryLabel")}).
                   </p>
 
                   <form onSubmit={handleSubmit} className="booking-detail-form">

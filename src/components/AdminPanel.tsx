@@ -92,7 +92,8 @@ const translations: Record<Lang, Record<string, string>> = {
   en: {
     adminBadge: "Admin Panel",
     adminTitle: "Training Management",
-    adminSubtitle: "Review the reservations received and manage the available classes.",
+    adminSubtitle:
+      "Review the reservations received and manage the available classes.",
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabBookings: "Bookings",
@@ -155,7 +156,8 @@ const translations: Record<Lang, Record<string, string>> = {
     errorSaveClass: "Could not save class.",
 
     addSessionsTitle: "Sessions (edit dates & hours)",
-    addSessionsHint: "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
+    addSessionsHint:
+      "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
     sessionsCountLabel: "Number of sessions",
     sessionDateLabel: "Session date",
 
@@ -190,7 +192,8 @@ const translations: Record<Lang, Record<string, string>> = {
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-    adminSubtitle: "Revisa las reservas recibidas y administra las clases disponibles.",
+    adminSubtitle:
+      "Revisa las reservas recibidas y administra las clases disponibles.",
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabBookings: "Reservas",
@@ -226,7 +229,8 @@ const translations: Record<Lang, Record<string, string>> = {
     btnDelete: "Eliminar",
 
     btnDeleteClass: "Eliminar",
-    confirmDeleteClassGroup: "¿Eliminar este grupo de clases y todas sus sesiones?",
+    confirmDeleteClassGroup:
+      "¿Eliminar este grupo de clases y todas sus sesiones?",
 
     classesTitle: "Clases disponibles",
     sessionsCount: "Sesiones",
@@ -253,7 +257,8 @@ const translations: Record<Lang, Record<string, string>> = {
     errorSaveClass: "No se pudo guardar la clase.",
 
     addSessionsTitle: "Sesiones (editar fechas y horas)",
-    addSessionsHint: "Define la fecha y hora inicio/fin por sesión. Sube/baja la cantidad de sesiones y guarda.",
+    addSessionsHint:
+      "Define la fecha y hora inicio/fin por sesión. Sube/baja la cantidad de sesiones y guarda.",
     sessionsCountLabel: "Número de sesiones",
     sessionDateLabel: "Fecha de la sesión",
 
@@ -314,7 +319,10 @@ const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang>("en");
-  const t = useCallback((key: string) => translations[lang][key] ?? key, [lang]);
+  const t = useCallback(
+    (key: string) => translations[lang][key] ?? key,
+    [lang]
+  );
 
   const [activeTab, setActiveTab] = useState<Tab>("bookings");
 
@@ -323,8 +331,11 @@ const AdminPanel: React.FC = () => {
 
   /** CLASSES (grouped) */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
-  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
-  const toggleGroup = (code: string) => setExpandedGroupCode((prev) => (prev === code ? null : code));
+  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(
+    null
+  );
+  const toggleGroup = (code: string) =>
+    setExpandedGroupCode((prev) => (prev === code ? null : code));
 
   /** Carousel */
   const carouselRef = useRef<HTMLDivElement | null>(null);
@@ -341,25 +352,33 @@ const AdminPanel: React.FC = () => {
 
   /** Sessions Draft */
   const [sessionsCount, setSessionsCount] = useState<number>(1);
-  const [sessions, setSessions] = useState<SessionDraft[]>([{ date_iso: "", start_time: "", end_time: "" }]);
+  const [sessions, setSessions] = useState<SessionDraft[]>([
+    { date_iso: "", start_time: "", end_time: "" },
+  ]);
 
   const setCount = (n: number) => {
     const safe = Math.max(1, Math.min(20, Number.isFinite(n) ? n : 1));
     setSessionsCount(safe);
     setSessions((prev) => {
       const next = [...prev];
-      while (next.length < safe) next.push({ date_iso: "", start_time: "", end_time: "" });
+      while (next.length < safe)
+        next.push({ date_iso: "", start_time: "", end_time: "" });
       return next.slice(0, safe);
     });
   };
 
   const selectedGroup = useMemo(() => {
     if (!expandedGroupCode) return null;
-    return groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null;
+    return (
+      groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null
+    );
   }, [expandedGroupCode, groupedClasses]);
 
   const computedRange = useMemo(() => {
-    const dates = sessions.map((s) => s.date_iso).filter(Boolean).sort();
+    const dates = sessions
+      .map((s) => s.date_iso)
+      .filter(Boolean)
+      .sort();
     if (dates.length === 0) return { start: "", end: "" };
     return { start: dates[0], end: dates[dates.length - 1] };
   }, [sessions]);
@@ -419,13 +438,19 @@ const AdminPanel: React.FC = () => {
   };
 
   const totalDays = (b: Booking) => {
-    if (typeof b.new_training_days === "number" && b.new_training_days > 0) return b.new_training_days;
-    if (typeof b.original_training_days === "number" && b.original_training_days > 0) return b.original_training_days;
+    if (typeof b.new_training_days === "number" && b.new_training_days > 0)
+      return b.new_training_days;
+    if (
+      typeof b.original_training_days === "number" &&
+      b.original_training_days > 0
+    )
+      return b.original_training_days;
 
     try {
       const s = new Date(b.start_date);
       const e = new Date(b.end_date);
-      const diff = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const diff =
+        Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       return diff > 0 ? diff : 1;
     } catch {
       return 1;
@@ -440,16 +465,21 @@ const AdminPanel: React.FC = () => {
   };
 
   const deriveBookingAttendance = (b: BookingWithSessions): boolean | null => {
-    const sess = (b.sessions ?? []).filter((s) => s && typeof s.id === "number" && s.id > 0);
+    const sess = (b.sessions ?? []).filter(
+      (s) => s && typeof s.id === "number" && s.id > 0
+    );
     if (sess.length === 0) {
-      return typeof b.attendedbutton === "undefined" ? null : b.attendedbutton ?? null;
+      return typeof b.attendedbutton === "undefined"
+        ? null
+        : b.attendedbutton ?? null;
     }
     if (sess.some((s) => s.attended === false)) return false;
     if (sess.some((s) => s.attended === true)) return true;
     return null;
   };
 
-  const attendanceLabelBooking = (b: BookingWithSessions) => attendanceLabelFromValue(deriveBookingAttendance(b));
+  const attendanceLabelBooking = (b: BookingWithSessions) =>
+    attendanceLabelFromValue(deriveBookingAttendance(b));
 
   /** ✅ Rows por sesión (flatten) */
   const bookingSessionRows = useMemo<BookingSessionRow[]>(() => {
@@ -491,7 +521,10 @@ const AdminPanel: React.FC = () => {
   }, [bookings]);
 
   /** ✅ Lock rule: si una sesión anterior está false => esta queda bloqueada */
-  const isSessionLocked = (b: BookingWithSessions, sessionIndex: number): boolean => {
+  const isSessionLocked = (
+    b: BookingWithSessions,
+    sessionIndex: number
+  ): boolean => {
     const sess = (b.sessions ?? []).slice().sort((a, c) => {
       const d = (a.date_iso || "").localeCompare(c.date_iso || "");
       if (d !== 0) return d;
@@ -499,21 +532,34 @@ const AdminPanel: React.FC = () => {
     });
 
     if (sess.length === 0) return false;
-    if (sessionIndex <= 0) return false;
 
+    // 1) Si alguna sesión previa está en false => bloquea todo lo que venga después
     for (let i = 0; i < sessionIndex; i++) {
       if (sess[i]?.attended === false) return true;
     }
-    return false;
+
+    // 2) Solo habilitar el "primer null" (primera sesión sin marcar)
+    const firstPendingIndex = sess.findIndex(
+      (s) => s.attended === null || typeof s.attended === "undefined"
+    );
+
+    // si ya no hay pendientes (todas marcadas), bloquea todo (solo lectura)
+    if (firstPendingIndex === -1) return true;
+
+    // solo se habilita esa exacta sesión pendiente
+    return sessionIndex !== firstPendingIndex;
   };
 
   const updateBookingStatus = async (id: number, status: BookingStatus) => {
     try {
       await ensureCsrf();
       const res = await api.put(`/api/admin/bookings/${id}/status`, { status });
-      const updated: BookingWithSessions = res.data?.booking ?? res.data?.data ?? res.data;
+      const updated: BookingWithSessions =
+        res.data?.booking ?? res.data?.data ?? res.data;
 
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated } : b)));
+      setBookings((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, ...updated } : b))
+      );
 
       // ✅ si aceptas: backend puede adjuntar sessions -> refrescar
       if (status === "accepted") {
@@ -538,25 +584,36 @@ const AdminPanel: React.FC = () => {
   };
 
   /** Toggle attendance por sesión */
-  const nextAttendance = (current: boolean | null | undefined): boolean | null => {
+  const nextAttendance = (
+    current: boolean | null | undefined
+  ): boolean | null => {
     if (current === null || typeof current === "undefined") return true;
     if (current === true) return false;
     return null;
   };
 
-  const toggleSessionAttendance = async (bookingId: number, sessionId: number, current: boolean | null | undefined) => {
+  const toggleSessionAttendance = async (
+    bookingId: number,
+    sessionId: number,
+    current: boolean | null | undefined
+  ) => {
     try {
       await ensureCsrf();
       const next = nextAttendance(current);
 
-      await api.put(`/api/admin/bookings/${bookingId}/sessions/${sessionId}/attendance`, {
-        attended: next,
-      });
+      await api.put(
+        `/api/admin/bookings/${bookingId}/sessions/${sessionId}/attendance`,
+        {
+          attended: next,
+        }
+      );
 
       setBookings((prev) =>
         prev.map((b) => {
           if (b.id !== bookingId) return b;
-          const updatedSessions = (b.sessions ?? []).map((s) => (s.id === sessionId ? { ...s, attended: next } : s));
+          const updatedSessions = (b.sessions ?? []).map((s) =>
+            s.id === sessionId ? { ...s, attended: next } : s
+          );
           return { ...b, sessions: updatedSessions };
         })
       );
@@ -565,6 +622,7 @@ const AdminPanel: React.FC = () => {
       alert("Could not update session attendance");
     }
   };
+
 
   /** DELETE group (all sessions) */
   const deleteClassGroup = async (g: GroupedClass) => {
@@ -653,17 +711,30 @@ const AdminPanel: React.FC = () => {
       end_time: (s.end_time || "").trim(),
     }));
 
-    const missing = cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
+    const missing = cleanSessions.some(
+      (s) => !s.date_iso || !s.start_time || !s.end_time
+    );
     if (missing) {
       alert("Please set date + start + end time for every session.");
       return;
     }
 
-    const rangeStart = (editClass.start_date || computedRange.start || "").trim();
-    const rangeEnd = (editClass.end_date || computedRange.end || rangeStart || "").trim();
+    const rangeStart = (
+      editClass.start_date ||
+      computedRange.start ||
+      ""
+    ).trim();
+    const rangeEnd = (
+      editClass.end_date ||
+      computedRange.end ||
+      rangeStart ||
+      ""
+    ).trim();
 
     if (rangeStart && rangeEnd) {
-      const out = cleanSessions.some((s) => s.date_iso < rangeStart || s.date_iso > rangeEnd);
+      const out = cleanSessions.some(
+        (s) => s.date_iso < rangeStart || s.date_iso > rangeEnd
+      );
       if (out) {
         alert("One or more sessions are outside the selected date range.");
         return;
@@ -745,7 +816,10 @@ const AdminPanel: React.FC = () => {
   const enrolled = useMemo(() => {
     return [...bookings]
       .filter((b) => b.status === "accepted")
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
   }, [bookings]);
 
   /** KPIs (por sesiones) */
@@ -806,7 +880,10 @@ const AdminPanel: React.FC = () => {
   const ENROLLED_PAGE_SIZE = 8;
   const [enrolledPage, setEnrolledPage] = useState(1);
 
-  const enrolledTotalPages = Math.max(1, Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE));
+  const enrolledTotalPages = Math.max(
+    1,
+    Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE)
+  );
   const enrolledPageSafe = Math.min(enrolledPage, enrolledTotalPages);
 
   const enrolledSlice = useMemo(() => {
@@ -815,7 +892,8 @@ const AdminPanel: React.FC = () => {
   }, [enrolled, enrolledPageSafe]);
 
   const goPrev = () => setEnrolledPage((p) => Math.max(1, p - 1));
-  const goNext = () => setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
+  const goNext = () =>
+    setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
 
   return (
     <div className="admin-page">
@@ -828,15 +906,27 @@ const AdminPanel: React.FC = () => {
           </div>
 
           <div className="admin-header-actions">
-            <button type="button" className="admin-lang-toggle" onClick={() => setLang(lang === "en" ? "es" : "en")}>
+            <button
+              type="button"
+              className="admin-lang-toggle"
+              onClick={() => setLang(lang === "en" ? "es" : "en")}
+            >
               {lang === "en" ? "ES" : "EN"}
             </button>
 
-            <button type="button" className="admin-back-button" onClick={() => navigate("/")}>
+            <button
+              type="button"
+              className="admin-back-button"
+              onClick={() => navigate("/")}
+            >
               {t("backToCalendar")}
             </button>
 
-            <button type="button" className="admin-logout-button" onClick={handleLogout}>
+            <button
+              type="button"
+              className="admin-logout-button"
+              onClick={handleLogout}
+            >
               {t("logout")}
             </button>
           </div>
@@ -845,7 +935,10 @@ const AdminPanel: React.FC = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={"admin-tab-button" + (activeTab === "bookings" ? " admin-tab-button--active" : "")}
+            className={
+              "admin-tab-button" +
+              (activeTab === "bookings" ? " admin-tab-button--active" : "")
+            }
             onClick={() => setActiveTab("bookings")}
           >
             {t("tabBookings")}
@@ -853,7 +946,10 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={"admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")}
+            className={
+              "admin-tab-button" +
+              (activeTab === "classes" ? " admin-tab-button--active" : "")
+            }
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
@@ -861,7 +957,10 @@ const AdminPanel: React.FC = () => {
 
           <button
             type="button"
-            className={"admin-tab-button" + (activeTab === "stats" ? " admin-tab-button--active" : "")}
+            className={
+              "admin-tab-button" +
+              (activeTab === "stats" ? " admin-tab-button--active" : "")
+            }
             onClick={() => setActiveTab("stats")}
           >
             {t("tabStats")}
@@ -873,7 +972,9 @@ const AdminPanel: React.FC = () => {
           <section className="admin-table-section">
             <h2 className="admin-table-title">{t("bookingListTitle")}</h2>
 
-            {bookings.length === 0 && <p className="admin-message">{t("noBookings")}</p>}
+            {bookings.length === 0 && (
+              <p className="admin-message">{t("noBookings")}</p>
+            )}
 
             {bookings.length > 0 && (
               <div className="admin-table-wrapper">
@@ -893,131 +994,182 @@ const AdminPanel: React.FC = () => {
                       <th>{t("sessionDateCol")}</th>
                       <th>{t("sessionTimeCol")}</th>
 
-                      <th className="th-center">{t("statsColumnAttendance")}</th>
+                      <th className="th-center">
+                        {t("statsColumnAttendance")}
+                      </th>
                       <th>{t("columnStatus")}</th>
                       <th>{t("columnActions")}</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {bookingSessionRows.map(({ booking: b, session, sessionIndex, sessionsCount }) => {
-                      const rowSpan = Math.max(sessionsCount, 1);
+                    {bookingSessionRows.map(
+                      ({
+                        booking: b,
+                        session,
+                        sessionIndex,
+                        sessionsCount,
+                      }) => {
+                        const rowSpan = Math.max(sessionsCount, 1);
 
-                      const locked =
-                        b.status === "accepted" && sessionsCount > 0 ? isSessionLocked(b, sessionIndex) : false;
+                        const locked =
+                          b.status !== "accepted" || !session.id
+                            ? true
+                            : isSessionLocked(b, sessionIndex);
 
-                      return (
-                        <tr key={`${b.id}-${session.id}-${sessionIndex}`}>
-                          {sessionIndex === 0 ? (
-                            <>
-                              <td rowSpan={rowSpan}>{b.name}</td>
-                              <td rowSpan={rowSpan}>{b.email}</td>
-                              <td rowSpan={rowSpan}>{formatDate(b.start_date)}</td>
-                              <td rowSpan={rowSpan}>{formatDate(b.end_date)}</td>
-                              <td rowSpan={rowSpan}>{totalDays(b)}</td>
-                              <td rowSpan={rowSpan}>{b.trainer_name || "—"}</td>
-                              <td rowSpan={rowSpan} className="admin-description-cell">
-                                {b.notes || "—"}
-                              </td>
-                              <td rowSpan={rowSpan}>{formatDateTime(b.created_at)}</td>
-                            </>
-                          ) : null}
-
-                          <td>{sessionsCount > 0 ? `${sessionIndex + 1}/${sessionsCount}` : "—"}</td>
-                          <td>{formatDate(session.date_iso)}</td>
-                          <td>{session.time_range || "—"}</td>
-
-                          <td className="attendance-cell">
-                            {b.status === "accepted" && session.id ? (
+                        return (
+                          <tr key={`${b.id}-${session.id}-${sessionIndex}`}>
+                            {sessionIndex === 0 ? (
                               <>
-                                <button
-                                  type="button"
-                                  className={
-                                    "attendance-switch " +
-                                    (session.attended === true
-                                      ? "attendance-switch--yes"
-                                      : session.attended === false
-                                      ? "attendance-switch--no"
-                                      : "attendance-switch--neutral") +
-                                    (locked ? " attendance-switch--disabled" : "")
-                                  }
-                                  onClick={() => {
-                                    if (locked) return;
-                                    toggleSessionAttendance(b.id, session.id, session.attended);
-                                  }}
-                                  aria-label="toggle attendance"
-                                  title={locked ? t("locked") : attendanceLabelFromValue(session.attended)}
-                                  disabled={locked}
-                                />
-                                <span
-                                  className={
-                                    "mini-pill " +
-                                    (locked
-                                      ? "mini-pill--neutral"
-                                      : session.attended === true
-                                      ? "mini-pill--ok"
-                                      : session.attended === false
-                                      ? "mini-pill--off"
-                                      : "mini-pill--neutral")
-                                  }
+                                <td rowSpan={rowSpan}>{b.name}</td>
+                                <td rowSpan={rowSpan}>{b.email}</td>
+                                <td rowSpan={rowSpan}>
+                                  {formatDate(b.start_date)}
+                                </td>
+                                <td rowSpan={rowSpan}>
+                                  {formatDate(b.end_date)}
+                                </td>
+                                <td rowSpan={rowSpan}>{totalDays(b)}</td>
+                                <td rowSpan={rowSpan}>
+                                  {b.trainer_name || "—"}
+                                </td>
+                                <td
+                                  rowSpan={rowSpan}
+                                  className="admin-description-cell"
                                 >
-                                  {locked ? t("locked") : attendanceLabelFromValue(session.attended)}
-                                </span>
+                                  {b.notes || "—"}
+                                </td>
+                                <td rowSpan={rowSpan}>
+                                  {formatDateTime(b.created_at)}
+                                </td>
                               </>
-                            ) : (
-                              <div className="mini-pill" style={{ opacity: 0.7 }}>
-                                —
-                              </div>
-                            )}
-                          </td>
+                            ) : null}
 
-                          {sessionIndex === 0 ? (
-                            <>
-                              <td rowSpan={rowSpan}>
-                                <span
-                                  className={
-                                    "status-pill " +
-                                    (b.status === "accepted"
-                                      ? "status-accepted"
-                                      : b.status === "denied"
-                                      ? "status-denied"
-                                      : "status-pending")
-                                  }
+                            <td>
+                              {sessionsCount > 0
+                                ? `${sessionIndex + 1}/${sessionsCount}`
+                                : "—"}
+                            </td>
+                            <td>{formatDate(session.date_iso)}</td>
+                            <td>{session.time_range || "—"}</td>
+
+                            <td className="attendance-cell">
+                              {b.status === "accepted" && session.id ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className={
+                                      "attendance-switch " +
+                                      (session.attended === true
+                                        ? "attendance-switch--yes"
+                                        : session.attended === false
+                                        ? "attendance-switch--no"
+                                        : "attendance-switch--neutral") +
+                                      (locked
+                                        ? " attendance-switch--disabled"
+                                        : "")
+                                    }
+                                    onClick={() => {
+                                      if (locked) return;
+                                      toggleSessionAttendance(
+                                        b.id,
+                                        session.id,
+                                        session.attended
+                                      );
+                                    }}
+                                    title={
+                                      locked
+                                        ? t("locked")
+                                        : attendanceLabelFromValue(
+                                            session.attended
+                                          )
+                                    }
+                                    disabled={locked}
+                                  />
+                                  <span
+                                    className={
+                                      "mini-pill " +
+                                      (locked
+                                        ? "mini-pill--neutral"
+                                        : session.attended === true
+                                        ? "mini-pill--ok"
+                                        : session.attended === false
+                                        ? "mini-pill--off"
+                                        : "mini-pill--neutral")
+                                    }
+                                  >
+                                    {locked
+                                      ? t("locked")
+                                      : attendanceLabelFromValue(
+                                          session.attended
+                                        )}
+                                  </span>
+                                </>
+                              ) : (
+                                <div
+                                  className="mini-pill"
+                                  style={{ opacity: 0.7 }}
                                 >
-                                  {b.status === "accepted"
-                                    ? t("statusAccepted")
-                                    : b.status === "denied"
-                                    ? t("statusDenied")
-                                    : t("statusPending")}
-                                </span>
-                              </td>
-
-                              <td rowSpan={rowSpan}>
-                                <div className="admin-actions">
-                                  <button
-                                    className="btn btn-mini"
-                                    onClick={() => updateBookingStatus(b.id, "accepted")}
-                                    disabled={b.status === "accepted"}
-                                  >
-                                    {t("btnAccept")}
-                                  </button>
-                                  <button
-                                    className="btn btn-mini btn-secondary"
-                                    onClick={() => updateBookingStatus(b.id, "denied")}
-                                    disabled={b.status === "denied"}
-                                  >
-                                    {t("btnDeny")}
-                                  </button>
-                                  <button className="btn btn-mini btn-danger" onClick={() => handleDeleteBooking(b.id)}>
-                                    {t("btnDelete")}
-                                  </button>
+                                  —
                                 </div>
-                              </td>
-                            </>
-                          ) : null}
-                        </tr>
-                      );
-                    })}
+                              )}
+                            </td>
+
+                            {sessionIndex === 0 ? (
+                              <>
+                                <td rowSpan={rowSpan}>
+                                  <span
+                                    className={
+                                      "status-pill " +
+                                      (b.status === "accepted"
+                                        ? "status-accepted"
+                                        : b.status === "denied"
+                                        ? "status-denied"
+                                        : "status-pending")
+                                    }
+                                  >
+                                    {b.status === "accepted"
+                                      ? t("statusAccepted")
+                                      : b.status === "denied"
+                                      ? t("statusDenied")
+                                      : t("statusPending")}
+                                  </span>
+                                </td>
+
+                                <td rowSpan={rowSpan}>
+                                  <div className="admin-actions">
+                                    <button
+                                      className="btn btn-mini"
+                                      onClick={() =>
+                                        updateBookingStatus(b.id, "accepted")
+                                      }
+                                      disabled={b.status === "accepted"}
+                                    >
+                                      {t("btnAccept")}
+                                    </button>
+                                    <button
+                                      className="btn btn-mini btn-secondary"
+                                      onClick={() =>
+                                        updateBookingStatus(b.id, "denied")
+                                      }
+                                      disabled={b.status === "denied"}
+                                    >
+                                      {t("btnDeny")}
+                                    </button>
+                                    <button
+                                      className="btn btn-mini btn-danger"
+                                      onClick={() => handleDeleteBooking(b.id)}
+                                    >
+                                      {t("btnDelete")}
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : null}
+                          </tr>
+                        );
+                      }
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1031,20 +1183,34 @@ const AdminPanel: React.FC = () => {
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("classesTitle")}</h2>
 
-              <button type="button" className="btn btn-primary" onClick={openNewClassModal}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={openNewClassModal}
+              >
                 {t("addNewClass")}
               </button>
             </div>
 
-            {groupedClasses.length === 0 && <p className="admin-message">{t("noClasses")}</p>}
+            {groupedClasses.length === 0 && (
+              <p className="admin-message">{t("noClasses")}</p>
+            )}
 
             {groupedClasses.length > 0 && (
               <div className="admin-carousel-wrap">
                 <div className="admin-carousel-controls">
-                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(-1)}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => scrollCarousel(-1)}
+                  >
                     ◀ {t("carouselPrev")}
                   </button>
-                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(1)}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => scrollCarousel(1)}
+                  >
                     {t("carouselNext")} ▶
                   </button>
                 </div>
@@ -1056,29 +1222,44 @@ const AdminPanel: React.FC = () => {
                     return (
                       <div
                         key={g.group_code}
-                        className={"admin-class-card" + (expanded ? " admin-class-card--active" : "")}
+                        className={
+                          "admin-class-card" +
+                          (expanded ? " admin-class-card--active" : "")
+                        }
                       >
                         <div className="admin-class-card-head">
                           <div>
                             <div className="admin-class-title">{g.title}</div>
                             <div className="admin-class-sub">
                               <span className="mini-pill">{g.modality}</span>
-                              <span className="mini-pill" style={{ marginLeft: 8 }}>
+                              <span
+                                className="mini-pill"
+                                style={{ marginLeft: 8 }}
+                              >
                                 {t("sessionsCount")}: {g.sessions_count}
                               </span>
                             </div>
                           </div>
 
-                          <button type="button" className="btn btn-secondary" onClick={() => toggleGroup(g.group_code)}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => toggleGroup(g.group_code)}
+                          >
                             {expanded ? t("collapse") : t("expand")}
                           </button>
                         </div>
 
                         <div className="admin-class-meta">
                           <div className="admin-class-meta-row">
-                            <strong>{t("columnTrainer")}:</strong> {g.trainer_name || t("statsNoTrainer")}
+                            <strong>{t("columnTrainer")}:</strong>{" "}
+                            {g.trainer_name || t("statsNoTrainer")}
                           </div>
-                          {g.description && <div className="admin-class-desc">{g.description}</div>}
+                          {g.description && (
+                            <div className="admin-class-desc">
+                              {g.description}
+                            </div>
+                          )}
                         </div>
 
                         {expanded && <div className="admin-divider" />}
@@ -1088,18 +1269,30 @@ const AdminPanel: React.FC = () => {
                             {g.sessions.map((s) => (
                               <div key={s.id} className="admin-session-pill">
                                 <span className="mini-pill">{s.date_iso}</span>
-                                <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                <span
+                                  className="mini-pill"
+                                  style={{ marginLeft: 8 }}
+                                >
                                   {s.time_range}
                                 </span>
                               </div>
                             ))}
 
-                            <div className="admin-actions" style={{ marginTop: 12 }}>
-                              <button className="btn btn-mini" onClick={() => openEditClassModal(g)}>
+                            <div
+                              className="admin-actions"
+                              style={{ marginTop: 12 }}
+                            >
+                              <button
+                                className="btn btn-mini"
+                                onClick={() => openEditClassModal(g)}
+                              >
                                 {t("modalEditClass")}
                               </button>
 
-                              <button className="btn btn-mini btn-danger" onClick={() => deleteClassGroup(g)}>
+                              <button
+                                className="btn btn-mini btn-danger"
+                                onClick={() => deleteClassGroup(g)}
+                              >
                                 {t("btnDeleteClass")}
                               </button>
                             </div>
@@ -1112,7 +1305,10 @@ const AdminPanel: React.FC = () => {
 
                 {selectedGroup && (
                   <div style={{ marginTop: 18 }}>
-                    <h3 className="admin-table-title" style={{ marginBottom: 10 }}>
+                    <h3
+                      className="admin-table-title"
+                      style={{ marginBottom: 10 }}
+                    >
                       {t("sessionsPanelTitle")} {selectedGroup.title}
                     </h3>
 
@@ -1146,7 +1342,9 @@ const AdminPanel: React.FC = () => {
             {showClassModal && editClass && (
               <div className="admin-modal-backdrop">
                 <div className="admin-modal admin-modal-wide">
-                  <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
+                  <h3>
+                    {isNewClass ? t("modalNewClass") : t("modalEditClass")}
+                  </h3>
 
                   <div className="admin-form-grid">
                     <div className="full">
@@ -1154,7 +1352,11 @@ const AdminPanel: React.FC = () => {
                       <input
                         className="form-input"
                         value={editClass.title}
-                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))}
+                        onChange={(e) =>
+                          setEditClass((prev) =>
+                            prev ? { ...prev, title: e.target.value } : prev
+                          )
+                        }
                       />
                     </div>
 
@@ -1164,7 +1366,14 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.trainer_name || ""}
                         onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, trainer_name: e.target.value || null } : prev))
+                          setEditClass((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  trainer_name: e.target.value || null,
+                                }
+                              : prev
+                          )
                         }
                       >
                         <option value="">{t("optionSelectTrainer")}</option>
@@ -1182,7 +1391,13 @@ const AdminPanel: React.FC = () => {
                         type="date"
                         className="form-input"
                         value={editClass.start_date || ""}
-                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, start_date: e.target.value } : prev))}
+                        onChange={(e) =>
+                          setEditClass((prev) =>
+                            prev
+                              ? { ...prev, start_date: e.target.value }
+                              : prev
+                          )
+                        }
                       />
                     </div>
 
@@ -1192,7 +1407,11 @@ const AdminPanel: React.FC = () => {
                         type="date"
                         className="form-input"
                         value={editClass.end_date || ""}
-                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, end_date: e.target.value } : prev))}
+                        onChange={(e) =>
+                          setEditClass((prev) =>
+                            prev ? { ...prev, end_date: e.target.value } : prev
+                          )
+                        }
                       />
                     </div>
 
@@ -1203,7 +1422,14 @@ const AdminPanel: React.FC = () => {
                         value={editClass.modality}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev ? { ...prev, modality: e.target.value as "Online" | "Presencial" } : prev
+                            prev
+                              ? {
+                                  ...prev,
+                                  modality: e.target.value as
+                                    | "Online"
+                                    | "Presencial",
+                                }
+                              : prev
                           )
                         }
                       >
@@ -1219,7 +1445,11 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.spots_left}
                         onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, spots_left: Number(e.target.value) } : prev))
+                          setEditClass((prev) =>
+                            prev
+                              ? { ...prev, spots_left: Number(e.target.value) }
+                              : prev
+                          )
                         }
                       />
                     </div>
@@ -1231,7 +1461,11 @@ const AdminPanel: React.FC = () => {
                         rows={3}
                         value={editClass.description ?? ""}
                         onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, description: e.target.value || null } : prev))
+                          setEditClass((prev) =>
+                            prev
+                              ? { ...prev, description: e.target.value || null }
+                              : prev
+                          )
                         }
                       />
                     </div>
@@ -1239,19 +1473,30 @@ const AdminPanel: React.FC = () => {
 
                   <div className="admin-divider" />
 
-                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>{t("addSessionsTitle")}</h4>
+                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>
+                    {t("addSessionsTitle")}
+                  </h4>
                   <p className="admin-message" style={{ marginTop: 0 }}>
                     {t("addSessionsHint")}
                   </p>
 
-                  <p className="admin-message" style={{ marginTop: 0, opacity: 0.85 }}>
+                  <p
+                    className="admin-message"
+                    style={{ marginTop: 0, opacity: 0.85 }}
+                  >
                     <strong>Computed range:</strong>{" "}
-                    {computedRange.start && computedRange.end ? `${computedRange.start} → ${computedRange.end}` : "—"}
+                    {computedRange.start && computedRange.end
+                      ? `${computedRange.start} → ${computedRange.end}`
+                      : "—"}
                   </p>
 
                   <label>{t("sessionsCountLabel")}</label>
                   <div className="admin-inline-controls">
-                    <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount - 1)}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setCount(sessionsCount - 1)}
+                    >
                       −
                     </button>
                     <input
@@ -1261,12 +1506,19 @@ const AdminPanel: React.FC = () => {
                       value={sessionsCount}
                       onChange={(e) => setCount(Number(e.target.value))}
                     />
-                    <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount + 1)}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setCount(sessionsCount + 1)}
+                    >
                       +
                     </button>
                   </div>
 
-                  <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
+                  <div
+                    className="admin-sessions-grid"
+                    style={{ marginTop: 12 }}
+                  >
                     {sessions.map((s, idx) => (
                       <div key={idx} className="admin-session-row">
                         <div>
@@ -1279,7 +1531,10 @@ const AdminPanel: React.FC = () => {
                             value={s.date_iso}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = { ...next[idx], date_iso: e.target.value };
+                              next[idx] = {
+                                ...next[idx],
+                                date_iso: e.target.value,
+                              };
                               setSessions(next);
                             }}
                           />
@@ -1293,7 +1548,10 @@ const AdminPanel: React.FC = () => {
                             value={s.start_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = { ...next[idx], start_time: e.target.value };
+                              next[idx] = {
+                                ...next[idx],
+                                start_time: e.target.value,
+                              };
                               setSessions(next);
                             }}
                           />
@@ -1307,7 +1565,10 @@ const AdminPanel: React.FC = () => {
                             value={s.end_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = { ...next[idx], end_time: e.target.value };
+                              next[idx] = {
+                                ...next[idx],
+                                end_time: e.target.value,
+                              };
                               setSessions(next);
                             }}
                           />
@@ -1317,11 +1578,19 @@ const AdminPanel: React.FC = () => {
                   </div>
 
                   <div className="admin-modal-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowClassModal(false)}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowClassModal(false)}
+                    >
                       {t("modalCancelDark")}
                     </button>
 
-                    <button type="button" className="btn btn-primary" onClick={saveClassChanges}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={saveClassChanges}
+                    >
                       {t("modalSaveDark")}
                     </button>
                   </div>
@@ -1338,7 +1607,9 @@ const AdminPanel: React.FC = () => {
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiAccepted")}</div>
-                  <div className="admin-kpi-value">{statsKPIs.acceptedTotal}</div>
+                  <div className="admin-kpi-value">
+                    {statsKPIs.acceptedTotal}
+                  </div>
                 </div>
 
                 <div className="admin-kpi-card">
@@ -1393,13 +1664,21 @@ const AdminPanel: React.FC = () => {
                   </div>
 
                   <div className="pagination">
-                    <button className="btn btn-secondary" onClick={goPrev} disabled={enrolledPage <= 1}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={goPrev}
+                      disabled={enrolledPage <= 1}
+                    >
                       {t("paginationPrev")}
                     </button>
                     <div className="pagination-info">
                       {enrolledPageSafe} / {enrolledTotalPages}
                     </div>
-                    <button className="btn btn-secondary" onClick={goNext} disabled={enrolledPageSafe >= enrolledTotalPages}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={goNext}
+                      disabled={enrolledPageSafe >= enrolledTotalPages}
+                    >
                       {t("paginationNext")}
                     </button>
                   </div>

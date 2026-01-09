@@ -353,6 +353,8 @@ const AdminPanel: React.FC = () => {
   const [showClassModal, setShowClassModal] = useState(false);
   const [isNewClass, setIsNewClass] = useState(false);
   const [editClass, setEditClass] = useState<AvailableClass | null>(null);
+
+  /** bookings server pagination */
   const [bookingsPage, setBookingsPage] = useState(1);
   const [bookingsPerPage] = useState(10);
   const [bookingsLastPage, setBookingsLastPage] = useState(1);
@@ -554,20 +556,16 @@ const AdminPanel: React.FC = () => {
 
     if (sess.length === 0) return false;
 
-    // 1) Si alguna sesión previa está en false => bloquea todo lo que venga después
     for (let i = 0; i < sessionIndex; i++) {
       if (sess[i]?.attended === false) return true;
     }
 
-    // 2) Solo habilitar el "primer null" (primera sesión sin marcar)
     const firstPendingIndex = sess.findIndex(
       (s) => s.attended === null || typeof s.attended === "undefined"
     );
 
-    // si ya no hay pendientes (todas marcadas), bloquea todo (solo lectura)
     if (firstPendingIndex === -1) return true;
 
-    // solo se habilita esa exacta sesión pendiente
     return sessionIndex !== firstPendingIndex;
   };
 
@@ -582,7 +580,6 @@ const AdminPanel: React.FC = () => {
         prev.map((b) => (b.id === id ? { ...b, ...updated } : b))
       );
 
-      // ✅ si aceptas: backend puede adjuntar sessions -> refrescar
       if (status === "accepted") {
         await fetchBookings();
       }
@@ -624,9 +621,7 @@ const AdminPanel: React.FC = () => {
 
       await api.put(
         `/api/admin/bookings/${bookingId}/sessions/${sessionId}/attendance`,
-        {
-          attended: next,
-        }
+        { attended: next }
       );
 
       setBookings((prev) =>
@@ -720,7 +715,7 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
-  /** ✅ SAVE class (FIX: no borra sesiones al crear) */
+  /** ✅ SAVE class */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
@@ -739,17 +734,8 @@ const AdminPanel: React.FC = () => {
       return;
     }
 
-    const rangeStart = (
-      editClass.start_date ||
-      computedRange.start ||
-      ""
-    ).trim();
-    const rangeEnd = (
-      editClass.end_date ||
-      computedRange.end ||
-      rangeStart ||
-      ""
-    ).trim();
+    const rangeStart = (editClass.start_date || computedRange.start || "").trim();
+    const rangeEnd = (editClass.end_date || computedRange.end || rangeStart || "").trim();
 
     if (rangeStart && rangeEnd) {
       const out = cleanSessions.some(
@@ -777,11 +763,9 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
-        // 1) crear base
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        // ✅ 2) UN SOLO PUT con TODAS las sesiones (no POST extra + PUT 1 sesión)
         await api.put(`/api/admin/classes/${saved.id}/sessions`, {
           sessions: [
             {
@@ -798,7 +782,6 @@ const AdminPanel: React.FC = () => {
           ],
         });
       } else {
-        // editar
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
         await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
@@ -832,7 +815,7 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  /** inscritos + paginación */
+  /** inscritos */
   const enrolled = useMemo(() => {
     return [...bookings]
       .filter((b) => b.status === "accepted")
@@ -841,6 +824,30 @@ const AdminPanel: React.FC = () => {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
   }, [bookings]);
+
+  /** ✅ enrolled pagination (LOCAL) */
+  const ENROLLED_PAGE_SIZE = 8;
+  const [enrolledPage, setEnrolledPage] = useState(1);
+
+  useEffect(() => {
+    // si cambian los datos, vuelve a la primera página para evitar vacíos
+    setEnrolledPage(1);
+  }, [enrolled.length]);
+
+  const enrolledTotalPages = Math.max(
+    1,
+    Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE)
+  );
+  const enrolledPageSafe = Math.min(enrolledPage, enrolledTotalPages);
+
+  const enrolledSlice = useMemo(() => {
+    const start = (enrolledPageSafe - 1) * ENROLLED_PAGE_SIZE;
+    return enrolled.slice(start, start + ENROLLED_PAGE_SIZE);
+  }, [enrolled, enrolledPageSafe]);
+
+  const goPrevEnrolled = () => setEnrolledPage((p) => Math.max(1, p - 1));
+  const goNextEnrolled = () =>
+    setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
 
   /** KPIs (por sesiones) */
   const sessionStats = useMemo(() => {
@@ -1003,20 +1010,7 @@ const AdminPanel: React.FC = () => {
     downloadCsv(`stats_export_${stamp}.csv`, rows);
   };
 
-  const ENROLLED_PAGE_SIZE = 8;
-  const [enrolledPage, setEnrolledPage] = useState(1);
-
-  const enrolledTotalPages = Math.max(
-    1,
-    Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE)
-  );
-  const enrolledPageSafe = Math.min(enrolledPage, enrolledTotalPages);
-
-  const enrolledSlice = useMemo(() => {
-    const start = (enrolledPageSafe - 1) * ENROLLED_PAGE_SIZE;
-    return enrolled.slice(start, start + ENROLLED_PAGE_SIZE);
-  }, [enrolled, enrolledPageSafe]);
-  
+  // ====== helpers for range redistribution (no warnings) ======
   const toDate = (iso: string) => {
     const [y, m, d] = iso.split("-").map(Number);
     return new Date(y, m - 1, d);
@@ -1048,8 +1042,6 @@ const AdminPanel: React.FC = () => {
    */
   const redistributeSessionsToRange = (startISO: string, endISO: string) => {
     if (!startISO || !endISO) return;
-
-    // si el usuario pone end < start, no hagas nada (evitas saltos raros)
     if (endISO < startISO) return;
 
     const n = sessions.length;
@@ -1171,9 +1163,7 @@ const AdminPanel: React.FC = () => {
                       <th>{t("sessionDateCol")}</th>
                       <th>{t("sessionTimeCol")}</th>
 
-                      <th className="th-center">
-                        {t("statsColumnAttendance")}
-                      </th>
+                      <th className="th-center">{t("statsColumnAttendance")}</th>
                       <th>{t("columnStatus")}</th>
                       <th>{t("columnActions")}</th>
                     </tr>
@@ -1181,12 +1171,7 @@ const AdminPanel: React.FC = () => {
 
                   <tbody>
                     {bookingSessionRows.map(
-                      ({
-                        booking: b,
-                        session,
-                        sessionIndex,
-                        sessionsCount,
-                      }) => {
+                      ({ booking: b, session, sessionIndex, sessionsCount }) => {
                         const rowSpan = Math.max(sessionsCount, 1);
 
                         const locked =
@@ -1283,10 +1268,7 @@ const AdminPanel: React.FC = () => {
                                   </span>
                                 </>
                               ) : (
-                                <div
-                                  className="mini-pill"
-                                  style={{ opacity: 0.7 }}
-                                >
+                                <div className="mini-pill" style={{ opacity: 0.7 }}>
                                   —
                                 </div>
                               )}
@@ -1409,10 +1391,7 @@ const AdminPanel: React.FC = () => {
                             <div className="admin-class-title">{g.title}</div>
                             <div className="admin-class-sub">
                               <span className="mini-pill">{g.modality}</span>
-                              <span
-                                className="mini-pill"
-                                style={{ marginLeft: 8 }}
-                              >
+                              <span className="mini-pill" style={{ marginLeft: 8 }}>
                                 {t("sessionsCount")}: {g.sessions_count}
                               </span>
                             </div>
@@ -1433,9 +1412,7 @@ const AdminPanel: React.FC = () => {
                             {g.trainer_name || t("statsNoTrainer")}
                           </div>
                           {g.description && (
-                            <div className="admin-class-desc">
-                              {g.description}
-                            </div>
+                            <div className="admin-class-desc">{g.description}</div>
                           )}
                         </div>
 
@@ -1446,19 +1423,13 @@ const AdminPanel: React.FC = () => {
                             {g.sessions.map((s) => (
                               <div key={s.id} className="admin-session-pill">
                                 <span className="mini-pill">{s.date_iso}</span>
-                                <span
-                                  className="mini-pill"
-                                  style={{ marginLeft: 8 }}
-                                >
+                                <span className="mini-pill" style={{ marginLeft: 8 }}>
                                   {s.time_range}
                                 </span>
                               </div>
                             ))}
 
-                            <div
-                              className="admin-actions"
-                              style={{ marginTop: 12 }}
-                            >
+                            <div className="admin-actions" style={{ marginTop: 12 }}>
                               <button
                                 className="btn btn-mini"
                                 onClick={() => openEditClassModal(g)}
@@ -1482,10 +1453,7 @@ const AdminPanel: React.FC = () => {
 
                 {selectedGroup && (
                   <div style={{ marginTop: 18 }}>
-                    <h3
-                      className="admin-table-title"
-                      style={{ marginBottom: 10 }}
-                    >
+                    <h3 className="admin-table-title" style={{ marginBottom: 10 }}>
                       {t("sessionsPanelTitle")} {selectedGroup.title}
                     </h3>
 
@@ -1519,9 +1487,7 @@ const AdminPanel: React.FC = () => {
             {showClassModal && editClass && (
               <div className="admin-modal-backdrop">
                 <div className="admin-modal admin-modal-wide">
-                  <h3>
-                    {isNewClass ? t("modalNewClass") : t("modalEditClass")}
-                  </h3>
+                  <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
 
                   <div className="admin-form-grid">
                     <div className="full">
@@ -1545,10 +1511,7 @@ const AdminPanel: React.FC = () => {
                         onChange={(e) =>
                           setEditClass((prev) =>
                             prev
-                              ? {
-                                  ...prev,
-                                  trainer_name: e.target.value || null,
-                                }
+                              ? { ...prev, trainer_name: e.target.value || null }
                               : prev
                           )
                         }
@@ -1571,14 +1534,11 @@ const AdminPanel: React.FC = () => {
                         onChange={(e) => {
                           const newStart = e.target.value;
 
-                          // 1) actualiza el estado
                           setEditClass((prev) =>
                             prev ? { ...prev, start_date: newStart } : prev
                           );
 
-                          // 2) mueve sesiones para que el grouped refleje el rango
-                          const end =
-                            editClass.end_date || computedRange.end || newStart;
+                          const end = editClass.end_date || computedRange.end || newStart;
                           if (newStart && end) {
                             redistributeSessionsToRange(newStart, end);
                           }
@@ -1595,16 +1555,12 @@ const AdminPanel: React.FC = () => {
                         onChange={(e) => {
                           const newEnd = e.target.value;
 
-                          // 1) actualiza el estado
                           setEditClass((prev) =>
                             prev ? { ...prev, end_date: newEnd } : prev
                           );
 
-                          // 2) mueve sesiones para que el grouped refleje el rango
                           const start =
-                            editClass.start_date ||
-                            computedRange.start ||
-                            newEnd;
+                            editClass.start_date || computedRange.start || newEnd;
                           if (start && newEnd) {
                             redistributeSessionsToRange(start, newEnd);
                           }
@@ -1643,9 +1599,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.spots_left}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, spots_left: Number(e.target.value) }
-                              : prev
+                            prev ? { ...prev, spots_left: Number(e.target.value) } : prev
                           )
                         }
                       />
@@ -1677,10 +1631,7 @@ const AdminPanel: React.FC = () => {
                     {t("addSessionsHint")}
                   </p>
 
-                  <p
-                    className="admin-message"
-                    style={{ marginTop: 0, opacity: 0.85 }}
-                  >
+                  <p className="admin-message" style={{ marginTop: 0, opacity: 0.85 }}>
                     <strong>Computed range:</strong>{" "}
                     {computedRange.start && computedRange.end
                       ? `${computedRange.start} → ${computedRange.end}`
@@ -1712,10 +1663,7 @@ const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  <div
-                    className="admin-sessions-grid"
-                    style={{ marginTop: 12 }}
-                  >
+                  <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
                     {sessions.map((s, idx) => (
                       <div key={idx} className="admin-session-row">
                         <div>
@@ -1728,10 +1676,7 @@ const AdminPanel: React.FC = () => {
                             value={s.date_iso}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                date_iso: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], date_iso: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1745,10 +1690,7 @@ const AdminPanel: React.FC = () => {
                             value={s.start_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                start_time: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], start_time: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1762,10 +1704,7 @@ const AdminPanel: React.FC = () => {
                             value={s.end_time}
                             onChange={(e) => {
                               const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                end_time: e.target.value,
-                              };
+                              next[idx] = { ...next[idx], end_time: e.target.value };
                               setSessions(next);
                             }}
                           />
@@ -1820,9 +1759,7 @@ const AdminPanel: React.FC = () => {
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="admin-kpi-label">{t("kpiAccepted")}</div>
-                  <div className="admin-kpi-value">
-                    {statsKPIs.acceptedTotal}
-                  </div>
+                  <div className="admin-kpi-value">{statsKPIs.acceptedTotal}</div>
                 </div>
 
                 <div className="admin-kpi-card">
@@ -1876,24 +1813,25 @@ const AdminPanel: React.FC = () => {
                     </table>
                   </div>
 
+                  {/* ✅ Pagination SOLO para enrolled */}
                   <div className="pagination" style={{ marginTop: 16 }}>
                     <button
                       className="btn btn-secondary"
-                      onClick={() => fetchBookings(bookingsPage - 1)}
-                      disabled={bookingsPage <= 1}
+                      onClick={goPrevEnrolled}
+                      disabled={enrolledPageSafe <= 1}
                     >
                       {t("paginationPrev")}
                     </button>
 
                     <div className="pagination-info">
-                      Page {bookingsPage} / {bookingsLastPage} · Total:{" "}
-                      {bookingsTotal}
+                      Page {enrolledPageSafe} / {enrolledTotalPages} · Total:{" "}
+                      {enrolled.length}
                     </div>
 
                     <button
                       className="btn btn-secondary"
-                      onClick={() => fetchBookings(bookingsPage + 1)}
-                      disabled={bookingsPage >= bookingsLastPage}
+                      onClick={goNextEnrolled}
+                      disabled={enrolledPageSafe >= enrolledTotalPages}
                     >
                       {t("paginationNext")}
                     </button>

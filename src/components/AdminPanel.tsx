@@ -1016,10 +1016,7 @@ const AdminPanel: React.FC = () => {
     const start = (enrolledPageSafe - 1) * ENROLLED_PAGE_SIZE;
     return enrolled.slice(start, start + ENROLLED_PAGE_SIZE);
   }, [enrolled, enrolledPageSafe]);
-
-  const goPrev = () => setEnrolledPage((p) => Math.max(1, p - 1));
-  const goNext = () =>
-    setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
+  
   const toDate = (iso: string) => {
     const [y, m, d] = iso.split("-").map(Number);
     return new Date(y, m - 1, d);

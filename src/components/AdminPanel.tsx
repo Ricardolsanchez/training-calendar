@@ -353,6 +353,10 @@ const AdminPanel: React.FC = () => {
   const [showClassModal, setShowClassModal] = useState(false);
   const [isNewClass, setIsNewClass] = useState(false);
   const [editClass, setEditClass] = useState<AvailableClass | null>(null);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [bookingsPerPage] = useState(10);
+  const [bookingsLastPage, setBookingsLastPage] = useState(1);
+  const [bookingsTotal, setBookingsTotal] = useState(0);
 
   /** Sessions Draft */
   const [sessionsCount, setSessionsCount] = useState<number>(1);
@@ -388,17 +392,30 @@ const AdminPanel: React.FC = () => {
   }, [sessions]);
 
   /** Fetch */
-  const fetchBookings = useCallback(async () => {
-    try {
-      const res = await api.get("/api/admin/bookings");
-      const data = res.data;
-      const list: BookingWithSessions[] = data.bookings ?? data;
-      setBookings(Array.isArray(list) ? list : []);
-    } catch (err) {
-      console.error("Error cargando reservas:", err);
-      setBookings([]);
-    }
-  }, []);
+  const fetchBookings = useCallback(
+    async (page = bookingsPage) => {
+      try {
+        const res = await api.get("/api/admin/bookings", {
+          params: { page, per_page: bookingsPerPage },
+        });
+
+        const data = res.data;
+        const list: BookingWithSessions[] = data.bookings ?? [];
+        setBookings(Array.isArray(list) ? list : []);
+
+        const p = data.pagination;
+        if (p) {
+          setBookingsPage(p.current_page);
+          setBookingsLastPage(p.last_page);
+          setBookingsTotal(p.total);
+        }
+      } catch (err) {
+        console.error("Error cargando reservas:", err);
+        setBookings([]);
+      }
+    },
+    [bookingsPage, bookingsPerPage]
+  );
 
   const fetchGrouped = useCallback(async () => {
     try {
@@ -1003,6 +1020,60 @@ const AdminPanel: React.FC = () => {
   const goPrev = () => setEnrolledPage((p) => Math.max(1, p - 1));
   const goNext = () =>
     setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
+  const toDate = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+
+  const toISO = (dt: Date) => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, "0");
+    const d = String(dt.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  const addDays = (iso: string, days: number) => {
+    const dt = toDate(iso);
+    dt.setDate(dt.getDate() + days);
+    return toISO(dt);
+  };
+
+  const diffDays = (a: string, b: string) => {
+    const da = toDate(a);
+    const db = toDate(b);
+    const ms = db.getTime() - da.getTime();
+    return Math.round(ms / (1000 * 60 * 60 * 24));
+  };
+
+  /**
+   * Reparte las sesiones equidistantes dentro del rango [startISO, endISO]
+   * Mantiene horas y IDs, solo cambia date_iso.
+   */
+  const redistributeSessionsToRange = (startISO: string, endISO: string) => {
+    if (!startISO || !endISO) return;
+
+    // si el usuario pone end < start, no hagas nada (evitas saltos raros)
+    if (endISO < startISO) return;
+
+    const n = sessions.length;
+
+    if (n <= 1) {
+      setSessions((prev) =>
+        prev.map((s, idx) => (idx === 0 ? { ...s, date_iso: startISO } : s))
+      );
+      return;
+    }
+
+    const total = diffDays(startISO, endISO);
+    const step = total / (n - 1);
+
+    setSessions((prev) =>
+      prev.map((s, idx) => {
+        const offset = Math.round(step * idx);
+        return { ...s, date_iso: addDays(startISO, offset) };
+      })
+    );
+  };
 
   return (
     <div className="admin-page">
@@ -1500,13 +1571,21 @@ const AdminPanel: React.FC = () => {
                         type="date"
                         className="form-input"
                         value={editClass.start_date || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const newStart = e.target.value;
+
+                          // 1) actualiza el estado
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, start_date: e.target.value }
-                              : prev
-                          )
-                        }
+                            prev ? { ...prev, start_date: newStart } : prev
+                          );
+
+                          // 2) mueve sesiones para que el grouped refleje el rango
+                          const end =
+                            editClass.end_date || computedRange.end || newStart;
+                          if (newStart && end) {
+                            redistributeSessionsToRange(newStart, end);
+                          }
+                        }}
                       />
                     </div>
 
@@ -1516,11 +1595,23 @@ const AdminPanel: React.FC = () => {
                         type="date"
                         className="form-input"
                         value={editClass.end_date || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const newEnd = e.target.value;
+
+                          // 1) actualiza el estado
                           setEditClass((prev) =>
-                            prev ? { ...prev, end_date: e.target.value } : prev
-                          )
-                        }
+                            prev ? { ...prev, end_date: newEnd } : prev
+                          );
+
+                          // 2) mueve sesiones para que el grouped refleje el rango
+                          const start =
+                            editClass.start_date ||
+                            computedRange.start ||
+                            newEnd;
+                          if (start && newEnd) {
+                            redistributeSessionsToRange(start, newEnd);
+                          }
+                        }}
                       />
                     </div>
 
@@ -1788,21 +1879,24 @@ const AdminPanel: React.FC = () => {
                     </table>
                   </div>
 
-                  <div className="pagination">
+                  <div className="pagination" style={{ marginTop: 16 }}>
                     <button
                       className="btn btn-secondary"
-                      onClick={goPrev}
-                      disabled={enrolledPage <= 1}
+                      onClick={() => fetchBookings(bookingsPage - 1)}
+                      disabled={bookingsPage <= 1}
                     >
                       {t("paginationPrev")}
                     </button>
+
                     <div className="pagination-info">
-                      {enrolledPageSafe} / {enrolledTotalPages}
+                      Page {bookingsPage} / {bookingsLastPage} · Total:{" "}
+                      {bookingsTotal}
                     </div>
+
                     <button
                       className="btn btn-secondary"
-                      onClick={goNext}
-                      disabled={enrolledPageSafe >= enrolledTotalPages}
+                      onClick={() => fetchBookings(bookingsPage + 1)}
+                      disabled={bookingsPage >= bookingsLastPage}
                     >
                       {t("paginationNext")}
                     </button>

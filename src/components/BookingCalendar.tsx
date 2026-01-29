@@ -4,7 +4,6 @@ import { api } from "../lib/api";
 import "./BookingCalendar.css";
 
 type Lang = "en" | "es";
-type Status = "idle" | "loading" | "success" | "error";
 
 type AvailableSession = {
   id: number;
@@ -143,7 +142,7 @@ const formatRangeLabel = (g: AvailableClassGroup, lang: Lang) => {
 
 const getMonthAnchor = (
   groups: AvailableClassGroup[],
-  selectedGroup: AvailableClassGroup | null
+  selectedGroup: AvailableClassGroup | null,
 ) => {
   if (selectedGroup?.start_date_iso)
     return parseLocalDate(selectedGroup.start_date_iso);
@@ -155,7 +154,7 @@ const buildRangeSetForMonth = (
   startIso: string,
   endIso: string,
   year: number,
-  month: number
+  month: number,
 ) => {
   const set = new Set<string>();
   const start = parseLocalDate(startIso);
@@ -174,7 +173,7 @@ const MiniCalendar: React.FC<{
 }> = ({ groups, lang, selectedGroup }) => {
   const anchor = useMemo(
     () => getMonthAnchor(groups, selectedGroup),
-    [groups, selectedGroup]
+    [groups, selectedGroup],
   );
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -262,10 +261,10 @@ const MiniCalendar: React.FC<{
             ? !prevInRange && nextInRange
               ? " mini-calendar-day--range-start"
               : prevInRange && !nextInRange
-              ? " mini-calendar-day--range-end"
-              : prevInRange && nextInRange
-              ? " mini-calendar-day--range-mid"
-              : " mini-calendar-day--range-single"
+                ? " mini-calendar-day--range-end"
+                : prevInRange && nextInRange
+                  ? " mini-calendar-day--range-mid"
+                  : " mini-calendar-day--range-single"
             : "";
 
           return (
@@ -294,17 +293,13 @@ const BookingCalendar: React.FC = () => {
   const t = (key: string) => translations[lang][key] ?? key;
 
   const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>(
-    []
+    [],
   );
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
 
   const [selectedGroup, setSelectedGroup] =
     useState<AvailableClassGroup | null>(null);
-
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
@@ -335,7 +330,7 @@ const BookingCalendar: React.FC = () => {
       } catch (err) {
         console.error("Error cargando clases:", err);
         setClassesError(
-          translations[lang].noClassesError ?? "Could not load classes."
+          translations[lang].noClassesError ?? "Could not load classes.",
         );
       } finally {
         setLoadingClasses(false);
@@ -356,11 +351,9 @@ const BookingCalendar: React.FC = () => {
     setIsAdmin(true);
   }, []);
 
-  const handleSelectGroup = (g: AvailableClassGroup) => {
-    setSelectedGroup(g);
-    setStatus("idle");
-    setErrorMessage("");
-  };
+const handleSelectGroup = (g: AvailableClassGroup) => {
+  setSelectedGroup(g);
+};
 
   const getSessionsCount = (g: AvailableClassGroup) =>
     (g.sessions?.length ?? 0) || g.sessions_count || 0;
@@ -368,67 +361,12 @@ const BookingCalendar: React.FC = () => {
   const getGroupSpotsLabel = (g: AvailableClassGroup) => {
     const minSpots = (g.sessions ?? []).reduce(
       (acc, s) => Math.min(acc, s.spots_left),
-      Number.POSITIVE_INFINITY
+      Number.POSITIVE_INFINITY,
     );
     const spots = Number.isFinite(minSpots) ? minSpots : 0;
     return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t(
-      "seatsAvailable"
+      "seatsAvailable",
     )}`;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedGroup) {
-      setStatus("error");
-      setErrorMessage(t("errorNoClass"));
-      return;
-    }
-    if (!email) {
-      setStatus("error");
-      setErrorMessage(t("errorNoEmail"));
-      return;
-    }
-
-    const { start, end } = getGroupRange(selectedGroup);
-
-    if (!start || !end) {
-      setStatus("error");
-      setErrorMessage(t("errorNoDates"));
-      return;
-    }
-
-    setStatus("loading");
-    setErrorMessage("");
-
-    try {
-      await api.post("/api/bookings", {
-        name: selectedGroup.title,
-        email,
-        start_date: start,
-        end_date: end,
-        trainer_name: selectedGroup.trainer_name ?? null,
-        notes: `Enrollment for "${selectedGroup.title}" from ${start} to ${end}. (All sessions mandatory)`,
-      });
-
-      setStatus("success");
-    } catch (err: any) {
-      console.error("Error creando booking:", err);
-      setStatus("error");
-
-      const backendMsg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        "Error sending booking.";
-
-      const fieldErrors = err?.response?.data?.errors
-        ? Object.values(err.response.data.errors).flat().join(" ")
-        : "";
-
-      setErrorMessage(
-        fieldErrors ? `${backendMsg} ${fieldErrors}` : String(backendMsg)
-      );
-    }
   };
 
   return (
@@ -635,40 +573,6 @@ const BookingCalendar: React.FC = () => {
                     {getSessionsCount(selectedGroup)} {t("sessions")} (
                     {t("mandatoryLabel")}).
                   </p>
-
-                  <form onSubmit={handleSubmit} className="booking-detail-form">
-                    <div className="form-group">
-                      <label htmlFor="email">{t("emailLabel")}</label>
-                      <input
-                        id="email"
-                        type="email"
-                        placeholder={t("emailPlaceholder")}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-
-                    {status === "error" && (
-                      <p className="form-message error">⚠️ {errorMessage}</p>
-                    )}
-                    {status === "success" && (
-                      <p className="form-message success">
-                        {t("successBooked")}
-                      </p>
-                    )}
-
-                    <button
-                      type="submit"
-                      className="booking-button"
-                      disabled={status === "loading"}
-                    >
-                      {status === "loading"
-                        ? t("submitLoading")
-                        : t("submitLabel")}
-                    </button>
-
-                    <p className="booking-privacy">{t("privacyText")}</p>
-                  </form>
                 </>
               )}
             </div>

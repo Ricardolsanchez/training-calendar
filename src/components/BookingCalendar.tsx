@@ -256,6 +256,9 @@ const BookingCalendar: React.FC = () => {
 
   const [selectedGroup, setSelectedGroup] =
     useState<AvailableClassGroup | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
+    null,
+  );
   const [selectedSessionIso, setSelectedSessionIso] = useState<string | null>(
     null,
   );
@@ -312,11 +315,15 @@ const BookingCalendar: React.FC = () => {
 
   const handleSelectGroup = (g: AvailableClassGroup) => {
     setSelectedGroup(g);
-  };
 
+    const first = g.sessions?.[0] ?? null;
+    setSelectedSessionId(first?.id ?? null);
+    setSelectedSessionIso(first?.date_iso ?? null);
+  };
   const handleSelectSession = (g: AvailableClassGroup, s: AvailableSession) => {
     setSelectedGroup(g);
-    setSelectedSessionIso(s.date_iso); // ✅ esto “marca” el día en el calendario
+    setSelectedSessionId(s.id);
+    setSelectedSessionIso(s.date_iso); // esto es lo que pinta el día en el calendario
   };
 
   const openWorkday = (url?: string | null) => {
@@ -420,51 +427,26 @@ const BookingCalendar: React.FC = () => {
                             </div>
 
                             <div className="class-meta">
-                              <div className="class-sessions-list">
-                                {g.sessions.slice(0, 4).map((s) => {
-                                  const isActive =
-                                    selectedGroup?.group_code ===
-                                      g.group_code &&
-                                    selectedSessionIso === s.date_iso;
-
-                                  return (
-                                    <button
-                                      key={s.id}
-                                      type="button"
-                                      className={
-                                        "session-pill" +
-                                        (isActive
-                                          ? " session-pill--active"
-                                          : "")
-                                      }
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleSelectSession(g, s);
-                                      }}
-                                    >
-                                      <span className="mini-pill">
-                                        {s.date_iso}
-                                      </span>
-                                      <span
-                                        className="mini-pill"
-                                        style={{ marginLeft: 8 }}
-                                      >
-                                        {s.time_range}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-
-                                {g.sessions.length > 4 ? (
-                                  <div
-                                    className="muted"
-                                    style={{ marginTop: 6, fontSize: 12 }}
-                                  >
-                                    +{g.sessions.length - 4} more
-                                  </div>
-                                ) : null}
-                              </div>
+                              {g.workday_url ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-mini btn-secondary"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openWorkday(g.workday_url);
+                                  }}
+                                >
+                                  {t("viewDetails")}
+                                </button>
+                              ) : (
+                                <span
+                                  className="mini-pill"
+                                  style={{ opacity: 0.8 }}
+                                >
+                                  {t("workdayLinkMissing")}
+                                </span>
+                              )}
                             </div>
                             {!!g.description && (
                               <p className="class-card-desc">{g.description}</p>
@@ -494,17 +476,33 @@ const BookingCalendar: React.FC = () => {
                 {/* ✅ debajo: NO mostrar sessions details; solo Workday link */}
                 {selectedGroup && (
                   <div className="class-sessions class-sessions--below">
-                    {selectedGroup.workday_url ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => openWorkday(selectedGroup.workday_url)}
-                      >
-                        {t("viewDetails")}
-                      </button>
-                    ) : (
-                      <div className="empty">{t("workdayLinkMissing")}</div>
-                    )}
+                    <div className="class-sessions-list-below">
+                      {selectedGroup.sessions.map((s) => {
+                        const active = selectedSessionId === s.id;
+
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            className={
+                              "session-pill session-pill--below" +
+                              (active ? " session-pill--active" : "")
+                            }
+                            onClick={() =>
+                              handleSelectSession(selectedGroup, s)
+                            }
+                          >
+                            <span className="mini-pill">{s.date_iso}</span>
+                            <span
+                              className="mini-pill"
+                              style={{ marginLeft: 8 }}
+                            >
+                              {s.time_range}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </>

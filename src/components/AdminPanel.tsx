@@ -52,8 +52,8 @@ type AvailableClass = {
   modality: "Online" | "Presencial";
   spots_left: number;
   description: string | null;
-  group_code?: string | null;
   workday_url?: string | null;
+  group_code?: string | null;
 };
 
 type GroupedSession = {
@@ -61,6 +61,7 @@ type GroupedSession = {
   date_iso: string;
   time_range: string;
   spots_left: number;
+  workday_url?: string | null;
 };
 
 type GroupedClass = {
@@ -475,6 +476,7 @@ const AdminPanel: React.FC = () => {
       spots_left: first?.spots_left ?? 0,
       description: group.description ?? null,
       group_code: group.group_code,
+      workday_url: group.workday_url ?? "",
     });
 
     setCount(group.sessions.length || 1);
@@ -574,6 +576,7 @@ const AdminPanel: React.FC = () => {
             date_iso: s.date_iso,
             start_time: s.start_time,
             end_time: s.end_time,
+            workday_url: editClass.workday_url ?? null, // ✅ CLAVE
           })),
         });
       }

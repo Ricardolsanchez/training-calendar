@@ -325,15 +325,6 @@ const AdminPanel: React.FC = () => {
     );
   }, [expandedGroupCode, groupedClasses]);
 
-  const computedRange = useMemo(() => {
-    const dates = sessions
-      .map((s) => s.date_iso)
-      .filter(Boolean)
-      .sort();
-    if (dates.length === 0) return { start: "", end: "" };
-    return { start: dates[0], end: dates[dates.length - 1] };
-  }, [sessions]);
-
   /** Fetch */
   const fetchBookings = useCallback(
     async (page = bookingsPage) => {
@@ -468,8 +459,8 @@ const AdminPanel: React.FC = () => {
       title: group.title,
       trainer_id: null,
       trainer_name: group.trainer_name ?? null,
-      start_date: start,
-      end_date: end,
+      start_date: "",
+      end_date: "",
       start_time: times.start_time,
       end_time: times.end_time,
       modality: group.modality,
@@ -509,37 +500,12 @@ const AdminPanel: React.FC = () => {
       alert("Please set date + start + end time for every session.");
       return;
     }
-
-    const rangeStart = (
-      editClass.start_date ||
-      computedRange.start ||
-      ""
-    ).trim();
-    const rangeEnd = (
-      editClass.end_date ||
-      computedRange.end ||
-      rangeStart ||
-      ""
-    ).trim();
-
-    if (rangeStart && rangeEnd) {
-      const out = cleanSessions.some(
-        (s) => s.date_iso < rangeStart || s.date_iso > rangeEnd,
-      );
-      if (out) {
-        alert("One or more sessions are outside the selected date range.");
-        return;
-      }
-    }
-
     try {
       await ensureCsrf();
 
       const payload = {
         title: editClass.title,
         trainer_name: editClass.trainer_name,
-        start_date: rangeStart,
-        end_date: rangeEnd,
         start_time: cleanSessions[0].start_time,
         end_time: cleanSessions[0].end_time,
         modality: editClass.modality,
@@ -795,56 +761,6 @@ const AdminPanel: React.FC = () => {
     ];
 
     downloadCsv(`stats_export_${stamp}.csv`, rows);
-  };
-
-  /** Range helpers */
-  const toDate = (iso: string) => {
-    const [y, m, d] = iso.split("-").map(Number);
-    return new Date(y, m - 1, d);
-  };
-
-  const toISO = (dt: Date) => {
-    const y = dt.getFullYear();
-    const m = String(dt.getMonth() + 1).padStart(2, "0");
-    const d = String(dt.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-
-  const addDays = (iso: string, days: number) => {
-    const dt = toDate(iso);
-    dt.setDate(dt.getDate() + days);
-    return toISO(dt);
-  };
-
-  const diffDays = (a: string, b: string) => {
-    const da = toDate(a);
-    const db = toDate(b);
-    const ms = db.getTime() - da.getTime();
-    return Math.round(ms / (1000 * 60 * 60 * 24));
-  };
-
-  const redistributeSessionsToRange = (startISO: string, endISO: string) => {
-    if (!startISO || !endISO) return;
-    if (endISO < startISO) return;
-
-    const n = sessions.length;
-
-    if (n <= 1) {
-      setSessions((prev) =>
-        prev.map((s, idx) => (idx === 0 ? { ...s, date_iso: startISO } : s)),
-      );
-      return;
-    }
-
-    const total = diffDays(startISO, endISO);
-    const step = total / (n - 1);
-
-    setSessions((prev) =>
-      prev.map((s, idx) => {
-        const offset = Math.round(step * idx);
-        return { ...s, date_iso: addDays(startISO, offset) };
-      }),
-    );
   };
 
   return (
@@ -1160,52 +1076,6 @@ const AdminPanel: React.FC = () => {
                     </div>
 
                     <div>
-                      <label>{t("labelStartDate")}</label>
-                      <input
-                        type="date"
-                        className="form-input"
-                        value={editClass.start_date || ""}
-                        onChange={(e) => {
-                          const newStart = e.target.value;
-
-                          setEditClass((prev) =>
-                            prev ? { ...prev, start_date: newStart } : prev,
-                          );
-
-                          const end =
-                            editClass.end_date || computedRange.end || newStart;
-                          if (newStart && end) {
-                            redistributeSessionsToRange(newStart, end);
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label>{t("labelEndDate")}</label>
-                      <input
-                        type="date"
-                        className="form-input"
-                        value={editClass.end_date || ""}
-                        onChange={(e) => {
-                          const newEnd = e.target.value;
-
-                          setEditClass((prev) =>
-                            prev ? { ...prev, end_date: newEnd } : prev,
-                          );
-
-                          const start =
-                            editClass.start_date ||
-                            computedRange.start ||
-                            newEnd;
-                          if (start && newEnd) {
-                            redistributeSessionsToRange(start, newEnd);
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div>
                       <label>{t("labelType")}</label>
                       <select
                         className="form-input"
@@ -1268,16 +1138,6 @@ const AdminPanel: React.FC = () => {
                   </h4>
                   <p className="admin-message" style={{ marginTop: 0 }}>
                     {t("addSessionsHint")}
-                  </p>
-
-                  <p
-                    className="admin-message"
-                    style={{ marginTop: 0, opacity: 0.85 }}
-                  >
-                    <strong>Computed range:</strong>{" "}
-                    {computedRange.start && computedRange.end
-                      ? `${computedRange.start} → ${computedRange.end}`
-                      : "—"}
                   </p>
 
                   <label>{t("sessionsCountLabel")}</label>

@@ -93,7 +93,7 @@ const getGroupRange = (g: AvailableClassGroup) => {
 
 const getMonthAnchor = (
   groups: AvailableClassGroup[],
-  selectedGroup: AvailableClassGroup | null
+  selectedGroup: AvailableClassGroup | null,
 ) => {
   if (selectedGroup?.start_date_iso)
     return parseLocalDate(selectedGroup.start_date_iso);
@@ -105,7 +105,7 @@ const buildRangeSetForMonth = (
   startIso: string,
   endIso: string,
   year: number,
-  month: number
+  month: number,
 ) => {
   const set = new Set<string>();
   const start = parseLocalDate(startIso);
@@ -121,10 +121,11 @@ const MiniCalendar: React.FC<{
   groups: AvailableClassGroup[];
   lang: Lang;
   selectedGroup: AvailableClassGroup | null;
-}> = ({ groups, lang, selectedGroup }) => {
+  selectedSessionIso?: string | null; // ✅ nuevo
+}> = ({ groups, lang, selectedGroup, selectedSessionIso }) => {
   const anchor = useMemo(
     () => getMonthAnchor(groups, selectedGroup),
-    [groups, selectedGroup]
+    [groups, selectedGroup],
   );
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -134,7 +135,11 @@ const MiniCalendar: React.FC<{
   const firstWeekday = monthStart.getDay();
 
   const days: Date[] = [];
-  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+  for (
+    let d = new Date(monthStart);
+    d <= monthEnd;
+    d.setDate(d.getDate() + 1)
+  ) {
     days.push(new Date(d));
   }
 
@@ -157,6 +162,11 @@ const MiniCalendar: React.FC<{
     if (!start) return new Set<string>();
     return buildRangeSetForMonth(start, end || start, year, month);
   }, [selectedGroup, year, month]);
+
+  const selectedDayKey = useMemo(() => {
+    if (!selectedSessionIso) return null;
+    return makeKey(parseLocalDate(selectedSessionIso));
+  }, [selectedSessionIso]);
 
   const locale = lang === "en" ? "en-US" : "es-ES";
   const monthLabel = monthStart.toLocaleDateString(locale, {
@@ -193,7 +203,7 @@ const MiniCalendar: React.FC<{
           const key = makeKey(d);
           const hasSession = daysWithSessions.has(key);
           const inRange = selectedRange.has(key);
-
+          const isSelectedDay = selectedDayKey === key;
           const prev = new Date(d);
           prev.setDate(prev.getDate() - 1);
           const next = new Date(d);
@@ -206,10 +216,10 @@ const MiniCalendar: React.FC<{
             ? !prevInRange && nextInRange
               ? " mini-calendar-day--range-start"
               : prevInRange && !nextInRange
-              ? " mini-calendar-day--range-end"
-              : prevInRange && nextInRange
-              ? " mini-calendar-day--range-mid"
-              : " mini-calendar-day--range-single"
+                ? " mini-calendar-day--range-end"
+                : prevInRange && nextInRange
+                  ? " mini-calendar-day--range-mid"
+                  : " mini-calendar-day--range-single"
             : "";
 
           return (
@@ -219,7 +229,8 @@ const MiniCalendar: React.FC<{
                 "mini-calendar-day" +
                 (hasSession ? " mini-calendar-day--highlight" : "") +
                 (inRange ? " mini-calendar-day--range" : "") +
-                rangePosClass
+                rangePosClass +
+                (isSelectedDay ? " mini-calendar-day--selected" : "") // ✅ nuevo
               }
             >
               {d.getDate()}
@@ -238,13 +249,16 @@ const BookingCalendar: React.FC = () => {
   const t = (key: string) => translations[lang][key] ?? key;
 
   const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>(
-    []
+    [],
   );
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
 
   const [selectedGroup, setSelectedGroup] =
     useState<AvailableClassGroup | null>(null);
+  const [selectedSessionIso, setSelectedSessionIso] = useState<string | null>(
+    null,
+  );
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
@@ -275,7 +289,7 @@ const BookingCalendar: React.FC = () => {
       } catch (err) {
         console.error("Error cargando clases:", err);
         setClassesError(
-          translations[lang].noClassesError ?? "Could not load classes."
+          translations[lang].noClassesError ?? "Could not load classes.",
         );
       } finally {
         setLoadingClasses(false);
@@ -298,6 +312,11 @@ const BookingCalendar: React.FC = () => {
 
   const handleSelectGroup = (g: AvailableClassGroup) => {
     setSelectedGroup(g);
+  };
+
+  const handleSelectSession = (g: AvailableClassGroup, s: AvailableSession) => {
+    setSelectedGroup(g);
+    setSelectedSessionIso(s.date_iso); // ✅ esto “marca” el día en el calendario
   };
 
   const openWorkday = (url?: string | null) => {
@@ -401,26 +420,52 @@ const BookingCalendar: React.FC = () => {
                             </div>
 
                             <div className="class-meta">
-                              {/* ✅ reemplaza fechas por link a Workday */}
-                              {g.workday_url ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-mini btn-secondary"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openWorkday(g.workday_url);
-                                  }}
-                                >
-                                  {t("viewDetails")}
-                                </button>
-                              ) : (
-                                <span className="mini-pill" style={{ opacity: 0.8 }}>
-                                  {t("workdayLinkMissing")}
-                                </span>
-                              )}
-                            </div>
+                              <div className="class-sessions-list">
+                                {g.sessions.slice(0, 4).map((s) => {
+                                  const isActive =
+                                    selectedGroup?.group_code ===
+                                      g.group_code &&
+                                    selectedSessionIso === s.date_iso;
 
+                                  return (
+                                    <button
+                                      key={s.id}
+                                      type="button"
+                                      className={
+                                        "session-pill" +
+                                        (isActive
+                                          ? " session-pill--active"
+                                          : "")
+                                      }
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleSelectSession(g, s);
+                                      }}
+                                    >
+                                      <span className="mini-pill">
+                                        {s.date_iso}
+                                      </span>
+                                      <span
+                                        className="mini-pill"
+                                        style={{ marginLeft: 8 }}
+                                      >
+                                        {s.time_range}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+
+                                {g.sessions.length > 4 ? (
+                                  <div
+                                    className="muted"
+                                    style={{ marginTop: 6, fontSize: 12 }}
+                                  >
+                                    +{g.sessions.length - 4} more
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
                             {!!g.description && (
                               <p className="class-card-desc">{g.description}</p>
                             )}
@@ -472,6 +517,7 @@ const BookingCalendar: React.FC = () => {
                 groups={availableGroups}
                 lang={lang}
                 selectedGroup={selectedGroup}
+                selectedSessionIso={selectedSessionIso}
               />
 
               {!selectedGroup ? (

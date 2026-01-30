@@ -566,6 +566,7 @@ const AdminPanel: React.FC = () => {
               end_time: s.end_time,
             })),
           ],
+          workday_url: editClass.workday_url ?? null, // ✅ también aquí
         });
       } else {
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
@@ -576,8 +577,8 @@ const AdminPanel: React.FC = () => {
             date_iso: s.date_iso,
             start_time: s.start_time,
             end_time: s.end_time,
-            workday_url: editClass.workday_url ?? null, // ✅ CLAVE
           })),
+          workday_url: editClass.workday_url ?? null, // ✅ AQUÍ, en root
         });
       }
 

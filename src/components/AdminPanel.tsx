@@ -284,9 +284,9 @@ const AdminPanel: React.FC = () => {
     el.scrollBy({ left: dir * 420, behavior: "smooth" });
   };
 
-    const openWorkday = (url: string) => {
-      if (!url) return;
-      window.open(url, "_blank", "noopener,noreferrer");
+  const openWorkday = (url: string) => {
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   /** New/Edit class modal */
@@ -982,6 +982,28 @@ const AdminPanel: React.FC = () => {
                             <strong>{t("columnTrainer")}:</strong>{" "}
                             {g.trainer_name || t("statsNoTrainer")}
                           </div>
+
+                          {/* 👇 AQUÍ VA EL BLOQUE */}
+                          {g.workday_url ? (
+                            <button
+                              type="button"
+                              className="btn btn-mini btn-secondary"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openWorkday(g.workday_url!);
+                              }}
+                            >
+                              {t("viewDetails")}
+                            </button>
+                          ) : (
+                            <span
+                              className="mini-pill"
+                              style={{ opacity: 0.8 }}
+                            >
+                              {t("workdayLinkMissing")}
+                            </span>
+                          )}
                           {g.description && (
                             <div className="admin-class-desc">
                               {g.description}

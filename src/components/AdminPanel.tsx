@@ -22,6 +22,7 @@ type Booking = {
   created_at: string;
   status: BookingStatus;
   calendar_url?: string | null;
+  workday_url?: string | null;
 
   // legacy (si aún llega, lo soportamos)
   attendedbutton?: boolean | null;
@@ -52,6 +53,7 @@ type AvailableClass = {
   spots_left: number;
   description: string | null;
   group_code?: string | null;
+  workday_url?: string | null;
 };
 
 type GroupedSession = {
@@ -70,6 +72,7 @@ type GroupedClass = {
   description: string | null;
   sessions_count: number;
   sessions: GroupedSession[];
+  workday_url?: string | null;
 };
 
 type Trainer = { id: number; name: string };
@@ -157,6 +160,8 @@ const translations: Record<Lang, Record<string, string>> = {
     paginationNext: "Next",
 
     downloadCsv: "Download CSV",
+    viewDetails: "View details here",
+    workdayLinkMissing: "Workday link missing",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -228,6 +233,8 @@ const translations: Record<Lang, Record<string, string>> = {
     paginationNext: "Siguiente",
 
     downloadCsv: "Descargar CSV",
+    viewDetails: "Ver detalles aquí",
+    workdayLinkMissing: "Link de Workday pendiente",
   },
 };
 
@@ -275,6 +282,11 @@ const AdminPanel: React.FC = () => {
     const el = carouselRef.current;
     if (!el) return;
     el.scrollBy({ left: dir * 420, behavior: "smooth" });
+  };
+
+    const openWorkday = (url: string) => {
+      if (!url) return;
+      window.open(url, "_blank", "noopener,noreferrer");
   };
 
   /** New/Edit class modal */
@@ -431,6 +443,7 @@ const AdminPanel: React.FC = () => {
       end_time: "",
       modality: "Online",
       spots_left: 0,
+      workday_url: "",
       description: null,
       group_code: null,
     });
@@ -530,6 +543,7 @@ const AdminPanel: React.FC = () => {
         modality: editClass.modality,
         spots_left: editClass.spots_left,
         description: editClass.description ?? null,
+        workday_url: editClass.workday_url ?? null,
       };
 
       if (isNewClass) {
@@ -1061,6 +1075,26 @@ const AdminPanel: React.FC = () => {
                   </h3>
 
                   <div className="admin-form-grid">
+                    <div className="full">
+                      <label>Workday course link</label>
+                      <input
+                        type="url"
+                        className="form-input"
+                        placeholder="https://wd5.myworkday.com/..."
+                        value={editClass.workday_url || ""}
+                        onChange={(e) =>
+                          setEditClass((prev) =>
+                            prev
+                              ? { ...prev, workday_url: e.target.value }
+                              : prev,
+                          )
+                        }
+                      />
+                      <small className="muted">
+                        This link redirects employees to the Workday enrollment
+                        page
+                      </small>
+                    </div>
                     <div className="full">
                       <label>{t("labelClassTitle")}</label>
                       <input

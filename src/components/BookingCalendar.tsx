@@ -23,6 +23,8 @@ type AvailableClassGroup = {
   sessions: AvailableSession[];
   start_date_iso?: string | null;
   end_date_iso?: string | null;
+
+  workday_url?: string | null; // ✅ NUEVO
 };
 
 const translations: Record<Lang, Record<string, string>> = {
@@ -31,62 +33,31 @@ const translations: Record<Lang, Record<string, string>> = {
     adminPanel: "Admin Panel",
     adminLogin: "Admin Login",
     availableClassesTitle: "AVAILABLE CLASSES THIS MONTH",
-    availableClassesSubtitle: "Click on a class to view details and enroll.",
+    availableClassesSubtitle: "Click a class to view it in Workday.",
     loadingClasses: "Loading classes...",
     noClassesError: "Could not load classes. Please try again later.",
     clickOnClassTitle: "Select a class",
-    clickOnClassText:
-      "Click on a class on the left to see details and sessions.",
+    clickOnClassText: "Click on a class on the left to see its Workday link.",
     selectedClassLabel: "SELECTED CLASS",
-    emailLabel: "Please provide your A&A Email Address",
-    emailPlaceholder: "youremail@yourcompany.com",
-    errorNoClass: "Please select a class first.",
-    errorNoEmail: "Please enter your email.",
-    submitLabel: "Enroll in all sessions",
-    submitLoading: "Enrolling...",
-    successBooked:
-      "✅ Enrollment submitted! You’ll receive a confirmation email.",
-    privacyText: "We’ll use your corporate email to confirm your enrollment.",
-    seats: "seat",
-    seatsPlural: "seats",
-    seatsAvailable: "Available",
-    sessions: "Sessions",
     highlightedHint: "Highlighted: days with classes",
-    includesLabel: "Includes",
-    mandatoryLabel: "mandatory",
-    errorNoDates: "This class has no valid dates configured.",
+    viewDetails: "View details here",
+    workdayLinkMissing: "Workday link not available yet.",
   },
   es: {
     updatedTag: "Actualizado",
     adminPanel: "Panel Admin",
     adminLogin: "Login Admin",
     availableClassesTitle: "CLASES DISPONIBLES ESTE MES",
-    availableClassesSubtitle:
-      "Haz click en una clase para ver detalles e inscribirte.",
+    availableClassesSubtitle: "Haz click en una clase para verla en Workday.",
     loadingClasses: "Cargando clases...",
     noClassesError: "No se pudieron cargar las clases. Intenta más tarde.",
     clickOnClassTitle: "Selecciona una clase",
     clickOnClassText:
-      "Haz click en una clase a la izquierda para ver detalles y sesiones.",
+      "Haz click en una clase a la izquierda para ver su link de Workday.",
     selectedClassLabel: "CLASE SELECCIONADA",
-    emailLabel: "Por favor ingresa tu correo corporativo A&A",
-    emailPlaceholder: "tucorreo@tuempresa.com",
-    errorNoClass: "Selecciona una clase primero.",
-    errorNoEmail: "Ingresa tu correo por favor.",
-    submitLabel: "Inscribirme a todas las sesiones",
-    submitLoading: "Inscribiendo...",
-    successBooked:
-      "✅ Inscripción enviada. Te llegará un correo de confirmación.",
-    privacyText:
-      "Usaremos tu correo corporativo para confirmar tu inscripción.",
-    seats: "cupo",
-    seatsPlural: "cupos",
-    seatsAvailable: "Disponibles",
-    sessions: "Sesiones",
     highlightedHint: "Resaltado: días con clases",
-    includesLabel: "Incluye",
-    mandatoryLabel: "obligatorias",
-    errorNoDates: "Esta clase no tiene fechas válidas configuradas.",
+    viewDetails: "Ver detalles aquí",
+    workdayLinkMissing: "Aún no hay link de Workday disponible.",
   },
 };
 
@@ -94,17 +65,6 @@ const translations: Record<Lang, Record<string, string>> = {
 const parseLocalDate = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
-};
-
-const formatDateLabel = (iso: string, lang: Lang) => {
-  const d = parseLocalDate(iso);
-  const locale = lang === "en" ? "en-US" : "es-ES";
-  return d.toLocaleDateString(locale, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 };
 
 const makeKey = (d: Date) => {
@@ -118,11 +78,9 @@ const getGroupRange = (g: AvailableClassGroup) => {
   const startFromApi = g.start_date_iso ?? "";
   const endFromApi = g.end_date_iso ?? "";
 
-  // ✅ prefer backend range
   if (startFromApi)
     return { start: startFromApi, end: endFromApi || startFromApi };
 
-  // ⛑️ fallback: derive from sessions
   const dates = (g.sessions ?? [])
     .map((s) => s.date_iso)
     .filter(Boolean)
@@ -133,16 +91,9 @@ const getGroupRange = (g: AvailableClassGroup) => {
   return { start, end };
 };
 
-const formatRangeLabel = (g: AvailableClassGroup, lang: Lang) => {
-  const { start, end } = getGroupRange(g);
-  if (!start) return "";
-  if (start === end) return formatDateLabel(start, lang);
-  return `${formatDateLabel(start, lang)} – ${formatDateLabel(end, lang)}`;
-};
-
 const getMonthAnchor = (
   groups: AvailableClassGroup[],
-  selectedGroup: AvailableClassGroup | null,
+  selectedGroup: AvailableClassGroup | null
 ) => {
   if (selectedGroup?.start_date_iso)
     return parseLocalDate(selectedGroup.start_date_iso);
@@ -154,7 +105,7 @@ const buildRangeSetForMonth = (
   startIso: string,
   endIso: string,
   year: number,
-  month: number,
+  month: number
 ) => {
   const set = new Set<string>();
   const start = parseLocalDate(startIso);
@@ -173,7 +124,7 @@ const MiniCalendar: React.FC<{
 }> = ({ groups, lang, selectedGroup }) => {
   const anchor = useMemo(
     () => getMonthAnchor(groups, selectedGroup),
-    [groups, selectedGroup],
+    [groups, selectedGroup]
   );
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -183,11 +134,7 @@ const MiniCalendar: React.FC<{
   const firstWeekday = monthStart.getDay();
 
   const days: Date[] = [];
-  for (
-    let d = new Date(monthStart);
-    d <= monthEnd;
-    d.setDate(d.getDate() + 1)
-  ) {
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
 
@@ -197,8 +144,6 @@ const MiniCalendar: React.FC<{
     for (const g of groups) {
       const { start, end } = getGroupRange(g);
       if (!start) continue;
-
-      // marcamos todos los días del rango del grupo en el mes visible
       const rangeSet = buildRangeSetForMonth(start, end || start, year, month);
       for (const k of rangeSet) set.add(k);
     }
@@ -261,10 +206,10 @@ const MiniCalendar: React.FC<{
             ? !prevInRange && nextInRange
               ? " mini-calendar-day--range-start"
               : prevInRange && !nextInRange
-                ? " mini-calendar-day--range-end"
-                : prevInRange && nextInRange
-                  ? " mini-calendar-day--range-mid"
-                  : " mini-calendar-day--range-single"
+              ? " mini-calendar-day--range-end"
+              : prevInRange && nextInRange
+              ? " mini-calendar-day--range-mid"
+              : " mini-calendar-day--range-single"
             : "";
 
           return (
@@ -293,7 +238,7 @@ const BookingCalendar: React.FC = () => {
   const t = (key: string) => translations[lang][key] ?? key;
 
   const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>(
-    [],
+    []
   );
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
@@ -330,7 +275,7 @@ const BookingCalendar: React.FC = () => {
       } catch (err) {
         console.error("Error cargando clases:", err);
         setClassesError(
-          translations[lang].noClassesError ?? "Could not load classes.",
+          translations[lang].noClassesError ?? "Could not load classes."
         );
       } finally {
         setLoadingClasses(false);
@@ -351,22 +296,13 @@ const BookingCalendar: React.FC = () => {
     setIsAdmin(true);
   }, []);
 
-const handleSelectGroup = (g: AvailableClassGroup) => {
-  setSelectedGroup(g);
-};
+  const handleSelectGroup = (g: AvailableClassGroup) => {
+    setSelectedGroup(g);
+  };
 
-  const getSessionsCount = (g: AvailableClassGroup) =>
-    (g.sessions?.length ?? 0) || g.sessions_count || 0;
-
-  const getGroupSpotsLabel = (g: AvailableClassGroup) => {
-    const minSpots = (g.sessions ?? []).reduce(
-      (acc, s) => Math.min(acc, s.spots_left),
-      Number.POSITIVE_INFINITY,
-    );
-    const spots = Number.isFinite(minSpots) ? minSpots : 0;
-    return `${spots} ${spots === 1 ? t("seats") : t("seatsPlural")} ${t(
-      "seatsAvailable",
-    )}`;
+  const openWorkday = (url?: string | null) => {
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -441,12 +377,6 @@ const handleSelectGroup = (g: AvailableClassGroup) => {
                       {availableGroups.map((g) => {
                         const isSelected =
                           selectedGroup?.group_code === g.group_code;
-                        const firstSession = g.sessions?.[0];
-
-                        const dateLabel = formatRangeLabel(g, lang);
-                        const timeLabel = firstSession
-                          ? firstSession.time_range
-                          : "";
 
                         const modalityDotClass =
                           g.modality === "Online" ? "online" : "presencial";
@@ -471,8 +401,24 @@ const handleSelectGroup = (g: AvailableClassGroup) => {
                             </div>
 
                             <div className="class-meta">
-                              <span className="class-date">{dateLabel}</span>
-                              <span className="class-time">{timeLabel}</span>
+                              {/* ✅ reemplaza fechas por link a Workday */}
+                              {g.workday_url ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-mini btn-secondary"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openWorkday(g.workday_url);
+                                  }}
+                                >
+                                  {t("viewDetails")}
+                                </button>
+                              ) : (
+                                <span className="mini-pill" style={{ opacity: 0.8 }}>
+                                  {t("workdayLinkMissing")}
+                                </span>
+                              )}
                             </div>
 
                             {!!g.description && (
@@ -484,9 +430,6 @@ const handleSelectGroup = (g: AvailableClassGroup) => {
                                 👤 {g.trainer_name}
                               </span>
                               <span className="class-level">{g.level}</span>
-                              <span className="class-spots">
-                                {getGroupSpotsLabel(g)}
-                              </span>
                             </div>
                           </button>
                         );
@@ -503,32 +446,20 @@ const handleSelectGroup = (g: AvailableClassGroup) => {
                   </button>
                 </div>
 
+                {/* ✅ debajo: NO mostrar sessions details; solo Workday link */}
                 {selectedGroup && (
                   <div className="class-sessions class-sessions--below">
-                    <div className="class-sessions-title">
-                      {t("sessions")} ({getSessionsCount(selectedGroup)})
-                    </div>
-
-                    <div className="class-sessions-list">
-                      {(selectedGroup.sessions ?? []).map((s) => (
-                        <div
-                          key={s.id}
-                          className="class-session-row class-session-row--readonly"
-                          role="listitem"
-                        >
-                          <span className="class-session-date">
-                            {formatDateLabel(s.date_iso, lang)}
-                          </span>
-                          <span className="class-session-time">
-                            {s.time_range}
-                          </span>
-                          <span className="class-session-spots">
-                            {s.spots_left}{" "}
-                            {s.spots_left === 1 ? t("seats") : t("seatsPlural")}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    {selectedGroup.workday_url ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => openWorkday(selectedGroup.workday_url)}
+                      >
+                        {t("viewDetails")}
+                      </button>
+                    ) : (
+                      <div className="empty">{t("workdayLinkMissing")}</div>
+                    )}
                   </div>
                 )}
               </>
@@ -566,13 +497,21 @@ const handleSelectGroup = (g: AvailableClassGroup) => {
                         {selectedGroup.description}
                       </p>
                     ) : null}
-                  </div>
 
-                  <p className="booking-detail-meta">
-                    <strong>{t("includesLabel")}:</strong>{" "}
-                    {getSessionsCount(selectedGroup)} {t("sessions")} (
-                    {t("mandatoryLabel")}).
-                  </p>
+                    <div style={{ marginTop: 12 }}>
+                      {selectedGroup.workday_url ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => openWorkday(selectedGroup.workday_url)}
+                        >
+                          {t("viewDetails")}
+                        </button>
+                      ) : (
+                        <div className="empty">{t("workdayLinkMissing")}</div>
+                      )}
+                    </div>
+                  </div>
                 </>
               )}
             </div>

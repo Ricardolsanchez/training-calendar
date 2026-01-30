@@ -42,6 +42,7 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Highlighted: days with classes",
     viewDetails: "View details here",
     workdayLinkMissing: "Workday link not available yet.",
+    sessionsTitle: "SESSIONS",
   },
   es: {
     updatedTag: "Actualizado",
@@ -58,6 +59,7 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Resaltado: días con clases",
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Aún no hay link de Workday disponible.",
+    sessionsTitle: "SESIONES",
   },
 };
 
@@ -289,6 +291,8 @@ const BookingCalendar: React.FC = () => {
             return prev;
           return normalized[0] ?? null;
         });
+        setSelectedSessionId(null);
+        setSelectedSessionIso(null);
       } catch (err) {
         console.error("Error cargando clases:", err);
         setClassesError(
@@ -315,10 +319,8 @@ const BookingCalendar: React.FC = () => {
 
   const handleSelectGroup = (g: AvailableClassGroup) => {
     setSelectedGroup(g);
-
-    const first = g.sessions?.[0] ?? null;
-    setSelectedSessionId(first?.id ?? null);
-    setSelectedSessionIso(first?.date_iso ?? null);
+    setSelectedSessionId(null);
+    setSelectedSessionIso(null);
   };
   const handleSelectSession = (g: AvailableClassGroup, s: AvailableSession) => {
     setSelectedGroup(g);
@@ -476,6 +478,9 @@ const BookingCalendar: React.FC = () => {
                 {/* ✅ debajo: NO mostrar sessions details; solo Workday link */}
                 {selectedGroup && (
                   <div className="class-sessions class-sessions--below">
+                    <div className="class-sessions-title">
+                      {t("sessionsTitle")}
+                    </div>
                     <div className="class-sessions-list-below">
                       {selectedGroup.sessions.map((s) => {
                         const active = selectedSessionId === s.id;

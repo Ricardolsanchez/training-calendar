@@ -351,19 +351,28 @@
   max-width: 920px;
 }
 
-.class-sessions-title {
+.class-sessions-title{
+  margin-top: 14px;
+  margin-bottom: 10px;
   font-size: 12px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   opacity: 0.85;
-  margin-bottom: 10px;
 }
+
 
 .class-sessions-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+
+.class-sessions-list-below{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 
 .class-session-row {
   display: flex;
@@ -754,6 +763,36 @@
   padding: 0;
   text-align: left;
   cursor: pointer;
+}
+
+.session-pill--below{
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 14px;         /* ✅ más grande */
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.session-pill--below:hover{
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.09);
+  border-color: rgba(255,255,255,0.22);
+}
+
+.session-pill--below .mini-pill{
+  font-size: 13px;            /* ✅ más grande */
+  opacity: 0.95;
+}
+
+.session-pill--active{
+  border-color: rgba(255,170,0,0.8);
+  box-shadow: 0 0 0 4px rgba(255,170,0,0.12);
 }
 .session-pill--active .mini-pill {
   outline: 1px solid rgba(245, 158, 11, 0.9);

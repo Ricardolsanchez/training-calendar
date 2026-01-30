@@ -161,7 +161,7 @@ const translations: Record<Lang, Record<string, string>> = {
     paginationNext: "Next",
 
     downloadCsv: "Download CSV",
-    viewDetails: "View details here",
+    viewDetails: "View Workday link here",
     workdayLinkMissing: "Workday link missing",
   },
   es: {

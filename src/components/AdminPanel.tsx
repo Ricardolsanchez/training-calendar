@@ -145,7 +145,6 @@ const translations: Record<Lang, Record<string, string>> = {
     attendanceNotMarked: "Not marked",
 
     enrolledTitle: "People enrolled",
-    enrolledSubtitle: "Accepted bookings (inscribed users).",
     statsNoData: "There are no requests yet.",
 
     howManyAttended: "How many sessions were attended",
@@ -254,7 +253,7 @@ const AdminPanel: React.FC = () => {
   const [lang, setLang] = useState<Lang>("en");
   const t = useCallback(
     (key: string) => translations[lang][key] ?? key,
-    [lang]
+    [lang],
   );
 
   const [activeTab, setActiveTab] = useState<Tab>("classes");
@@ -265,7 +264,7 @@ const AdminPanel: React.FC = () => {
   /** CLASSES (grouped) */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
   const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(
-    null
+    null,
   );
   const toggleGroup = (code: string) =>
     setExpandedGroupCode((prev) => (prev === code ? null : code));
@@ -345,7 +344,7 @@ const AdminPanel: React.FC = () => {
         setBookings([]);
       }
     },
-    [bookingsPage, bookingsPerPage]
+    [bookingsPage, bookingsPerPage],
   );
 
   const fetchGrouped = useCallback(async () => {
@@ -380,12 +379,12 @@ const AdminPanel: React.FC = () => {
 
   const deriveBookingAttendance = (b: BookingWithSessions): boolean | null => {
     const sess = (b.sessions ?? []).filter(
-      (s) => s && typeof s.id === "number" && s.id > 0
+      (s) => s && typeof s.id === "number" && s.id > 0,
     );
     if (sess.length === 0) {
       return typeof b.attendedbutton === "undefined"
         ? null
-        : b.attendedbutton ?? null;
+        : (b.attendedbutton ?? null);
     }
     if (sess.some((s) => s.attended === false)) return false;
     if (sess.some((s) => s.attended === true)) return true;
@@ -471,7 +470,7 @@ const AdminPanel: React.FC = () => {
         id: s.id,
         date_iso: s.date_iso,
         ...parseTimeRange(s.time_range),
-      }))
+      })),
     );
 
     setShowClassModal(true);
@@ -489,14 +488,18 @@ const AdminPanel: React.FC = () => {
     }));
 
     const missing = cleanSessions.some(
-      (s) => !s.date_iso || !s.start_time || !s.end_time
+      (s) => !s.date_iso || !s.start_time || !s.end_time,
     );
     if (missing) {
       alert("Please set date + start + end time for every session.");
       return;
     }
 
-    const rangeStart = (editClass.start_date || computedRange.start || "").trim();
+    const rangeStart = (
+      editClass.start_date ||
+      computedRange.start ||
+      ""
+    ).trim();
     const rangeEnd = (
       editClass.end_date ||
       computedRange.end ||
@@ -506,7 +509,7 @@ const AdminPanel: React.FC = () => {
 
     if (rangeStart && rangeEnd) {
       const out = cleanSessions.some(
-        (s) => s.date_iso < rangeStart || s.date_iso > rangeEnd
+        (s) => s.date_iso < rangeStart || s.date_iso > rangeEnd,
       );
       if (out) {
         alert("One or more sessions are outside the selected date range.");
@@ -588,7 +591,7 @@ const AdminPanel: React.FC = () => {
       .filter((b) => b.status === "accepted")
       .sort(
         (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
   }, [bookings]);
 
@@ -602,7 +605,7 @@ const AdminPanel: React.FC = () => {
 
   const enrolledTotalPages = Math.max(
     1,
-    Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE)
+    Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE),
   );
   const enrolledPageSafe = Math.min(enrolledPage, enrolledTotalPages);
 
@@ -810,7 +813,7 @@ const AdminPanel: React.FC = () => {
 
     if (n <= 1) {
       setSessions((prev) =>
-        prev.map((s, idx) => (idx === 0 ? { ...s, date_iso: startISO } : s))
+        prev.map((s, idx) => (idx === 0 ? { ...s, date_iso: startISO } : s)),
       );
       return;
     }
@@ -822,7 +825,7 @@ const AdminPanel: React.FC = () => {
       prev.map((s, idx) => {
         const offset = Math.round(step * idx);
         return { ...s, date_iso: addDays(startISO, offset) };
-      })
+      }),
     );
   };
 
@@ -1065,7 +1068,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.title}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev ? { ...prev, title: e.target.value } : prev
+                            prev ? { ...prev, title: e.target.value } : prev,
                           )
                         }
                       />
@@ -1083,7 +1086,7 @@ const AdminPanel: React.FC = () => {
                                   ...prev,
                                   trainer_name: e.target.value || null,
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                       >
@@ -1106,7 +1109,7 @@ const AdminPanel: React.FC = () => {
                           const newStart = e.target.value;
 
                           setEditClass((prev) =>
-                            prev ? { ...prev, start_date: newStart } : prev
+                            prev ? { ...prev, start_date: newStart } : prev,
                           );
 
                           const end =
@@ -1128,11 +1131,13 @@ const AdminPanel: React.FC = () => {
                           const newEnd = e.target.value;
 
                           setEditClass((prev) =>
-                            prev ? { ...prev, end_date: newEnd } : prev
+                            prev ? { ...prev, end_date: newEnd } : prev,
                           );
 
                           const start =
-                            editClass.start_date || computedRange.start || newEnd;
+                            editClass.start_date ||
+                            computedRange.start ||
+                            newEnd;
                           if (start && newEnd) {
                             redistributeSessionsToRange(start, newEnd);
                           }
@@ -1154,7 +1159,7 @@ const AdminPanel: React.FC = () => {
                                     | "Online"
                                     | "Presencial",
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                       >
@@ -1173,7 +1178,7 @@ const AdminPanel: React.FC = () => {
                           setEditClass((prev) =>
                             prev
                               ? { ...prev, spots_left: Number(e.target.value) }
-                              : prev
+                              : prev,
                           )
                         }
                       />
@@ -1189,7 +1194,7 @@ const AdminPanel: React.FC = () => {
                           setEditClass((prev) =>
                             prev
                               ? { ...prev, description: e.target.value || null }
-                              : prev
+                              : prev,
                           )
                         }
                       />
@@ -1240,7 +1245,10 @@ const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
+                  <div
+                    className="admin-sessions-grid"
+                    style={{ marginTop: 12 }}
+                  >
                     {sessions.map((s, idx) => (
                       <div key={idx} className="admin-session-row">
                         <div>

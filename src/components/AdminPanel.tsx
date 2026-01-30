@@ -482,7 +482,7 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
-  /** SAVE class */
+  /** SAVE class (sin date range) */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
@@ -493,6 +493,7 @@ const AdminPanel: React.FC = () => {
       end_time: (s.end_time || "").trim(),
     }));
 
+    // ✅ validación mínima
     const missing = cleanSessions.some(
       (s) => !s.date_iso || !s.start_time || !s.end_time,
     );
@@ -500,9 +501,11 @@ const AdminPanel: React.FC = () => {
       alert("Please set date + start + end time for every session.");
       return;
     }
+
     try {
       await ensureCsrf();
 
+      // ✅ payload sin start_date/end_date
       const payload = {
         title: editClass.title,
         trainer_name: editClass.trainer_name,
@@ -515,36 +518,33 @@ const AdminPanel: React.FC = () => {
       };
 
       if (isNewClass) {
+        // ✅ IMPORTANTE: el backend de tu controlador aún valida start_date/end_date en store()
+        // Si ya lo cambiaste en backend para que NO sean requeridos, ok.
+        // Si NO lo has cambiado, aquí se va a caer.
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
         await api.put(`/api/admin/classes/${saved.id}/sessions`, {
-          sessions: [
-            {
-              id: saved.id,
-              date_iso: cleanSessions[0].date_iso,
-              start_time: cleanSessions[0].start_time,
-              end_time: cleanSessions[0].end_time,
-            },
-            ...cleanSessions.slice(1).map((s) => ({
-              date_iso: s.date_iso,
-              start_time: s.start_time,
-              end_time: s.end_time,
-            })),
-          ],
-          workday_url: editClass.workday_url ?? null, // ✅ también aquí
+          sessions: cleanSessions.map((s, idx) => ({
+            // la primera session puede llevar id (opcional)
+            ...(idx === 0 ? { id: saved.id } : {}),
+            date_iso: s.date_iso,
+            start_time: s.start_time,
+            end_time: s.end_time,
+          })),
+          workday_url: editClass.workday_url ?? null,
         });
       } else {
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
         await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
           sessions: cleanSessions.map((s) => ({
-            id: s.id,
+            id: s.id, // si viene vacío, crea
             date_iso: s.date_iso,
             start_time: s.start_time,
             end_time: s.end_time,
           })),
-          workday_url: editClass.workday_url ?? null, // ✅ AQUÍ, en root
+          workday_url: editClass.workday_url ?? null,
         });
       }
 

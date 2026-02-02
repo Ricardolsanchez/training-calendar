@@ -90,6 +90,7 @@ const TRAINERS: Trainer[] = [
   { id: 7, name: "Josias Mendez" },
   { id: 8, name: "Ricardo Sanchez" },
   { id: 9, name: "Giselle Cárdenas" },
+  { id: 10,name: "Alexandria Yorkman"}
 ];
 
 const translations: Record<Lang, Record<string, string>> = {

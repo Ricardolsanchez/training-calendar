@@ -94,6 +94,7 @@ const formatDayMonth = (iso: string, lang: Lang) => {
   return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
+    year: "numeric",
   }).format(dt);
 };
 

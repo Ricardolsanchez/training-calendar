@@ -41,6 +41,7 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Marked: days with classes",
     viewDetails: "View details here",
     workdayLinkMissing: "Workday link not available yet.",
+    availableSeats: "Available seats",
     sessionsTitle: "SESSIONS",
   },
   es: {
@@ -58,10 +59,21 @@ const translations: Record<Lang, Record<string, string>> = {
     highlightedHint: "Marcado: días con clases",
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Aún no hay link de Workday disponible.",
+    availableSeats: "Cupos disponibles",
     sessionsTitle: "SESIONES",
   },
 };
+const getGroupSeats = (g: AvailableClassGroup) => {
+    const seats = (g.sessions ?? [])
+      .map((s) => Number(s.spots_left ?? 0))
+      .filter((n) => Number.isFinite(n));
 
+    if (seats.length === 0) return 0;
+
+    // ✅ recomendado: mínimo
+    return Math.min(...seats);
+  };
+  
 /** ✅ evita bug UTC con YYYY-MM-DD */
 const parseLocalDate = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
@@ -156,6 +168,8 @@ const MiniCalendar: React.FC<{
       : ["D", "L", "M", "X", "J", "V", "S"];
 
   const t = (k: string) => translations[lang][k] ?? k;
+
+  
 
   return (
     <div className="booking-mini-calendar">
@@ -418,6 +432,9 @@ const BookingCalendar: React.FC = () => {
                                 👤 {g.trainer_name}
                               </span>
                               <span className="class-level">{g.level}</span>
+                              <span className="class-spots">
+                                {t("availableSeats")}: {getGroupSeats(g)}
+                              </span>
                             </div>
                           </button>
                         );

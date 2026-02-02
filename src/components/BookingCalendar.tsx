@@ -88,6 +88,15 @@ const parseLocalDate = (iso: string) => {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 };
 
+const formatDayMonth = (iso: string, lang: Lang) => {
+  const locale = lang === "en" ? "en-US" : "es-ES";
+  const dt = parseLocalDate(iso); // tu función evita bug UTC
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "short",
+  }).format(dt);
+};
+
 const makeKey = (d: Date) => {
   const y = d.getFullYear();
   const m = (d.getMonth() + 1).toString().padStart(2, "0");
@@ -543,7 +552,7 @@ const BookingCalendar: React.FC = () => {
                             }
                             onClick={() => handleSelectSession(selectedGroup, s)}
                           >
-                            <span className="mini-pill">{s.date_iso}</span>
+                            <span className="mini-pill">{formatDayMonth(s.date_iso, lang)}</span>
                             <span className="mini-pill" style={{ marginLeft: 8 }}>
                               {s.time_range}
                             </span>

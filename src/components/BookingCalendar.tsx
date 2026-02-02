@@ -505,20 +505,6 @@ const BookingCalendar: React.FC = () => {
                         {selectedGroup.description}
                       </p>
                     ) : null}
-
-                    <div style={{ marginTop: 12 }}>
-                      {selectedGroup.workday_url ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={() => openWorkday(selectedGroup.workday_url)}
-                        >
-                          {t("viewDetails")}
-                        </button>
-                      ) : (
-                        <div className="empty">{t("workdayLinkMissing")}</div>
-                      )}
-                    </div>
                   </div>
                 </>
               )}

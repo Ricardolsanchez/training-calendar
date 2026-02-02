@@ -570,9 +570,32 @@ const BookingCalendar: React.FC = () => {
                           </div>
 
                           <div className="other-class-row-right">
+                            {/* ✅ Workday link */}
+                            {group.workday_url ? (
+                              <button
+                                type="button"
+                                className="other-workday-btn"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation(); // ✅ evita que seleccione la fila
+                                  openWorkday(group.workday_url);
+                                }}
+                              >
+                                {t("viewDetails")}
+                              </button>
+                            ) : (
+                              <span
+                                className="mini-pill"
+                                style={{ opacity: 0.75 }}
+                              >
+                                {t("workdayLinkMissing")}
+                              </span>
+                            )}
+
                             <span className="mini-pill">
                               {session.time_range}
                             </span>
+
                             <span
                               className="mini-pill"
                               style={{ marginLeft: 8 }}

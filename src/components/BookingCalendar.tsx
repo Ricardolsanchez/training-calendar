@@ -26,7 +26,7 @@ type AvailableClassGroup = {
   workday_url?: string | null;
 };
 
-const SUGGESTION_URL = "https://example.com/suggest-class"; // <-- reemplaza con tu link real
+const SUGGESTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfQtnvDXIs6Iwo6XDIZ_73K9oJrNxSEYoaJUZKRwMQyaUj_RA/viewform?usp=publish-editor"; // <-- reemplaza con tu link real
 
 const translations: Record<Lang, Record<string, string>> = {
   en: {

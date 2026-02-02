@@ -78,9 +78,16 @@ const makeKey = (d: Date) => {
 const getMonthAnchor = (
   groups: AvailableClassGroup[],
   selectedGroup: AvailableClassGroup | null,
+  selectedSessionIso?: string | null,
 ) => {
-  // si tu API trae start_date_iso, úsalo, sino usa la primera sesión del primer grupo
-  if (selectedGroup?.start_date_iso) return parseLocalDate(selectedGroup.start_date_iso);
+  // ✅ 1) prioridad: la sesión seleccionada
+  if (selectedSessionIso) return parseLocalDate(selectedSessionIso);
+
+  // ✅ 2) si hay start_date_iso del grupo seleccionado
+  if (selectedGroup?.start_date_iso)
+    return parseLocalDate(selectedGroup.start_date_iso);
+
+  // ✅ 3) fallback: primera sesión disponible del primer grupo
   const first = groups[0]?.sessions?.[0]?.date_iso;
   return first ? parseLocalDate(first) : new Date();
 };
@@ -92,8 +99,8 @@ const MiniCalendar: React.FC<{
   selectedSessionIso?: string | null; // ✅ solo este define el día “activo”
 }> = ({ groups, lang, selectedGroup, selectedSessionIso }) => {
   const anchor = useMemo(
-    () => getMonthAnchor(groups, selectedGroup),
-    [groups, selectedGroup],
+    () => getMonthAnchor(groups, selectedGroup, selectedSessionIso),
+    [groups, selectedGroup, selectedSessionIso],
   );
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -121,7 +128,10 @@ const MiniCalendar: React.FC<{
       for (const s of g.sessions ?? []) {
         if (!s?.date_iso) continue;
         const key = makeKey(parseLocalDate(s.date_iso));
-        if (parseLocalDate(s.date_iso).getFullYear() === year && parseLocalDate(s.date_iso).getMonth() === month) {
+        if (
+          parseLocalDate(s.date_iso).getFullYear() === year &&
+          parseLocalDate(s.date_iso).getMonth() === month
+        ) {
           set.add(key);
         }
       }
@@ -442,10 +452,15 @@ const BookingCalendar: React.FC = () => {
                               "session-pill session-pill--below" +
                               (active ? " session-pill--active" : "")
                             }
-                            onClick={() => handleSelectSession(selectedGroup, s)}
+                            onClick={() =>
+                              handleSelectSession(selectedGroup, s)
+                            }
                           >
                             <span className="mini-pill">{s.date_iso}</span>
-                            <span className="mini-pill" style={{ marginLeft: 8 }}>
+                            <span
+                              className="mini-pill"
+                              style={{ marginLeft: 8 }}
+                            >
                               {s.time_range}
                             </span>
                           </button>

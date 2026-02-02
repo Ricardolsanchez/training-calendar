@@ -63,17 +63,16 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionsTitle: "SESIONES",
   },
 };
+
 const getGroupSeats = (g: AvailableClassGroup) => {
-    const seats = (g.sessions ?? [])
-      .map((s) => Number(s.spots_left ?? 0))
-      .filter((n) => Number.isFinite(n));
+  const seats = (g.sessions ?? [])
+    .map((s) => Number(s.spots_left ?? 0))
+    .filter((n) => Number.isFinite(n));
+  if (seats.length === 0) return 0;
+  // recomendado: mínimo del grupo (más realista)
+  return Math.min(...seats);
+};
 
-    if (seats.length === 0) return 0;
-
-    // ✅ recomendado: mínimo
-    return Math.min(...seats);
-  };
-  
 /** ✅ evita bug UTC con YYYY-MM-DD */
 const parseLocalDate = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
@@ -92,12 +91,11 @@ const getMonthAnchor = (
   selectedGroup: AvailableClassGroup | null,
   selectedSessionIso?: string | null,
 ) => {
-  // ✅ 1) prioridad: la sesión seleccionada
+  // ✅ 1) prioridad: el día seleccionado en el calendario / sesión
   if (selectedSessionIso) return parseLocalDate(selectedSessionIso);
 
   // ✅ 2) si hay start_date_iso del grupo seleccionado
-  if (selectedGroup?.start_date_iso)
-    return parseLocalDate(selectedGroup.start_date_iso);
+  if (selectedGroup?.start_date_iso) return parseLocalDate(selectedGroup.start_date_iso);
 
   // ✅ 3) fallback: primera sesión disponible del primer grupo
   const first = groups[0]?.sessions?.[0]?.date_iso;
@@ -108,8 +106,9 @@ const MiniCalendar: React.FC<{
   groups: AvailableClassGroup[];
   lang: Lang;
   selectedGroup: AvailableClassGroup | null;
-  selectedSessionIso?: string | null; // ✅ solo este define el día “activo”
-}> = ({ groups, lang, selectedGroup, selectedSessionIso }) => {
+  selectedSessionIso?: string | null;
+  onDayClick?: (iso: string) => void; // ✅ nuevo
+}> = ({ groups, lang, selectedGroup, selectedSessionIso, onDayClick }) => {
   const anchor = useMemo(
     () => getMonthAnchor(groups, selectedGroup, selectedSessionIso),
     [groups, selectedGroup, selectedSessionIso],
@@ -122,30 +121,21 @@ const MiniCalendar: React.FC<{
   const firstWeekday = monthStart.getDay();
 
   const days: Date[] = [];
-  for (
-    let d = new Date(monthStart);
-    d <= monthEnd;
-    d.setDate(d.getDate() + 1)
-  ) {
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
 
   /**
-   * ✅ daysWithSessions: SOLO marca los días que realmente tienen sesiones
-   * (no rangos)
+   * ✅ daysWithSessions: SOLO marca días que realmente tienen sesiones
    */
   const daysWithSessions = useMemo(() => {
     const set = new Set<string>();
     for (const g of groups) {
       for (const s of g.sessions ?? []) {
         if (!s?.date_iso) continue;
-        const key = makeKey(parseLocalDate(s.date_iso));
-        if (
-          parseLocalDate(s.date_iso).getFullYear() === year &&
-          parseLocalDate(s.date_iso).getMonth() === month
-        ) {
-          set.add(key);
-        }
+        const dt = parseLocalDate(s.date_iso);
+        if (dt.getFullYear() !== year || dt.getMonth() !== month) continue;
+        set.add(makeKey(dt));
       }
     }
     return set;
@@ -168,8 +158,6 @@ const MiniCalendar: React.FC<{
       : ["D", "L", "M", "X", "J", "V", "S"];
 
   const t = (k: string) => translations[lang][k] ?? k;
-
-  
 
   return (
     <div className="booking-mini-calendar">
@@ -195,16 +183,19 @@ const MiniCalendar: React.FC<{
           const isSelectedDay = selectedDayKey === key;
 
           return (
-            <div
+            <button
               key={key}
+              type="button"
+              onClick={() => onDayClick?.(key)} // key ya es YYYY-MM-DD
               className={
                 "mini-calendar-day" +
                 (hasSession ? " mini-calendar-day--highlight" : "") +
                 (isSelectedDay ? " mini-calendar-day--selected" : "")
               }
+              style={{ cursor: "pointer" }}
             >
               {d.getDate()}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -218,20 +209,13 @@ const BookingCalendar: React.FC = () => {
   const [lang, setLang] = useState<Lang>("en");
   const t = (key: string) => translations[lang][key] ?? key;
 
-  const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>(
-    [],
-  );
+  const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
 
-  const [selectedGroup, setSelectedGroup] =
-    useState<AvailableClassGroup | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
-    null,
-  );
-  const [selectedSessionIso, setSelectedSessionIso] = useState<string | null>(
-    null,
-  );
+  const [selectedGroup, setSelectedGroup] = useState<AvailableClassGroup | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [selectedSessionIso, setSelectedSessionIso] = useState<string | null>(null);
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
@@ -254,20 +238,13 @@ const BookingCalendar: React.FC = () => {
         const normalized = Array.isArray(list) ? list : [];
         setAvailableGroups(normalized);
 
-        setSelectedGroup((prev) => {
-          if (prev && normalized.some((g) => g.group_code === prev.group_code))
-            return prev;
-          return normalized[0] ?? null;
-        });
-
-        // ✅ por defecto: nada seleccionado -> no highlight “activo”
+        // ✅ default: nada seleccionado (dashboard vacío)
+        setSelectedGroup(null);
         setSelectedSessionId(null);
         setSelectedSessionIso(null);
       } catch (err) {
         console.error("Error cargando clases:", err);
-        setClassesError(
-          translations[lang].noClassesError ?? "Could not load classes.",
-        );
+        setClassesError(translations[lang].noClassesError ?? "Could not load classes.");
       } finally {
         setLoadingClasses(false);
       }
@@ -287,17 +264,55 @@ const BookingCalendar: React.FC = () => {
     setIsAdmin(true);
   }, []);
 
+  const sessionsByDay = useMemo(() => {
+    const map = new Map<string, { group: AvailableClassGroup; session: AvailableSession }[]>();
+
+    for (const g of availableGroups) {
+      for (const s of g.sessions ?? []) {
+        if (!s?.date_iso) continue;
+        const key = s.date_iso; // YYYY-MM-DD
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push({ group: g, session: s });
+      }
+    }
+
+    // opcional: ordenar por time_range
+    map.forEach((list) =>
+      list.sort((a, b) => (a.session.time_range ?? "").localeCompare(b.session.time_range ?? "")),
+    );
+
+    return map;
+  }, [availableGroups]);
+
   const handleSelectGroup = (g: AvailableClassGroup) => {
     setSelectedGroup(g);
-    // ✅ al cambiar de grupo, quitamos selección activa del calendario
     setSelectedSessionId(null);
-    setSelectedSessionIso(null);
+    setSelectedSessionIso(null); // ✅ no hay día activo hasta que seleccione sesión
   };
 
   const handleSelectSession = (g: AvailableClassGroup, s: AvailableSession) => {
     setSelectedGroup(g);
     setSelectedSessionId(s.id);
-    setSelectedSessionIso(s.date_iso); // ✅ esto prende el “selected” day
+    setSelectedSessionIso(s.date_iso); // ✅ enciende selected day y cambia mes si aplica
+  };
+
+  const handleCalendarDayClick = (dayIso: string) => {
+    const list = sessionsByDay.get(dayIso) ?? [];
+
+    // ✅ siempre marcamos el día seleccionado (aunque no tenga sesiones)
+    setSelectedSessionIso(dayIso);
+
+    if (list.length === 0) {
+      // ✅ dashboard vacío si no hay sesiones
+      setSelectedGroup(null);
+      setSelectedSessionId(null);
+      return;
+    }
+
+    // ✅ si hay sesiones, selecciona la primera
+    const first = list[0];
+    setSelectedGroup(first.group);
+    setSelectedSessionId(first.session.id);
   };
 
   const openWorkday = (url?: string | null) => {
@@ -310,11 +325,7 @@ const BookingCalendar: React.FC = () => {
       <div className="booking-card">
         <header className="booking-header">
           <div className="booking-header-left booking-header-logo">
-            <img
-              src="/logo.png"
-              alt="Alonso & Alonso Academy"
-              className="booking-logo"
-            />
+            <img src="/logo.png" alt="Alonso & Alonso Academy" className="booking-logo" />
           </div>
 
           <div className="booking-header-right">
@@ -332,11 +343,7 @@ const BookingCalendar: React.FC = () => {
             </button>
 
             {isAdmin === null ? null : isAdmin ? (
-              <button
-                type="button"
-                className="booking-login-btn"
-                onClick={() => navigate("/admin")}
-              >
+              <button type="button" className="booking-login-btn" onClick={() => navigate("/admin")}>
                 {t("adminPanel")}
               </button>
             ) : (
@@ -354,12 +361,8 @@ const BookingCalendar: React.FC = () => {
               <p>{t("availableClassesSubtitle")}</p>
             </div>
 
-            {loadingClasses && (
-              <p className="form-message">{t("loadingClasses")}</p>
-            )}
-            {classesError && (
-              <p className="form-message error">{classesError}</p>
-            )}
+            {loadingClasses && <p className="form-message">{t("loadingClasses")}</p>}
+            {classesError && <p className="form-message error">{classesError}</p>}
 
             {!loadingClasses && !classesError && (
               <>
@@ -375,11 +378,8 @@ const BookingCalendar: React.FC = () => {
                   <div className="class-carousel-viewport" ref={carouselRef}>
                     <div className="class-carousel-track">
                       {availableGroups.map((g) => {
-                        const isSelected =
-                          selectedGroup?.group_code === g.group_code;
-
-                        const modalityDotClass =
-                          g.modality === "Online" ? "online" : "presencial";
+                        const isSelected = selectedGroup?.group_code === g.group_code;
+                        const modalityDotClass = g.modality === "Online" ? "online" : "presencial";
 
                         return (
                           <button
@@ -414,23 +414,16 @@ const BookingCalendar: React.FC = () => {
                                   {t("viewDetails")}
                                 </button>
                               ) : (
-                                <span
-                                  className="mini-pill"
-                                  style={{ opacity: 0.8 }}
-                                >
+                                <span className="mini-pill" style={{ opacity: 0.8 }}>
                                   {t("workdayLinkMissing")}
                                 </span>
                               )}
                             </div>
 
-                            {!!g.description && (
-                              <p className="class-card-desc">{g.description}</p>
-                            )}
+                            {!!g.description && <p className="class-card-desc">{g.description}</p>}
 
                             <div className="class-footer">
-                              <span className="class-trainer">
-                                👤 {g.trainer_name}
-                              </span>
+                              <span className="class-trainer">👤 {g.trainer_name}</span>
                               <span className="class-level">{g.level}</span>
                               <span className="class-spots">
                                 {t("availableSeats")}: {getGroupSeats(g)}
@@ -451,11 +444,10 @@ const BookingCalendar: React.FC = () => {
                   </button>
                 </div>
 
+                {/* ✅ SOLO mostrar pills si hay grupo seleccionado */}
                 {selectedGroup && (
                   <div className="class-sessions class-sessions--below">
-                    <div className="class-sessions-title">
-                      {t("sessionsTitle")}
-                    </div>
+                    <div className="class-sessions-title">{t("sessionsTitle")}</div>
 
                     <div className="class-sessions-list-below">
                       {selectedGroup.sessions.map((s) => {
@@ -469,15 +461,10 @@ const BookingCalendar: React.FC = () => {
                               "session-pill session-pill--below" +
                               (active ? " session-pill--active" : "")
                             }
-                            onClick={() =>
-                              handleSelectSession(selectedGroup, s)
-                            }
+                            onClick={() => handleSelectSession(selectedGroup, s)}
                           >
                             <span className="mini-pill">{s.date_iso}</span>
-                            <span
-                              className="mini-pill"
-                              style={{ marginLeft: 8 }}
-                            >
+                            <span className="mini-pill" style={{ marginLeft: 8 }}>
                               {s.time_range}
                             </span>
                           </button>
@@ -497,33 +484,24 @@ const BookingCalendar: React.FC = () => {
                 lang={lang}
                 selectedGroup={selectedGroup}
                 selectedSessionIso={selectedSessionIso}
+                onDayClick={handleCalendarDayClick}
               />
 
-              {!selectedGroup ? (
-                <div className="booking-detail-empty">
-                  <h3>{t("clickOnClassTitle")}</h3>
-                  <p>{t("clickOnClassText")}</p>
+              {/* ✅ si no hay selectedGroup, NO mostramos nada del dashboard */}
+              {!selectedGroup ? null : (
+                <div className="booking-detail-header">
+                  <span className="booking-detail-label">{t("selectedClassLabel")}</span>
+                  <h3>{selectedGroup.title}</h3>
+
+                  <p className="booking-detail-meta">
+                    Trainer: {selectedGroup.trainer_name} · {selectedGroup.level} ·{" "}
+                    {selectedGroup.modality}
+                  </p>
+
+                  {selectedGroup.description ? (
+                    <p className="booking-detail-desc">{selectedGroup.description}</p>
+                  ) : null}
                 </div>
-              ) : (
-                <>
-                  <div className="booking-detail-header">
-                    <span className="booking-detail-label">
-                      {t("selectedClassLabel")}
-                    </span>
-                    <h3>{selectedGroup.title}</h3>
-
-                    <p className="booking-detail-meta">
-                      Trainer: {selectedGroup.trainer_name} ·{" "}
-                      {selectedGroup.level} · {selectedGroup.modality}
-                    </p>
-
-                    {selectedGroup.description ? (
-                      <p className="booking-detail-desc">
-                        {selectedGroup.description}
-                      </p>
-                    ) : null}
-                  </div>
-                </>
               )}
             </div>
           </section>

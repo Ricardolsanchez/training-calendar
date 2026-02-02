@@ -499,6 +499,8 @@
   border: 1px solid rgba(55, 65, 81, 0.8);
   position: relative;
   transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+   appearance: none;
+  -webkit-appearance: none;
 }
 
 .mini-calendar-day.empty {

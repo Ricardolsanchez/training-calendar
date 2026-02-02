@@ -23,8 +23,7 @@ type AvailableClassGroup = {
   sessions: AvailableSession[];
   start_date_iso?: string | null;
   end_date_iso?: string | null;
-
-  workday_url?: string | null; // ✅ NUEVO
+  workday_url?: string | null;
 };
 
 const translations: Record<Lang, Record<string, string>> = {
@@ -39,7 +38,7 @@ const translations: Record<Lang, Record<string, string>> = {
     clickOnClassTitle: "Select a class",
     clickOnClassText: "Click on a class on the left to see its Workday link.",
     selectedClassLabel: "SELECTED CLASS",
-    highlightedHint: "Highlighted: days with classes",
+    highlightedHint: "Marked: days with classes",
     viewDetails: "View details here",
     workdayLinkMissing: "Workday link not available yet.",
     sessionsTitle: "SESSIONS",
@@ -56,7 +55,7 @@ const translations: Record<Lang, Record<string, string>> = {
     clickOnClassText:
       "Haz click en una clase a la izquierda para ver su link de Workday.",
     selectedClassLabel: "CLASE SELECCIONADA",
-    highlightedHint: "Resaltado: días con clases",
+    highlightedHint: "Marcado: días con clases",
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Aún no hay link de Workday disponible.",
     sessionsTitle: "SESIONES",
@@ -76,54 +75,21 @@ const makeKey = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
-const getGroupRange = (g: AvailableClassGroup) => {
-  const startFromApi = g.start_date_iso ?? "";
-  const endFromApi = g.end_date_iso ?? "";
-
-  if (startFromApi)
-    return { start: startFromApi, end: endFromApi || startFromApi };
-
-  const dates = (g.sessions ?? [])
-    .map((s) => s.date_iso)
-    .filter(Boolean)
-    .sort();
-
-  const start = dates[0] ?? "";
-  const end = dates[dates.length - 1] ?? start;
-  return { start, end };
-};
-
 const getMonthAnchor = (
   groups: AvailableClassGroup[],
   selectedGroup: AvailableClassGroup | null,
 ) => {
-  if (selectedGroup?.start_date_iso)
-    return parseLocalDate(selectedGroup.start_date_iso);
+  // si tu API trae start_date_iso, úsalo, sino usa la primera sesión del primer grupo
+  if (selectedGroup?.start_date_iso) return parseLocalDate(selectedGroup.start_date_iso);
   const first = groups[0]?.sessions?.[0]?.date_iso;
   return first ? parseLocalDate(first) : new Date();
-};
-
-const buildRangeSetForMonth = (
-  startIso: string,
-  endIso: string,
-  year: number,
-  month: number,
-) => {
-  const set = new Set<string>();
-  const start = parseLocalDate(startIso);
-  const end = parseLocalDate(endIso);
-
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    if (d.getFullYear() === year && d.getMonth() === month) set.add(makeKey(d));
-  }
-  return set;
 };
 
 const MiniCalendar: React.FC<{
   groups: AvailableClassGroup[];
   lang: Lang;
   selectedGroup: AvailableClassGroup | null;
-  selectedSessionIso?: string | null; // ✅ nuevo
+  selectedSessionIso?: string | null; // ✅ solo este define el día “activo”
 }> = ({ groups, lang, selectedGroup, selectedSessionIso }) => {
   const anchor = useMemo(
     () => getMonthAnchor(groups, selectedGroup),
@@ -145,25 +111,23 @@ const MiniCalendar: React.FC<{
     days.push(new Date(d));
   }
 
+  /**
+   * ✅ daysWithSessions: SOLO marca los días que realmente tienen sesiones
+   * (no rangos)
+   */
   const daysWithSessions = useMemo(() => {
     const set = new Set<string>();
-
     for (const g of groups) {
-      const { start, end } = getGroupRange(g);
-      if (!start) continue;
-      const rangeSet = buildRangeSetForMonth(start, end || start, year, month);
-      for (const k of rangeSet) set.add(k);
+      for (const s of g.sessions ?? []) {
+        if (!s?.date_iso) continue;
+        const key = makeKey(parseLocalDate(s.date_iso));
+        if (parseLocalDate(s.date_iso).getFullYear() === year && parseLocalDate(s.date_iso).getMonth() === month) {
+          set.add(key);
+        }
+      }
     }
-
     return set;
   }, [groups, year, month]);
-
-  const selectedRange = useMemo(() => {
-    if (!selectedGroup) return new Set<string>();
-    const { start, end } = getGroupRange(selectedGroup);
-    if (!start) return new Set<string>();
-    return buildRangeSetForMonth(start, end || start, year, month);
-  }, [selectedGroup, year, month]);
 
   const selectedDayKey = useMemo(() => {
     if (!selectedSessionIso) return null;
@@ -204,25 +168,7 @@ const MiniCalendar: React.FC<{
         {days.map((d) => {
           const key = makeKey(d);
           const hasSession = daysWithSessions.has(key);
-          const inRange = selectedRange.has(key);
           const isSelectedDay = selectedDayKey === key;
-          const prev = new Date(d);
-          prev.setDate(prev.getDate() - 1);
-          const next = new Date(d);
-          next.setDate(next.getDate() + 1);
-
-          const prevInRange = selectedRange.has(makeKey(prev));
-          const nextInRange = selectedRange.has(makeKey(next));
-
-          const rangePosClass = inRange
-            ? !prevInRange && nextInRange
-              ? " mini-calendar-day--range-start"
-              : prevInRange && !nextInRange
-                ? " mini-calendar-day--range-end"
-                : prevInRange && nextInRange
-                  ? " mini-calendar-day--range-mid"
-                  : " mini-calendar-day--range-single"
-            : "";
 
           return (
             <div
@@ -230,9 +176,7 @@ const MiniCalendar: React.FC<{
               className={
                 "mini-calendar-day" +
                 (hasSession ? " mini-calendar-day--highlight" : "") +
-                (inRange ? " mini-calendar-day--range" : "") +
-                rangePosClass +
-                (isSelectedDay ? " mini-calendar-day--selected" : "") // ✅ nuevo
+                (isSelectedDay ? " mini-calendar-day--selected" : "")
               }
             >
               {d.getDate()}
@@ -291,6 +235,8 @@ const BookingCalendar: React.FC = () => {
             return prev;
           return normalized[0] ?? null;
         });
+
+        // ✅ por defecto: nada seleccionado -> no highlight “activo”
         setSelectedSessionId(null);
         setSelectedSessionIso(null);
       } catch (err) {
@@ -319,13 +265,15 @@ const BookingCalendar: React.FC = () => {
 
   const handleSelectGroup = (g: AvailableClassGroup) => {
     setSelectedGroup(g);
+    // ✅ al cambiar de grupo, quitamos selección activa del calendario
     setSelectedSessionId(null);
     setSelectedSessionIso(null);
   };
+
   const handleSelectSession = (g: AvailableClassGroup, s: AvailableSession) => {
     setSelectedGroup(g);
     setSelectedSessionId(s.id);
-    setSelectedSessionIso(s.date_iso); // esto es lo que pinta el día en el calendario
+    setSelectedSessionIso(s.date_iso); // ✅ esto prende el “selected” day
   };
 
   const openWorkday = (url?: string | null) => {
@@ -450,6 +398,7 @@ const BookingCalendar: React.FC = () => {
                                 </span>
                               )}
                             </div>
+
                             {!!g.description && (
                               <p className="class-card-desc">{g.description}</p>
                             )}
@@ -475,12 +424,12 @@ const BookingCalendar: React.FC = () => {
                   </button>
                 </div>
 
-                {/* ✅ debajo: NO mostrar sessions details; solo Workday link */}
                 {selectedGroup && (
                   <div className="class-sessions class-sessions--below">
                     <div className="class-sessions-title">
                       {t("sessionsTitle")}
                     </div>
+
                     <div className="class-sessions-list-below">
                       {selectedGroup.sessions.map((s) => {
                         const active = selectedSessionId === s.id;
@@ -493,15 +442,10 @@ const BookingCalendar: React.FC = () => {
                               "session-pill session-pill--below" +
                               (active ? " session-pill--active" : "")
                             }
-                            onClick={() =>
-                              handleSelectSession(selectedGroup, s)
-                            }
+                            onClick={() => handleSelectSession(selectedGroup, s)}
                           >
                             <span className="mini-pill">{s.date_iso}</span>
-                            <span
-                              className="mini-pill"
-                              style={{ marginLeft: 8 }}
-                            >
+                            <span className="mini-pill" style={{ marginLeft: 8 }}>
                               {s.time_range}
                             </span>
                           </button>

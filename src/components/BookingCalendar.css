@@ -296,14 +296,6 @@
   color: #9ca3af;
 }
 
-.class-date::before {
-  content: "📅 ";
-}
-
-.class-time::before {
-  content: "⏰ ";
-}
-
 .class-card-desc {
   font-size: 0.9rem;
   color: #cbd5e1;
@@ -331,12 +323,6 @@
   font-size: 0.75rem;
 }
 
-.class-spots {
-  font-weight: 500;
-  color: #4ade80;
-  font-size: 0.8rem;
-}
-
 /* =========================== */
 /* ✅ SESIONES DEBAJO          */
 /* =========================== */
@@ -351,7 +337,7 @@
   max-width: 920px;
 }
 
-.class-sessions-title{
+.class-sessions-title {
   margin-top: 14px;
   margin-bottom: 10px;
   font-size: 12px;
@@ -360,78 +346,43 @@
   opacity: 0.85;
 }
 
-
-.class-sessions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.class-sessions-list-below{
+.class-sessions-list-below {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-
-.class-session-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  cursor: pointer;
-  transition:
-    transform 0.12s ease,
-    border-color 0.12s ease,
-    background 0.12s ease;
-}
-
-.class-session-row:hover {
-  transform: translateY(-1px);
-  border-color: rgba(96, 165, 250, 0.7);
+.session-pill--below {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease,
+    border-color 120ms ease;
 }
 
-.class-session-row--selected {
-  border-color: rgba(230, 190, 82, 0.9);
-  box-shadow: 0 0 0 1px rgba(230, 190, 82, 0.55);
-  background: rgba(230, 190, 82, 0.08);
+.session-pill--below:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
 }
-.class-session-row--readonly {
-  cursor: default;
+
+.session-pill--below .mini-pill {
+  font-size: 13px;
   opacity: 0.95;
 }
 
-.class-session-row--readonly:hover {
-  transform: none;
-  filter: none;
+.session-pill--active {
+  border-color: rgba(255, 170, 0, 0.8);
+  box-shadow: 0 0 0 4px rgba(255, 170, 0, 0.12);
 }
 
-.class-session-date,
-.class-session-time,
-.class-session-spots {
-  font-size: 0.82rem;
-  color: #e5e7eb;
-}
-
-.class-session-date {
-  min-width: 110px;
-  opacity: 0.9;
-}
-
-.class-session-time {
-  flex: 1;
-  opacity: 0.95;
-}
-
-.class-session-spots {
-  color: #4ade80;
-  font-weight: 600;
-  white-space: nowrap;
+.session-pill--active .mini-pill {
+  outline: 1px solid rgba(245, 158, 11, 0.9);
 }
 
 /* =========================== */
@@ -447,6 +398,12 @@
   min-height: 260px;
 }
 
+.booking-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .booking-detail-empty {
   text-align: left;
   color: #9ca3af;
@@ -456,12 +413,6 @@
   color: #e5e7eb;
   font-size: 1.05rem;
   margin-bottom: 0.4rem;
-}
-
-.booking-detail-card {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
 .booking-detail-header {
@@ -488,143 +439,6 @@
 .booking-detail-meta {
   margin-top: 0.2rem;
   font-size: 0.85rem;
-  color: #9ca3af;
-}
-
-.booking-detail-form {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-
-/* =========================== */
-/* 📝   INPUTS                */
-/* =========================== */
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.85rem;
-  color: #e5e7eb;
-}
-
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.7);
-  background: rgba(15, 23, 42, 0.85);
-  padding: 0.65rem 0.8rem;
-  color: #f9fafb;
-  font-size: 0.9rem;
-  outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.form-group input::placeholder,
-.form-group textarea::placeholder {
-  color: #6b7280;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  border-color: #60a5fa;
-  box-shadow:
-    0 0 0 1px rgba(96, 165, 250, 0.85),
-    0 0 0 10px rgba(37, 99, 235, 0.2);
-  background: rgba(15, 23, 42, 0.95);
-}
-
-/* =========================== */
-/* 🔘 BOTÓN                   */
-/* =========================== */
-
-.booking-button {
-  margin-top: 0.3rem;
-  width: 100%;
-  border: none;
-  border-radius: 999px;
-  padding: 0.8rem 1.2rem;
-  font-weight: 600;
-  font-size: 0.95rem;
-  background: linear-gradient(135deg, #d10000, #e6be52);
-  color: #f9fafb;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  box-shadow:
-    0 15px 35px rgba(37, 99, 235, 0.45),
-    0 0 0 1px rgba(15, 23, 42, 0.9);
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease,
-    opacity 0.12s ease;
-}
-
-.booking-button:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 22px 45px rgba(37, 99, 235, 0.5),
-    0 0 0 1px rgba(15, 23, 42, 0.9);
-}
-
-.booking-button:active {
-  transform: translateY(1px);
-  box-shadow:
-    0 10px 25px rgba(15, 23, 42, 0.9),
-    0 0 0 1px rgba(15, 23, 42, 0.9);
-}
-
-.booking-button:disabled {
-  opacity: 0.7;
-  cursor: default;
-}
-
-/* =========================== */
-/* 🔴 DOTS ONLINE/PRESENCIAL  */
-/* =========================== */
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  margin-right: 5px;
-}
-
-.dot.online {
-  background-color: #28d878;
-}
-
-.dot.presencial {
-  background-color: #f44336;
-}
-
-/* =========================== */
-/* 💬 MENSAJES                */
-/* =========================== */
-
-.form-message {
-  font-size: 0.85rem;
-}
-
-.form-message.error {
-  color: #fca5a5;
-}
-
-.form-message.success {
-  color: #bbf7d0;
-}
-
-.booking-privacy {
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
   color: #9ca3af;
 }
 
@@ -684,10 +498,7 @@
   color: #e5e7eb;
   border: 1px solid rgba(55, 65, 81, 0.8);
   position: relative;
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease,
-    filter 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
 .mini-calendar-day.empty {
@@ -695,107 +506,60 @@
   border: none;
 }
 
-/* ✅ days with sessions */
+/* ✅ sutil: días con clases */
 .mini-calendar-day--highlight {
-  background: linear-gradient(135deg, #d10000, #e6be52);
-  border-color: rgba(234, 179, 8, 0.9);
-  color: #020617;
-  font-weight: 800;
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
+  background: rgba(230, 190, 82, 0.12);
+  border-color: rgba(230, 190, 82, 0.55);
+  color: #e5e7eb;
+  font-weight: 700;
 }
 
-/* ✅ PRO RANGE: same palette as highlight, pill bar */
-.mini-calendar-day--range {
-  /* priority over default */
-  background: linear-gradient(135deg, #d10000, #e6be52);
-  border-color: rgba(234, 179, 8, 0.9);
-  color: #020617;
-  font-weight: 800;
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
-}
-
-/* when day is both highlight and range, keep range look (same anyway) */
-.mini-calendar-day--highlight.mini-calendar-day--range {
-  filter: brightness(1.02);
-}
-
-/* range “positions” to create connected pills */
-.mini-calendar-day--range-mid {
-  border-radius: 10px;
-}
-
-.mini-calendar-day--range-start {
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
-  border-top-left-radius: 999px;
-  border-bottom-left-radius: 999px;
-}
-
-.mini-calendar-day--range-end {
-  border-top-left-radius: 10px;
-  border-bottom-left-radius: 10px;
-  border-top-right-radius: 999px;
-  border-bottom-right-radius: 999px;
-}
-
-.mini-calendar-day--range-single {
-  border-radius: 999px;
-}
-
-/* subtle pop */
-.mini-calendar-day--range:hover,
-.mini-calendar-day--highlight:hover {
-  transform: translateY(-1px);
-}
-
+/* ✅ fuerte: día seleccionado (click en sesión) */
 .mini-calendar-day--selected {
-  outline: 2px solid #f59e0b; /* amber */
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
-  border-radius: 999px;
-}
-.session-pill {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
+  background: linear-gradient(135deg, #d10000, #e6be52);
+  border-color: rgba(234, 179, 8, 0.95);
+  color: #020617;
+  font-weight: 900;
+  outline: 2px solid #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18);
 }
 
-.session-pill--below{
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-
-  padding: 10px 14px;         /* ✅ más grande */
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-
-  cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
-}
-
-.session-pill--below:hover{
+/* hover suave */
+.mini-calendar-day--highlight:hover,
+.mini-calendar-day--selected:hover {
   transform: translateY(-1px);
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(255,255,255,0.22);
 }
 
-.session-pill--below .mini-pill{
-  font-size: 13px;            /* ✅ más grande */
-  opacity: 0.95;
+/* =========================== */
+/* 🔴 DOTS ONLINE/PRESENCIAL  */
+/* =========================== */
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
 }
 
-.session-pill--active{
-  border-color: rgba(255,170,0,0.8);
-  box-shadow: 0 0 0 4px rgba(255,170,0,0.12);
+.dot.online {
+  background-color: #28d878;
 }
-.session-pill--active .mini-pill {
-  outline: 1px solid rgba(245, 158, 11, 0.9);
+
+.dot.presencial {
+  background-color: #f44336;
+}
+
+/* =========================== */
+/* 💬 MENSAJES                */
+/* =========================== */
+
+.form-message {
+  font-size: 0.85rem;
+}
+
+.form-message.error {
+  color: #fca5a5;
 }
 
 /* =========================== */

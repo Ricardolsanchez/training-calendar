@@ -26,6 +26,8 @@ type AvailableClassGroup = {
   workday_url?: string | null;
 };
 
+const SUGGESTION_URL = "https://example.com/suggest-class"; // <-- reemplaza con tu link real
+
 const translations: Record<Lang, Record<string, string>> = {
   en: {
     updatedTag: "Updated",
@@ -49,6 +51,10 @@ const translations: Record<Lang, Record<string, string>> = {
     otherClassesForDay: "OTHER CLASSES",
     noOtherClassesForDay: "No other classes for this day.",
     pickDayHint: "Select a day on the calendar to see more classes.",
+
+    // ✅ Footer
+    footerSuggestPrefix: "Don’t see the class you’re looking for?",
+    footerSuggestCta: "Suggest it here.",
   },
   es: {
     updatedTag: "Actualizado",
@@ -74,6 +80,10 @@ const translations: Record<Lang, Record<string, string>> = {
     otherClassesForDay: "OTRAS CLASES",
     noOtherClassesForDay: "No hay otras clases para ese día.",
     pickDayHint: "Selecciona un día en el calendario para ver más clases.",
+
+    // ✅ Footer
+    footerSuggestPrefix: "¿No encuentras la clase que buscas?",
+    footerSuggestCta: "Sugiere una aquí.",
   },
 };
 
@@ -105,7 +115,6 @@ const getNextSessionDate = (sessions: AvailableSession[], lang: Lang) => {
   if (!sessions || sessions.length === 0) return null;
 
   const today = new Date();
-  // normaliza "hoy" a medianoche para comparar bien
   today.setHours(0, 0, 0, 0);
 
   const upcoming = sessions
@@ -331,19 +340,19 @@ const BookingCalendar: React.FC = () => {
     return Array.from(unique.values());
   }, [selectedSessionIso, sessionsByDay, selectedGroup]);
 
-  // ✅ título dinámico: "OTHER CLASSES for Feb 02, 2026" / "OTRAS CLASES para 02 feb 2026"
   const otherClassesTitle = useMemo(() => {
     if (!selectedSessionIso) return t("otherClassesForDay");
     const dateLabel = formatDayMonth(selectedSessionIso, lang);
     return lang === "en"
       ? `${t("otherClassesForDay")} for ${dateLabel}`
       : `${t("otherClassesForDay")} para ${dateLabel}`;
-  }, [selectedSessionIso, lang]); // t depende de lang
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSessionIso, lang]);
 
   const handleSelectGroup = (g: AvailableClassGroup) => {
     setSelectedGroup(g);
     setSelectedSessionId(null);
-    setSelectedSessionIso(null); // ✅ reset día seleccionado
+    setSelectedSessionIso(null);
   };
 
   const handleSelectSession = (g: AvailableClassGroup, s: AvailableSession) => {
@@ -420,7 +429,6 @@ const BookingCalendar: React.FC = () => {
 
             {!loadingClasses && !classesError && (
               <>
-                {/* ✅ Carousel */}
                 <div className="class-carousel">
                   <button
                     type="button"
@@ -502,7 +510,6 @@ const BookingCalendar: React.FC = () => {
                   </button>
                 </div>
 
-                {/* ✅ Other classes for selected day */}
                 <div className="other-classes">
                   <div className="other-classes-title">{otherClassesTitle}</div>
 
@@ -527,14 +534,13 @@ const BookingCalendar: React.FC = () => {
                           </div>
 
                           <div className="other-class-row-right">
-                            {/* ✅ Workday link */}
                             {group.workday_url ? (
                               <button
                                 type="button"
                                 className="other-workday-btn"
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  e.stopPropagation(); // ✅ evita que seleccione la fila
+                                  e.stopPropagation();
                                   openWorkday(group.workday_url);
                                 }}
                               >
@@ -564,7 +570,6 @@ const BookingCalendar: React.FC = () => {
           {/* ===================== RIGHT ===================== */}
           <section className="booking-detail-section">
             <div className="booking-detail-card">
-              {/* ✅ título arriba del calendario */}
               <div className="calendar-instruction">{t("calendarInstruction")}</div>
 
               <MiniCalendar
@@ -622,6 +627,19 @@ const BookingCalendar: React.FC = () => {
             </div>
           </section>
         </div>
+
+        {/* ✅ Footer centrado */}
+        <footer className="booking-footer">
+          <span className="booking-footer-text">{t("footerSuggestPrefix")}</span>{" "}
+          <a
+            className="booking-footer-link"
+            href={SUGGESTION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t("footerSuggestCta")}
+          </a>
+        </footer>
       </div>
     </div>
   );

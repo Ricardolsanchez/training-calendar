@@ -566,6 +566,12 @@
   transform: translateY(-1px);
 }
 
+.calendar-instruction {
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  color: rgba(229, 231, 235, 0.82);
+}
+
 /* =========================== */
 /* 🔴 DOTS ONLINE/PRESENCIAL  */
 /* =========================== */
@@ -719,6 +725,26 @@
 .session-pill--detail .mini-pill {
   font-size: 13px;
   opacity: 0.95;
+}
+
+.booking-footer {
+  margin-top: 14px;
+  padding: 12px 10px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.booking-footer-text {
+  font-size: 13px;
+}
+
+.booking-footer-link {
+  font-size: 13px;
+  text-decoration: underline;
+  font-weight: 600;
+}
+.booking-footer-link:hover {
+  opacity: 0.9;
 }
 
 /* =========================== */

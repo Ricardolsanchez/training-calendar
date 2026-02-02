@@ -98,6 +98,21 @@ const formatDayMonth = (iso: string, lang: Lang) => {
   }).format(dt);
 };
 
+const getNextSessionDate = (sessions: AvailableSession[], lang: Lang) => {
+  if (!sessions || sessions.length === 0) return null;
+
+  const today = new Date();
+
+  const upcoming = sessions
+    .map((s) => ({ ...s, date: parseLocalDate(s.date_iso) }))
+    .filter((s) => s.date >= today)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  if (upcoming.length === 0) return null;
+
+  return formatDayMonth(upcoming[0].date_iso, lang);
+};
+
 const makeKey = (d: Date) => {
   const y = d.getFullYear();
   const m = (d.getMonth() + 1).toString().padStart(2, "0");
@@ -443,6 +458,9 @@ const BookingCalendar: React.FC = () => {
                         const modalityDotClass =
                           g.modality === "Online" ? "online" : "presencial";
 
+                        // ✅ aquí va la fecha (arriba, antes del return)
+                        const nextDate = getNextSessionDate(g.sessions, lang);
+
                         return (
                           <button
                             key={g.group_code}
@@ -461,6 +479,13 @@ const BookingCalendar: React.FC = () => {
                                 {g.modality.toUpperCase()}
                               </span>
                             </div>
+
+                            {/* ✅ fecha debajo del título */}
+                            {nextDate && (
+                              <div className="class-card-date">
+                                📅 {nextDate}
+                              </div>
+                            )}
 
                             <div className="class-meta">
                               {g.workday_url ? (

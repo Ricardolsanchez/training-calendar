@@ -450,9 +450,6 @@ const AdminPanel: React.FC = () => {
 
     const first = group.sessions?.[0];
     const times = parseTimeRange(first?.time_range || "");
-    const sortedDates = [...group.sessions].map((s) => s.date_iso).sort();
-    // const start = sortedDates[0] || "";
-    // const end = sortedDates[sortedDates.length - 1] || start;
 
     setEditClass({
       id: first?.id ?? 0,

@@ -132,6 +132,49 @@
   transform: translateY(-1px);
 }
 
+/* Fila debajo del header */
+.booking-filters-row {
+  margin-top: 10px;
+  margin-bottom: 14px;
+}
+
+/* Contenedor de filtros */
+.audience-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Botones */
+.audience-pill {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.audience-pill:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Activo */
+.audience-pill--active {
+  background: rgba(255, 166, 0, 0.16); /* naranja suave */
+  border-color: rgba(255, 166, 0, 0.55);
+  color: rgba(255, 255, 255, 0.98);
+}
+
 /* =========================== */
 /* 🧩  LAYOUT INTERNO         */
 /* =========================== */
@@ -745,6 +788,33 @@
 }
 .booking-footer-link:hover {
   opacity: 0.9;
+}
+
+.audience-filters {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.audience-pill {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.audience-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.audience-pill--active {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 /* =========================== */

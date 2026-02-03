@@ -3,44 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import "./AdminPanel.css";
 
-type BookingStatus = "pending" | "accepted" | "denied";
-
-type Booking = {
-  id: number;
-  name: string;
-  email: string;
-  notes: string | null;
-  start_date: string;
-  end_date: string;
-  trainer_name: string | null;
-
-  original_start_date: string | null;
-  original_end_date: string | null;
-  original_training_days: number | null;
-  new_training_days: number | null;
-
-  created_at: string;
-  status: BookingStatus;
-  calendar_url?: string | null;
-  workday_url?: string | null;
-
-  // legacy (si aún llega, lo soportamos)
-  attendedbutton?: boolean | null;
-};
-
-type BookingSession = {
-  id: number; // class_sessions.id
-  date_iso: string; // YYYY-MM-DD
-  time_range: string; // "HH:mm - HH:mm" (o "—")
-  calendar_url?: string | null;
-  attended?: boolean | null; // derivado del pivot (o set en backend)
-};
-
-type BookingWithSessions = Booking & {
-  sessions?: BookingSession[];
-};
-
-type Tab = "classes" | "stats";
 type Lang = "en" | "es";
 
 type Audience = "sales" | "all_employees" | "new_hires" | "hr" | "it" | "legal";
@@ -122,17 +84,14 @@ const translations: Record<Lang, Record<string, string>> = {
   en: {
     adminBadge: "Admin Panel",
     adminTitle: "Training Management",
-    adminSubtitle: "Manage available classes and review key statistics.",
+    adminSubtitle: "Manage available classes.",
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabClasses: "Available Classes",
-    tabStats: "Statistics",
 
     addNewClass: "+ New Class",
     noClasses: "No Classes at this time.",
 
-    columnName: "Name",
-    columnEmail: "Corporate Email",
     columnTrainer: "Trainer",
 
     btnDeleteClass: "Delete",
@@ -150,8 +109,6 @@ const translations: Record<Lang, Record<string, string>> = {
     modalEditClass: "Edit class",
     labelClassTitle: "Class title",
     labelTrainer: "Trainer",
-    labelStartDate: "Start Date (optional)",
-    labelEndDate: "End Date (optional)",
     labelType: "Type",
     labelSeats: "Available Seats",
     labelDescription: "Short description",
@@ -170,43 +127,20 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionsCountLabel: "Number of sessions",
     sessionDateLabel: "Session date",
 
-    statsNoTrainer: "No trainer assigned",
-    statsColumnAttendance: "Attended?",
-    attendanceYes: "Attended",
-    attendanceNo: "Not attended",
-    attendanceNotMarked: "Not marked",
-
-    enrolledTitle: "People enrolled",
-    enrolledSubtitle: "Accepted bookings (enrolled).",
-    statsNoData: "There are no requests yet.",
-
-    howManyAttended: "How many sessions were attended",
-    howManyCompleted: "How many sessions were completed",
-    kpiAccepted: "Accepted",
-    kpiNotMarked: "Not marked",
-    kpiDidNotAttend: "How many sessions were not attended",
-
-    paginationPrev: "Previous",
-    paginationNext: "Next",
-
-    downloadCsv: "Download CSV",
     viewDetails: "View Workday link here",
     workdayLinkMissing: "Workday link missing",
   },
   es: {
     adminBadge: "Panel Admin",
     adminTitle: "Gestión de formaciones",
-    adminSubtitle: "Administra clases disponibles y revisa estadísticas clave.",
+    adminSubtitle: "Administra clases disponibles.",
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabClasses: "Clases disponibles",
-    tabStats: "Estadísticas",
 
     addNewClass: "+ Nueva clase",
     noClasses: "No hay clases por el momento.",
 
-    columnName: "Nombre",
-    columnEmail: "Correo corporativo",
     columnTrainer: "Trainer",
 
     btnDeleteClass: "Eliminar",
@@ -225,8 +159,6 @@ const translations: Record<Lang, Record<string, string>> = {
     modalEditClass: "Editar clase",
     labelClassTitle: "Título de la clase",
     labelTrainer: "Trainer",
-    labelStartDate: "Fecha inicio (opcional)",
-    labelEndDate: "Fecha fin (opcional)",
     labelType: "Modalidad",
     labelSeats: "Cupos",
     labelDescription: "Descripción breve",
@@ -245,26 +177,6 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionsCountLabel: "Número de sesiones",
     sessionDateLabel: "Fecha de la sesión",
 
-    statsNoTrainer: "Sin trainer asignado",
-    statsColumnAttendance: "¿Asistió?",
-    attendanceYes: "Asistió",
-    attendanceNo: "No asistió",
-    attendanceNotMarked: "Sin marcar",
-
-    enrolledTitle: "Personas inscritas",
-    enrolledSubtitle: "Reservas aceptadas (inscritos).",
-    statsNoData: "Aún no hay solicitudes.",
-
-    howManyAttended: "¿Cuántas sesiones asistieron?",
-    howManyCompleted: "¿Cuántas sesiones completaron?",
-    kpiAccepted: "Aceptados",
-    kpiNotMarked: "Sin marcar",
-    kpiDidNotAttend: "¿Cuántas sesiones no asistieron?",
-
-    paginationPrev: "Anterior",
-    paginationNext: "Siguiente",
-
-    downloadCsv: "Descargar CSV",
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Link de Workday pendiente",
   },
@@ -295,10 +207,8 @@ const AdminPanel: React.FC = () => {
     [lang],
   );
 
-  const [activeTab, setActiveTab] = useState<Tab>("classes");
-
-  /** BOOKINGS (solo para alimentar STATS) */
-  const [bookings, setBookings] = useState<BookingWithSessions[]>([]);
+  // ✅ solo classes
+  const [activeTab, setActiveTab] = useState<"classes">("classes");
 
   /** CLASSES (grouped) */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
@@ -326,12 +236,6 @@ const AdminPanel: React.FC = () => {
   const [isNewClass, setIsNewClass] = useState(false);
   const [editClass, setEditClass] = useState<AvailableClass | null>(null);
 
-  /** bookings server pagination (se mantiene si tu endpoint viene paginado) */
-  const [bookingsPage, setBookingsPage] = useState(1);
-  const [bookingsPerPage] = useState(10);
-  const [bookingsLastPage, setBookingsLastPage] = useState(1);
-  const [bookingsTotal, setBookingsTotal] = useState(0);
-
   /** Sessions Draft */
   const [sessionsCount, setSessionsCount] = useState<number>(1);
   const [sessions, setSessions] = useState<SessionDraft[]>([
@@ -356,32 +260,7 @@ const AdminPanel: React.FC = () => {
     );
   }, [expandedGroupCode, groupedClasses]);
 
-  /** Fetch */
-  const fetchBookings = useCallback(
-    async (page = bookingsPage) => {
-      try {
-        const res = await api.get("/api/admin/bookings", {
-          params: { page, per_page: bookingsPerPage },
-        });
-
-        const data = res.data;
-        const list: BookingWithSessions[] = data.bookings ?? [];
-        setBookings(Array.isArray(list) ? list : []);
-
-        const p = data.pagination;
-        if (p) {
-          setBookingsPage(p.current_page);
-          setBookingsLastPage(p.last_page);
-          setBookingsTotal(p.total);
-        }
-      } catch (err) {
-        console.error("Error cargando reservas:", err);
-        setBookings([]);
-      }
-    },
-    [bookingsPage, bookingsPerPage],
-  );
-
+  /** Fetch grouped classes */
   const fetchGrouped = useCallback(async () => {
     try {
       const res = await api.get("/api/classes-grouped");
@@ -393,12 +272,7 @@ const AdminPanel: React.FC = () => {
     }
   }, []);
 
-  /** Mount: trae bookings para STATS (aunque no haya tab bookings) */
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
-
-  /** When entering classes tab */
+  /** Mount + when entering classes tab */
   useEffect(() => {
     if (activeTab !== "classes") return;
     fetchGrouped();
@@ -411,29 +285,6 @@ const AdminPanel: React.FC = () => {
     if (y && m && d) return `${m}/${d}/${y}`;
     return value;
   };
-
-  const deriveBookingAttendance = (b: BookingWithSessions): boolean | null => {
-    const sess = (b.sessions ?? []).filter(
-      (s) => s && typeof s.id === "number" && s.id > 0,
-    );
-    if (sess.length === 0) {
-      return typeof b.attendedbutton === "undefined"
-        ? null
-        : (b.attendedbutton ?? null);
-    }
-    if (sess.some((s) => s.attended === false)) return false;
-    if (sess.some((s) => s.attended === true)) return true;
-    return null;
-  };
-
-  const attendanceLabelFromValue = (val: boolean | null | undefined) => {
-    if (val === true) return t("attendanceYes");
-    if (val === false) return t("attendanceNo");
-    return t("attendanceNotMarked");
-  };
-
-  const attendanceLabelBooking = (b: BookingWithSessions) =>
-    attendanceLabelFromValue(deriveBookingAttendance(b));
 
   /** DELETE group (all sessions) */
   const deleteClassGroup = async (g: GroupedClass) => {
@@ -512,7 +363,7 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
-  /** SAVE class (sin date range) */
+  /** SAVE class */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
@@ -523,7 +374,6 @@ const AdminPanel: React.FC = () => {
       end_time: (s.end_time || "").trim(),
     }));
 
-    // ✅ validación mínima
     const missing = cleanSessions.some(
       (s) => !s.date_iso || !s.start_time || !s.end_time,
     );
@@ -535,7 +385,6 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      // ✅ payload sin start_date/end_date
       const payload = {
         title: editClass.title,
         trainer_name: editClass.trainer_name,
@@ -572,7 +421,7 @@ const AdminPanel: React.FC = () => {
             end_time: s.end_time,
           })),
           workday_url: editClass.workday_url ?? null,
-          audience: editClass.audience ?? "all_employees", // ✅
+          audience: editClass.audience ?? "all_employees",
         });
       }
 
@@ -595,201 +444,6 @@ const AdminPanel: React.FC = () => {
       localStorage.removeItem("admin_token");
       navigate("/");
     }
-  };
-
-  /** inscritos */
-  const enrolled = useMemo(() => {
-    return [...bookings]
-      .filter((b) => b.status === "accepted")
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
-  }, [bookings]);
-
-  /** enrolled pagination (LOCAL) */
-  const ENROLLED_PAGE_SIZE = 8;
-  const [enrolledPage, setEnrolledPage] = useState(1);
-
-  useEffect(() => {
-    setEnrolledPage(1);
-  }, [enrolled.length]);
-
-  const enrolledTotalPages = Math.max(
-    1,
-    Math.ceil(enrolled.length / ENROLLED_PAGE_SIZE),
-  );
-  const enrolledPageSafe = Math.min(enrolledPage, enrolledTotalPages);
-
-  const enrolledSlice = useMemo(() => {
-    const start = (enrolledPageSafe - 1) * ENROLLED_PAGE_SIZE;
-    return enrolled.slice(start, start + ENROLLED_PAGE_SIZE);
-  }, [enrolled, enrolledPageSafe]);
-
-  const goPrevEnrolled = () => setEnrolledPage((p) => Math.max(1, p - 1));
-  const goNextEnrolled = () =>
-    setEnrolledPage((p) => Math.min(enrolledTotalPages, p + 1));
-
-  /** KPIs (por sesiones) */
-  const sessionStats = useMemo(() => {
-    const acceptedBookings = bookings.filter((b) => b.status === "accepted");
-
-    let totalSessions = 0;
-    let attendedSessions = 0;
-    let notMarkedSessions = 0;
-    let notAttendedSessions = 0;
-
-    for (const b of acceptedBookings) {
-      const sess = (b.sessions ?? []).filter((s) => s && s.id && s.id > 0);
-
-      if (sess.length === 0) {
-        totalSessions += 1;
-        const v = deriveBookingAttendance(b);
-        if (v === true) attendedSessions += 1;
-        else if (v === false) notAttendedSessions += 1;
-        else notMarkedSessions += 1;
-        continue;
-      }
-
-      totalSessions += sess.length;
-
-      for (const s of sess) {
-        if (s.attended === true) attendedSessions += 1;
-        else if (s.attended === false) notAttendedSessions += 1;
-        else notMarkedSessions += 1;
-      }
-    }
-
-    const completedSessions = attendedSessions;
-
-    return {
-      acceptedBookings: acceptedBookings.length,
-      totalSessions,
-      attendedSessions,
-      completedSessions,
-      notMarkedSessions,
-      notAttendedSessions,
-    };
-  }, [bookings]);
-
-  const statsKPIs = useMemo(() => {
-    return {
-      acceptedTotal: sessionStats.acceptedBookings,
-      attended: sessionStats.attendedSessions,
-      completed: sessionStats.completedSessions,
-      notMarked: sessionStats.notMarkedSessions,
-    };
-  }, [sessionStats]);
-
-  const didNotAttendCount = useMemo(
-    () => sessionStats.notAttendedSessions,
-    [sessionStats],
-  );
-
-  /** CSV EXPORT (STATS) */
-  const csvEscape = (v: any) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-    return s;
-  };
-
-  const downloadCsv = (filename: string, rows: string[][]) => {
-    const content = rows.map((r) => r.map(csvEscape).join(",")).join("\n");
-    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadStatsCsv = () => {
-    const stamp = new Date().toISOString().slice(0, 10);
-
-    const kpiRows: string[][] = [
-      ["KPI", "Value"],
-      [t("kpiAccepted"), String(statsKPIs.acceptedTotal)],
-      [t("howManyAttended"), String(statsKPIs.attended)],
-      [t("howManyCompleted"), String(statsKPIs.completed)],
-      [t("kpiNotMarked"), String(statsKPIs.notMarked)],
-      [t("kpiDidNotAttend"), String(didNotAttendCount)],
-    ];
-
-    const detailRows: string[][] = [
-      [
-        "booking_id",
-        "name",
-        "email",
-        "trainer",
-        "status",
-        "session_number",
-        "sessions_total",
-        "date_iso",
-        "time_range",
-        "attended",
-      ],
-    ];
-
-    const accepted = bookings.filter((b) => b.status === "accepted");
-
-    for (const b of accepted) {
-      const sess = (b.sessions ?? []).filter((s) => s && s.id && s.id > 0);
-
-      if (sess.length === 0) {
-        const v = deriveBookingAttendance(b);
-        detailRows.push([
-          String(b.id),
-          b.name,
-          b.email,
-          b.trainer_name ?? "",
-          b.status,
-          "1",
-          "1",
-          b.start_date ?? "",
-          "",
-          v === true ? "true" : v === false ? "false" : "",
-        ]);
-        continue;
-      }
-
-      const sorted = [...sess].sort((a, c) => {
-        const d = (a.date_iso || "").localeCompare(c.date_iso || "");
-        if (d !== 0) return d;
-        return (a.time_range || "").localeCompare(c.time_range || "");
-      });
-
-      sorted.forEach((s, idx) => {
-        detailRows.push([
-          String(b.id),
-          b.name,
-          b.email,
-          b.trainer_name ?? "",
-          b.status,
-          String(idx + 1),
-          String(sorted.length),
-          s.date_iso ?? "",
-          s.time_range ?? "",
-          s.attended === true ? "true" : s.attended === false ? "false" : "",
-        ]);
-      });
-    }
-
-    const rows: string[][] = [
-      ["STATS EXPORT", stamp],
-      [],
-      ...kpiRows,
-      [],
-      ["DETAIL (accepted bookings - per session)"],
-      [],
-      ...detailRows,
-    ];
-
-    downloadCsv(`stats_export_${stamp}.csv`, rows);
   };
 
   return (
@@ -839,17 +493,6 @@ const AdminPanel: React.FC = () => {
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
-          </button>
-
-          <button
-            type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "stats" ? " admin-tab-button--active" : "")
-            }
-            onClick={() => setActiveTab("stats")}
-          >
-            {t("tabStats")}
           </button>
         </div>
 
@@ -916,7 +559,6 @@ const AdminPanel: React.FC = () => {
                                 {t("sessionsCount")}: {g.sessions_count}
                               </span>
 
-                              {/* ✅ Audience visible in card (recommended) */}
                               <span
                                 className="mini-pill"
                                 style={{ marginLeft: 8 }}
@@ -941,7 +583,7 @@ const AdminPanel: React.FC = () => {
                         <div className="admin-class-meta">
                           <div className="admin-class-meta-row">
                             <strong>{t("columnTrainer")}:</strong>{" "}
-                            {g.trainer_name || t("statsNoTrainer")}
+                            {g.trainer_name || "—"}
                           </div>
 
                           {g.workday_url ? (
@@ -957,10 +599,7 @@ const AdminPanel: React.FC = () => {
                               {t("viewDetails")}
                             </button>
                           ) : (
-                            <span
-                              className="mini-pill"
-                              style={{ opacity: 0.8 }}
-                            >
+                            <span className="mini-pill" style={{ opacity: 0.8 }}>
                               {t("workdayLinkMissing")}
                             </span>
                           )}
@@ -1316,120 +955,6 @@ const AdminPanel: React.FC = () => {
                 </div>
               </div>
             )}
-          </section>
-        )}
-
-        {/* STATS */}
-        {activeTab === "stats" && (
-          <section className="admin-table-section">
-            <div className="enrolled-panel">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  marginBottom: 12,
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleDownloadStatsCsv}
-                >
-                  ⬇ {t("downloadCsv")}
-                </button>
-              </div>
-
-              <div className="admin-kpi-grid">
-                <div className="admin-kpi-card">
-                  <div className="admin-kpi-label">{t("kpiAccepted")}</div>
-                  <div className="admin-kpi-value">
-                    {statsKPIs.acceptedTotal}
-                  </div>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="admin-kpi-label">{t("howManyAttended")}</div>
-                  <div className="admin-kpi-value">{statsKPIs.attended}</div>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="admin-kpi-label">{t("howManyCompleted")}</div>
-                  <div className="admin-kpi-value">{statsKPIs.completed}</div>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="admin-kpi-label">{t("kpiNotMarked")}</div>
-                  <div className="admin-kpi-value">{statsKPIs.notMarked}</div>
-                </div>
-              </div>
-
-              <div className="admin-kpi-card">
-                <div className="admin-kpi-label">{t("kpiDidNotAttend")}</div>
-                <div className="admin-kpi-value">{didNotAttendCount}</div>
-              </div>
-
-              <h3>{t("enrolledTitle")}</h3>
-              <p className="muted">{t("enrolledSubtitle")}</p>
-
-              {enrolled.length === 0 ? (
-                <div className="empty">{t("statsNoData")}</div>
-              ) : (
-                <>
-                  <div className="table-wrap">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>{t("columnName")}</th>
-                          <th>{t("columnEmail")}</th>
-                          <th>{t("columnTrainer")}</th>
-                          <th>{t("statsColumnAttendance")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {enrolledSlice.map((b) => (
-                          <tr key={b.id}>
-                            <td>{b.name}</td>
-                            <td>{b.email}</td>
-                            <td>{b.trainer_name ?? t("statsNoTrainer")}</td>
-                            <td>{attendanceLabelBooking(b)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="pagination" style={{ marginTop: 16 }}>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={goPrevEnrolled}
-                      disabled={enrolledPageSafe <= 1}
-                    >
-                      {t("paginationPrev")}
-                    </button>
-
-                    <div className="pagination-info">
-                      Page {enrolledPageSafe} / {enrolledTotalPages} · Total:{" "}
-                      {enrolled.length}
-                      {bookingsTotal ? (
-                        <>
-                          {" "}
-                          · (Server: {bookingsPage}/{bookingsLastPage} ·{" "}
-                          {bookingsTotal})
-                        </>
-                      ) : null}
-                    </div>
-
-                    <button
-                      className="btn btn-secondary"
-                      onClick={goNextEnrolled}
-                      disabled={enrolledPageSafe >= enrolledTotalPages}
-                    >
-                      {t("paginationNext")}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
           </section>
         )}
       </div>

@@ -10,22 +10,17 @@ type AudienceFilter = "all" | Audience;
 
 const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "sales", label_en: "Sales", label_es: "Ventas" },
-  {
-    value: "all_employees",
-    label_en: "All Employees",
-    label_es: "Todos los empleados",
-  },
+  { value: "all_employees", label_en: "All Employees", label_es: "Todos los empleados" },
   { value: "new_hires", label_en: "New Hires", label_es: "Nuevos ingresos" },
   { value: "hr", label_en: "HR", label_es: "RR. HH." },
   { value: "it", label_en: "IT", label_es: "TI" },
   { value: "legal", label_en: "Legal", label_es: "Legal" },
 ];
 
-const AUDIENCE_FILTERS: {
-  value: AudienceFilter;
-  label_en: string;
-  label_es: string;
-}[] = [{ value: "all", label_en: "All", label_es: "Todas" }, ...AUDIENCES];
+const AUDIENCE_FILTERS: { value: AudienceFilter; label_en: string; label_es: string }[] = [
+  { value: "all", label_en: "All", label_es: "Todas" },
+  ...AUDIENCES,
+];
 
 const getAudienceLabel = (aud: Audience | null | undefined, lang: Lang) => {
   const found = AUDIENCES.find((a) => a.value === aud);
@@ -46,9 +41,7 @@ type AvailableClassGroup = {
   trainer_name: string;
   modality: "Online" | "Presencial";
   audience?: Audience | null;
-  // legacy
   level?: string | null;
-
   description?: string | null;
   sessions_count: number;
   sessions: AvailableSession[];
@@ -69,8 +62,6 @@ const translations: Record<Lang, Record<string, string>> = {
     availableClassesSubtitle: "Click a class to view it in Workday.",
     loadingClasses: "Loading classes...",
     noClassesError: "Could not load classes. Please try again later.",
-    clickOnClassTitle: "Select a class",
-    clickOnClassText: "Click on a class on the left to see its Workday link.",
     selectedClassLabel: "SELECTED CLASS",
     highlightedHint: "Marked: days for selected class",
     viewDetails: "View details here",
@@ -78,16 +69,12 @@ const translations: Record<Lang, Record<string, string>> = {
     availableSeats: "Available seats",
     sessionsTitle: "SESSIONS",
     calendarInstruction: "Select a day this month to join a class.",
-
     noClassesSelectedDay: "No classes for this day.",
-
     otherClassesForDay: "OTHER CLASSES",
     noOtherClassesForDay: "No other classes for this day.",
     pickDayHint: "Select a day on the calendar to see more classes.",
-
     footerSuggestPrefix: "Don’t see the class you’re looking for?",
     footerSuggestCta: "Suggest it here.",
-
     allClassesToggle: "ALL",
     allClassesHint: "Showing all classes",
   },
@@ -99,27 +86,19 @@ const translations: Record<Lang, Record<string, string>> = {
     availableClassesSubtitle: "Haz click en una clase para verla en Workday.",
     loadingClasses: "Cargando clases...",
     noClassesError: "No se pudieron cargar las clases. Intenta más tarde.",
-    clickOnClassTitle: "Selecciona una clase",
-    clickOnClassText:
-      "Haz click en una clase a la izquierda para ver su link de Workday.",
     selectedClassLabel: "CLASE SELECCIONADA",
     highlightedHint: "Marcado: días de la clase seleccionada",
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Aún no hay link de Workday disponible.",
     availableSeats: "Cupos disponibles",
     sessionsTitle: "SESIONES",
-    calendarInstruction:
-      "Selecciona un día del mes para participar en una clase.",
-
+    calendarInstruction: "Selecciona un día del mes para participar en una clase.",
     noClassesSelectedDay: "No hay clases para este día.",
-
     otherClassesForDay: "OTRAS CLASES",
     noOtherClassesForDay: "No hay otras clases para ese día.",
     pickDayHint: "Selecciona un día en el calendario para ver más clases.",
-
     footerSuggestPrefix: "¿No encuentras la clase que buscas?",
     footerSuggestCta: "Sugiere una aquí.",
-
     allClassesToggle: "TODAS",
     allClassesHint: "Mostrando todas las clases",
   },
@@ -133,7 +112,7 @@ const getGroupSeats = (g: AvailableClassGroup) => {
   return Math.min(...seats);
 };
 
-/** ✅ evita bug UTC con YYYY-MM-DD */
+/** evita bug UTC con YYYY-MM-DD */
 const parseLocalDate = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
@@ -142,11 +121,7 @@ const parseLocalDate = (iso: string) => {
 const formatDayMonth = (iso: string, lang: Lang) => {
   const locale = lang === "en" ? "en-US" : "es-ES";
   const dt = parseLocalDate(iso);
-  return new Intl.DateTimeFormat(locale, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(dt);
+  return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric" }).format(dt);
 };
 
 const getNextSessionDate = (sessions: AvailableSession[], lang: Lang) => {
@@ -165,7 +140,6 @@ const getNextSessionDate = (sessions: AvailableSession[], lang: Lang) => {
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   if (upcoming.length === 0) return null;
-
   return formatDayMonth(upcoming[0].date_iso, lang);
 };
 
@@ -182,36 +156,16 @@ const getMonthAnchor = (
   selectedSessionIso?: string | null,
 ) => {
   if (selectedSessionIso) return parseLocalDate(selectedSessionIso);
-  if (selectedGroup?.start_date_iso)
-    return parseLocalDate(selectedGroup.start_date_iso);
+  if (selectedGroup?.start_date_iso) return parseLocalDate(selectedGroup.start_date_iso);
   const first = groups[0]?.sessions?.[0]?.date_iso;
   return first ? parseLocalDate(first) : new Date();
 };
 
-const handleToggleMiniCalendarMode = () => {
-  setMiniCalendarMode((prev) => {
-    const next = prev === "all" ? "selected" : "all";
-
-    // ✅ Si voy a ALL: limpio selección de día y clase
-    if (next === "all") {
-      setSelectedSessionIso(null);
-      setSelectedSessionId(null);
-      setSelectedGroup(null);
-    }
-
-    return next;
-  });
-};
-
-/** ---------------------------
- * ✅ AUTO-HIDE PAST SESSIONS
- * --------------------------- */
-
+/** AUTO-HIDE PAST SESSIONS */
 const parseTimeToMinutes = (t: string) => {
   const raw = (t ?? "").trim().toUpperCase();
   if (!raw) return null;
 
-  // 24h: "15:30"
   const m24 = raw.match(/^(\d{1,2}):(\d{2})$/);
   if (m24) {
     const hh = Number(m24[1]);
@@ -220,18 +174,15 @@ const parseTimeToMinutes = (t: string) => {
     return hh * 60 + mm;
   }
 
-  // 12h: "3:30 PM"
   const m12 = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
   if (m12) {
     let hh = Number(m12[1]);
     const mm = Number(m12[2]);
     const ap = m12[3];
-
     if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
 
     if (ap === "AM" && hh === 12) hh = 0;
     if (ap === "PM" && hh !== 12) hh += 12;
-
     return hh * 60 + mm;
   }
 
@@ -265,22 +216,10 @@ const MiniCalendar: React.FC<{
   selectedGroup: AvailableClassGroup | null;
   selectedSessionIso?: string | null;
   onDayClick?: (iso: string) => void;
-
   mode: "selected" | "all";
   onToggleMode: () => void;
-}> = ({
-  groups,
-  lang,
-  selectedGroup,
-  selectedSessionIso,
-  onDayClick,
-  mode,
-  onToggleMode,
-}) => {
-  const anchor = useMemo(
-    () => getMonthAnchor(groups, selectedGroup, selectedSessionIso),
-    [groups, selectedGroup, selectedSessionIso],
-  );
+}> = ({ groups, lang, selectedGroup, selectedSessionIso, onDayClick, mode, onToggleMode }) => {
+  const anchor = useMemo(() => getMonthAnchor(groups, selectedGroup, selectedSessionIso), [groups, selectedGroup, selectedSessionIso]);
 
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -290,19 +229,13 @@ const MiniCalendar: React.FC<{
   const firstWeekday = monthStart.getDay();
 
   const days: Date[] = [];
-  for (
-    let d = new Date(monthStart);
-    d <= monthEnd;
-    d.setDate(d.getDate() + 1)
-  ) {
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
 
   const daysWithSessions = useMemo(() => {
     const set = new Set<string>();
-
-    const sourceGroups =
-      mode === "all" ? groups : selectedGroup ? [selectedGroup] : [];
+    const sourceGroups = mode === "all" ? groups : selectedGroup ? [selectedGroup] : [];
 
     for (const g of sourceGroups) {
       for (const s of g.sessions ?? []) {
@@ -312,7 +245,6 @@ const MiniCalendar: React.FC<{
         set.add(makeKey(dt));
       }
     }
-
     return set;
   }, [mode, groups, selectedGroup, year, month]);
 
@@ -322,16 +254,9 @@ const MiniCalendar: React.FC<{
   }, [selectedSessionIso]);
 
   const locale = lang === "en" ? "en-US" : "es-ES";
-  const monthLabel = monthStart.toLocaleDateString(locale, {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel = monthStart.toLocaleDateString(locale, { month: "long", year: "numeric" });
 
-  const weekdayLabels =
-    lang === "en"
-      ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-      : ["D", "L", "M", "X", "J", "V", "S"];
-
+  const weekdayLabels = lang === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["D", "L", "M", "X", "J", "V", "S"];
   const t = (k: string) => translations[lang][k] ?? k;
 
   return (
@@ -339,13 +264,9 @@ const MiniCalendar: React.FC<{
       <div className="mini-calendar-header">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className="mini-calendar-title">{monthLabel}</span>
-
           <button
             type="button"
-            className={
-              "mini-all-toggle" +
-              (mode === "all" ? " mini-all-toggle--active" : "")
-            }
+            className={"mini-all-toggle" + (mode === "all" ? " mini-all-toggle--active" : "")}
             onClick={onToggleMode}
           >
             {t("allClassesToggle")}
@@ -400,34 +321,41 @@ const BookingCalendar: React.FC = () => {
   const [lang, setLang] = useState<Lang>("en");
   const t = (key: string) => translations[lang][key] ?? key;
 
-  const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>(
-    [],
-  );
+  const [availableGroups, setAvailableGroups] = useState<AvailableClassGroup[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [classesError, setClassesError] = useState<string | null>(null);
 
-  const [selectedGroup, setSelectedGroup] =
-    useState<AvailableClassGroup | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
-    null,
-  );
-  const [selectedSessionIso, setSelectedSessionIso] = useState<string | null>(
-    null,
-  );
+  const [selectedGroup, setSelectedGroup] = useState<AvailableClassGroup | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [selectedSessionIso, setSelectedSessionIso] = useState<string | null>(null);
 
   const [audienceFilter, setAudienceFilter] = useState<AudienceFilter>("all");
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
-  const [miniCalendarMode, setMiniCalendarMode] = useState<"selected" | "all">(
-    "selected",
-  );
+  const [miniCalendarMode, setMiniCalendarMode] = useState<"selected" | "all">("selected");
 
-  /** ✅ tick para recalcular el filtro por hora (y que desaparezcan al terminar) */
+  /** ✅ tick para recalcular el filtro por hora */
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  /** ✅ IMPORTANTE: la función debe vivir DENTRO del componente */
+  const handleToggleMiniCalendarMode = () => {
+    setMiniCalendarMode((prev: "selected" | "all") => {
+      const next: "selected" | "all" = prev === "all" ? "selected" : "all";
+
+      // ✅ Si voy a ALL: limpio selección de día y clase
+      if (next === "all") {
+        setSelectedSessionIso(null);
+        setSelectedSessionId(null);
+        setSelectedGroup(null);
+      }
+
+      return next;
+    });
+  };
 
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const scrollCarousel = (dir: -1 | 1) => {
@@ -453,9 +381,7 @@ const BookingCalendar: React.FC = () => {
         setSelectedSessionIso(null);
       } catch (err) {
         console.error("Error cargando clases:", err);
-        setClassesError(
-          translations[lang].noClassesError ?? "Could not load classes.",
-        );
+        setClassesError(translations[lang].noClassesError ?? "Could not load classes.");
       } finally {
         setLoadingClasses(false);
       }
@@ -475,29 +401,24 @@ const BookingCalendar: React.FC = () => {
     setIsAdmin(true);
   }, []);
 
-  /** ✅ 1) Filtra cursos ya finalizados (por tiempo) */
+  /** 1) Filtra cursos ya finalizados (por tiempo) */
   const timeFilteredGroups = useMemo(() => {
     const now = new Date(nowTick);
     return availableGroups.filter((g) => isGroupStillActive(g, now));
   }, [availableGroups, nowTick]);
 
-  /** ✅ 2) Filtra por audiencia (y "All") */
+  /** 2) Filtra por audiencia */
   const filteredGroups = useMemo(() => {
     const base = timeFilteredGroups;
     if (audienceFilter === "all") return base;
-
-    return base.filter(
-      (g) => (g.audience ?? "all_employees") === audienceFilter,
-    );
+    return base.filter((g) => (g.audience ?? "all_employees") === audienceFilter);
   }, [timeFilteredGroups, audienceFilter]);
 
-  /** ✅ si selectedGroup ya no existe en filteredGroups, limpia selección */
+  /** si selectedGroup ya no existe, limpia selección */
   useEffect(() => {
     if (!selectedGroup) return;
 
-    const exists = filteredGroups.some(
-      (g) => g.group_code === selectedGroup.group_code,
-    );
+    const exists = filteredGroups.some((g) => g.group_code === selectedGroup.group_code);
     if (!exists) {
       setSelectedGroup(null);
       setSelectedSessionId(null);
@@ -506,50 +427,40 @@ const BookingCalendar: React.FC = () => {
   }, [filteredGroups, selectedGroup]);
 
   const sessionsByDay = useMemo(() => {
-    const map = new Map<
-      string,
-      { group: AvailableClassGroup; session: AvailableSession }[]
-    >();
+    const map = new Map<string, { group: AvailableClassGroup; session: AvailableSession }[]>();
 
     for (const g of filteredGroups) {
       for (const s of g.sessions ?? []) {
         if (!s?.date_iso) continue;
-        const key = s.date_iso;
+        const key = s.date_iso; // YYYY-MM-DD
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push({ group: g, session: s });
       }
     }
 
     map.forEach((list) =>
-      list.sort((a, b) =>
-        (a.session.time_range ?? "").localeCompare(b.session.time_range ?? ""),
-      ),
+      list.sort((a, b) => (a.session.time_range ?? "").localeCompare(b.session.time_range ?? "")),
     );
 
     return map;
   }, [filteredGroups]);
 
-  /** ✅ (NUEVO) detecta si el día seleccionado tiene clases */
+  /** detecta si el día seleccionado tiene clases */
   const selectedDayHasClasses = useMemo(() => {
-    if (!selectedSessionIso) return true; // sin día seleccionado: normal
+    if (!selectedSessionIso) return true;
     const list = sessionsByDay.get(selectedSessionIso) ?? [];
     return list.length > 0;
   }, [selectedSessionIso, sessionsByDay]);
 
-  /** ✅ (NUEVO) si selecciona día vacío, ocultamos carrusel */
+  /** si selecciona día vacío, ocultamos carrusel */
   const shouldShowCarousel = !selectedSessionIso || selectedDayHasClasses;
 
   const otherClassesForSelectedDay = useMemo(() => {
     if (!selectedSessionIso) return [];
 
     const list = sessionsByDay.get(selectedSessionIso) ?? [];
-
-    const unique = new Map<
-      string,
-      { group: AvailableClassGroup; session: AvailableSession }
-    >();
+    const unique = new Map<string, { group: AvailableClassGroup; session: AvailableSession }>();
     for (const item of list) unique.set(item.group.group_code, item);
-
     if (selectedGroup?.group_code) unique.delete(selectedGroup.group_code);
 
     return Array.from(unique.values());
@@ -578,11 +489,12 @@ const BookingCalendar: React.FC = () => {
 
   const handleCalendarDayClick = (dayIso: string) => {
     const list = sessionsByDay.get(dayIso) ?? [];
-
     setSelectedSessionIso(dayIso);
 
+    // ✅ al seleccionar un día, dejamos el modo en "selected"
+    if (miniCalendarMode === "all") setMiniCalendarMode("selected");
+
     if (list.length === 0) {
-      // ✅ vacío si no hay clases ese día
       setSelectedGroup(null);
       setSelectedSessionId(null);
       return;
@@ -603,11 +515,7 @@ const BookingCalendar: React.FC = () => {
       <div className="booking-card">
         <header className="booking-header">
           <div className="booking-header-left booking-header-logo">
-            <img
-              src="/logo.png"
-              alt="Alonso & Alonso Academy"
-              className="booking-logo"
-            />
+            <img src="/logo.png" alt="Alonso & Alonso Academy" className="booking-logo" />
           </div>
 
           <div className="booking-header-right">
@@ -625,11 +533,7 @@ const BookingCalendar: React.FC = () => {
             </button>
 
             {isAdmin === null ? null : isAdmin ? (
-              <button
-                type="button"
-                className="booking-login-btn"
-                onClick={() => navigate("/admin")}
-              >
+              <button type="button" className="booking-login-btn" onClick={() => navigate("/admin")}>
                 {t("adminPanel")}
               </button>
             ) : (
@@ -640,7 +544,6 @@ const BookingCalendar: React.FC = () => {
           </div>
         </header>
 
-        {/* ✅ FILTROS EN SU PROPIA FILA */}
         <div className="booking-filters-row">
           <div className="audience-filters">
             {AUDIENCE_FILTERS.map((a) => {
@@ -649,9 +552,7 @@ const BookingCalendar: React.FC = () => {
                 <button
                   key={a.value}
                   type="button"
-                  className={
-                    "audience-pill" + (active ? " audience-pill--active" : "")
-                  }
+                  className={"audience-pill" + (active ? " audience-pill--active" : "")}
                   onClick={() => setAudienceFilter(a.value)}
                 >
                   {lang === "en" ? a.label_en : a.label_es}
@@ -669,68 +570,42 @@ const BookingCalendar: React.FC = () => {
               <p>{t("availableClassesSubtitle")}</p>
             </div>
 
-            {loadingClasses && (
-              <p className="form-message">{t("loadingClasses")}</p>
-            )}
-            {classesError && (
-              <p className="form-message error">{classesError}</p>
-            )}
+            {loadingClasses && <p className="form-message">{t("loadingClasses")}</p>}
+            {classesError && <p className="form-message error">{classesError}</p>}
 
             {!loadingClasses && !classesError && (
               <>
-                {/* ✅ Si el usuario selecciona un día vacío => NO mostramos carrusel ni other classes */}
                 {shouldShowCarousel ? (
                   <>
                     <div className="class-carousel">
-                      <button
-                        type="button"
-                        className="carousel-btn carousel-btn--left"
-                        onClick={() => scrollCarousel(-1)}
-                      >
+                      <button type="button" className="carousel-btn carousel-btn--left" onClick={() => scrollCarousel(-1)}>
                         ‹
                       </button>
 
-                      <div
-                        className="class-carousel-viewport"
-                        ref={carouselRef}
-                      >
+                      <div className="class-carousel-viewport" ref={carouselRef}>
                         <div className="class-carousel-track">
                           {filteredGroups.map((g) => {
-                            const isSelected =
-                              selectedGroup?.group_code === g.group_code;
-                            const modalityDotClass =
-                              g.modality === "Online" ? "online" : "presencial";
-                            const nextDate = getNextSessionDate(
-                              g.sessions,
-                              lang,
-                            );
+                            const isSelected = selectedGroup?.group_code === g.group_code;
+                            const modalityDotClass = g.modality === "Online" ? "online" : "presencial";
+                            const nextDate = getNextSessionDate(g.sessions, lang);
 
                             return (
                               <button
                                 key={g.group_code}
                                 type="button"
-                                className={
-                                  "class-card class-card--carousel" +
-                                  (isSelected ? " class-card--selected" : "")
-                                }
+                                className={"class-card class-card--carousel" + (isSelected ? " class-card--selected" : "")}
                                 onClick={() => handleSelectGroup(g)}
                               >
                                 <div className="class-card-top">
                                   <span className="class-title">{g.title}</span>
 
                                   <span className="class-badge">
-                                    <span
-                                      className={`dot ${modalityDotClass}`}
-                                    />
+                                    <span className={`dot ${modalityDotClass}`} />
                                     {g.modality.toUpperCase()}
                                   </span>
                                 </div>
 
-                                {nextDate && (
-                                  <div className="class-card-date">
-                                    📅 {nextDate}
-                                  </div>
-                                )}
+                                {nextDate && <div className="class-card-date">📅 {nextDate}</div>}
 
                                 <div className="class-meta">
                                   {g.workday_url ? (
@@ -746,32 +621,18 @@ const BookingCalendar: React.FC = () => {
                                       {t("viewDetails")}
                                     </button>
                                   ) : (
-                                    <span
-                                      className="mini-pill"
-                                      style={{ opacity: 0.8 }}
-                                    >
+                                    <span className="mini-pill" style={{ opacity: 0.8 }}>
                                       {t("workdayLinkMissing")}
                                     </span>
                                   )}
                                 </div>
 
-                                {!!g.description && (
-                                  <p className="class-card-desc">
-                                    {g.description}
-                                  </p>
-                                )}
+                                {!!g.description && <p className="class-card-desc">{g.description}</p>}
 
                                 <div className="class-footer">
-                                  <span className="class-trainer">
-                                    👤 {g.trainer_name}
-                                  </span>
+                                  <span className="class-trainer">👤 {g.trainer_name}</span>
 
-                                  <span className="class-level">
-                                    {getAudienceLabel(
-                                      g.audience ?? "all_employees",
-                                      lang,
-                                    )}
-                                  </span>
+                                  <span className="class-level">{getAudienceLabel(g.audience ?? "all_employees", lang)}</span>
 
                                   <span className="class-spots">
                                     {t("availableSeats")}: {getGroupSeats(g)}
@@ -783,91 +644,61 @@ const BookingCalendar: React.FC = () => {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        className="carousel-btn carousel-btn--right"
-                        onClick={() => scrollCarousel(1)}
-                      >
+                      <button type="button" className="carousel-btn carousel-btn--right" onClick={() => scrollCarousel(1)}>
                         ›
                       </button>
                     </div>
 
                     <div className="other-classes">
-                      <div className="other-classes-title">
-                        {otherClassesTitle}
-                      </div>
+                      <div className="other-classes-title">{otherClassesTitle}</div>
 
                       {!selectedSessionIso ? (
-                        <p className="other-classes-empty">
-                          {t("pickDayHint")}
-                        </p>
+                        <p className="other-classes-empty">{t("pickDayHint")}</p>
                       ) : otherClassesForSelectedDay.length === 0 ? (
-                        <p className="other-classes-empty">
-                          {t("noOtherClassesForDay")}
-                        </p>
+                        <p className="other-classes-empty">{t("noOtherClassesForDay")}</p>
                       ) : (
                         <div className="other-classes-list">
-                          {otherClassesForSelectedDay.map(
-                            ({ group, session }) => (
-                              <button
-                                key={`${group.group_code}-${session.id}`}
-                                type="button"
-                                className="other-class-row"
-                                onClick={() =>
-                                  handleSelectSession(group, session)
-                                }
-                              >
-                                <div className="other-class-row-left">
-                                  <div className="other-class-title">
-                                    {group.title}
-                                  </div>
-                                  <div className="other-class-meta">
-                                    👤 {group.trainer_name} ·{" "}
-                                    {getAudienceLabel(
-                                      group.audience ?? "all_employees",
-                                      lang,
-                                    )}{" "}
-                                    · {group.modality}
-                                  </div>
+                          {otherClassesForSelectedDay.map(({ group, session }) => (
+                            <button
+                              key={`${group.group_code}-${session.id}`}
+                              type="button"
+                              className="other-class-row"
+                              onClick={() => handleSelectSession(group, session)}
+                            >
+                              <div className="other-class-row-left">
+                                <div className="other-class-title">{group.title}</div>
+                                <div className="other-class-meta">
+                                  👤 {group.trainer_name} · {getAudienceLabel(group.audience ?? "all_employees", lang)} · {group.modality}
                                 </div>
+                              </div>
 
-                                <div className="other-class-row-right">
-                                  {group.workday_url ? (
-                                    <button
-                                      type="button"
-                                      className="other-workday-btn"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        openWorkday(group.workday_url);
-                                      }}
-                                    >
-                                      {t("viewDetails")}
-                                    </button>
-                                  ) : (
-                                    <span
-                                      className="mini-pill"
-                                      style={{ opacity: 0.75 }}
-                                    >
-                                      {t("workdayLinkMissing")}
-                                    </span>
-                                  )}
-
-                                  <span className="mini-pill">
-                                    {session.time_range}
-                                  </span>
-
-                                  <span
-                                    className="mini-pill"
-                                    style={{ marginLeft: 8 }}
+                              <div className="other-class-row-right">
+                                {group.workday_url ? (
+                                  <button
+                                    type="button"
+                                    className="other-workday-btn"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openWorkday(group.workday_url);
+                                    }}
                                   >
-                                    {t("availableSeats")}:{" "}
-                                    {getGroupSeats(group)}
+                                    {t("viewDetails")}
+                                  </button>
+                                ) : (
+                                  <span className="mini-pill" style={{ opacity: 0.75 }}>
+                                    {t("workdayLinkMissing")}
                                   </span>
-                                </div>
-                              </button>
-                            ),
-                          )}
+                                )}
+
+                                <span className="mini-pill">{session.time_range}</span>
+
+                                <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                  {t("availableSeats")}: {getGroupSeats(group)}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -884,9 +715,7 @@ const BookingCalendar: React.FC = () => {
           {/* RIGHT */}
           <section className="booking-detail-section">
             <div className="booking-detail-card">
-              <div className="calendar-instruction">
-                {t("calendarInstruction")}
-              </div>
+              <div className="calendar-instruction">{t("calendarInstruction")}</div>
 
               <MiniCalendar
                 groups={filteredGroups}
@@ -901,31 +730,18 @@ const BookingCalendar: React.FC = () => {
               {!selectedGroup ? null : (
                 <>
                   <div className="booking-detail-header">
-                    <span className="booking-detail-label">
-                      {t("selectedClassLabel")}
-                    </span>
+                    <span className="booking-detail-label">{t("selectedClassLabel")}</span>
                     <h3>{selectedGroup.title}</h3>
 
                     <p className="booking-detail-meta">
-                      Trainer: {selectedGroup.trainer_name} ·{" "}
-                      {getAudienceLabel(
-                        selectedGroup.audience ?? "all_employees",
-                        lang,
-                      )}{" "}
-                      · {selectedGroup.modality}
+                      Trainer: {selectedGroup.trainer_name} · {getAudienceLabel(selectedGroup.audience ?? "all_employees", lang)} · {selectedGroup.modality}
                     </p>
 
-                    {selectedGroup.description ? (
-                      <p className="booking-detail-desc">
-                        {selectedGroup.description}
-                      </p>
-                    ) : null}
+                    {selectedGroup.description ? <p className="booking-detail-desc">{selectedGroup.description}</p> : null}
                   </div>
 
                   <div className="booking-detail-sessions">
-                    <div className="class-sessions-title">
-                      {t("sessionsTitle")}
-                    </div>
+                    <div className="class-sessions-title">{t("sessionsTitle")}</div>
 
                     <div className="booking-detail-sessions-list">
                       {selectedGroup.sessions.map((s) => {
@@ -935,21 +751,11 @@ const BookingCalendar: React.FC = () => {
                           <button
                             key={s.id}
                             type="button"
-                            className={
-                              "session-pill session-pill--detail" +
-                              (active ? " session-pill--active" : "")
-                            }
-                            onClick={() =>
-                              handleSelectSession(selectedGroup, s)
-                            }
+                            className={"session-pill session-pill--detail" + (active ? " session-pill--active" : "")}
+                            onClick={() => handleSelectSession(selectedGroup, s)}
                           >
-                            <span className="mini-pill">
-                              {formatDayMonth(s.date_iso, lang)}
-                            </span>
-                            <span
-                              className="mini-pill"
-                              style={{ marginLeft: 8 }}
-                            >
+                            <span className="mini-pill">{formatDayMonth(s.date_iso, lang)}</span>
+                            <span className="mini-pill" style={{ marginLeft: 8 }}>
                               {s.time_range}
                             </span>
                           </button>
@@ -964,15 +770,8 @@ const BookingCalendar: React.FC = () => {
         </div>
 
         <footer className="booking-footer">
-          <span className="booking-footer-text">
-            {t("footerSuggestPrefix")}
-          </span>{" "}
-          <a
-            className="booking-footer-link"
-            href={SUGGESTION_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <span className="booking-footer-text">{t("footerSuggestPrefix")}</span>{" "}
+          <a className="booking-footer-link" href={SUGGESTION_URL} target="_blank" rel="noopener noreferrer">
             {t("footerSuggestCta")}
           </a>
         </footer>

@@ -32,6 +32,9 @@ const getAudienceLabel = (aud: Audience | null | undefined, lang: Lang) => {
   if (!found) return lang === "en" ? "All Employees" : "Todos los empleados";
   return lang === "en" ? found.label_en : found.label_es;
 };
+const [miniCalendarMode, setMiniCalendarMode] = useState<"selected" | "all">(
+  "selected",
+);
 
 type AvailableSession = {
   id: number;
@@ -85,6 +88,8 @@ const translations: Record<Lang, Record<string, string>> = {
 
     footerSuggestPrefix: "Don’t see the class you’re looking for?",
     footerSuggestCta: "Suggest it here.",
+    allClassesToggle: "ALL",
+    allClassesHint: "Showing all classes",
   },
   es: {
     updatedTag: "Actualizado",
@@ -112,6 +117,8 @@ const translations: Record<Lang, Record<string, string>> = {
 
     footerSuggestPrefix: "¿No encuentras la clase que buscas?",
     footerSuggestCta: "Sugiere una aquí.",
+    allClassesToggle: "TODAS",
+    allClassesHint: "Mostrando todas las clases",
   },
 };
 
@@ -244,7 +251,19 @@ const MiniCalendar: React.FC<{
   selectedGroup: AvailableClassGroup | null;
   selectedSessionIso?: string | null;
   onDayClick?: (iso: string) => void;
-}> = ({ groups, lang, selectedGroup, selectedSessionIso, onDayClick }) => {
+
+  // ✅ nuevo
+  mode: "selected" | "all";
+  onToggleMode: () => void;
+}> = ({
+  groups,
+  lang,
+  selectedGroup,
+  selectedSessionIso,
+  onDayClick,
+  mode,
+  onToggleMode,
+}) => {
   const anchor = useMemo(
     () => getMonthAnchor(groups, selectedGroup, selectedSessionIso),
     [groups, selectedGroup, selectedSessionIso],
@@ -266,18 +285,25 @@ const MiniCalendar: React.FC<{
     days.push(new Date(d));
   }
 
+  // ✅ Si mode === "all": marca días con sesiones de TODOS los grupos visibles
+  // ✅ Si mode === "selected": marca solo del selectedGroup como antes
   const daysWithSessions = useMemo(() => {
     const set = new Set<string>();
-    if (!selectedGroup) return set;
 
-    for (const s of selectedGroup.sessions ?? []) {
-      if (!s?.date_iso) continue;
-      const dt = parseLocalDate(s.date_iso);
-      if (dt.getFullYear() !== year || dt.getMonth() !== month) continue;
-      set.add(makeKey(dt));
+    const sourceGroups =
+      mode === "all" ? groups : selectedGroup ? [selectedGroup] : [];
+
+    for (const g of sourceGroups) {
+      for (const s of g.sessions ?? []) {
+        if (!s?.date_iso) continue;
+        const dt = parseLocalDate(s.date_iso);
+        if (dt.getFullYear() !== year || dt.getMonth() !== month) continue;
+        set.add(makeKey(dt));
+      }
     }
+
     return set;
-  }, [selectedGroup, year, month]);
+  }, [mode, groups, selectedGroup, year, month]);
 
   const selectedDayKey = useMemo(() => {
     if (!selectedSessionIso) return null;
@@ -300,8 +326,25 @@ const MiniCalendar: React.FC<{
   return (
     <div className="booking-mini-calendar">
       <div className="mini-calendar-header">
-        <span className="mini-calendar-title">{monthLabel}</span>
-        <span className="mini-calendar-hint">{t("highlightedHint")}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="mini-calendar-title">{monthLabel}</span>
+
+          {/* ✅ Botón ALL */}
+          <button
+            type="button"
+            className={
+              "mini-all-toggle" +
+              (mode === "all" ? " mini-all-toggle--active" : "")
+            }
+            onClick={onToggleMode}
+          >
+            {t("allClassesToggle")}
+          </button>
+        </div>
+
+        <span className="mini-calendar-hint">
+          {mode === "all" ? t("allClassesHint") : t("highlightedHint")}
+        </span>
       </div>
 
       <div className="mini-calendar-grid">
@@ -509,13 +552,13 @@ const BookingCalendar: React.FC = () => {
     setSelectedSessionId(s.id);
     setSelectedSessionIso(s.date_iso);
   };
-
   const handleCalendarDayClick = (dayIso: string) => {
     const list = sessionsByDay.get(dayIso) ?? [];
 
     setSelectedSessionIso(dayIso);
 
     if (list.length === 0) {
+      // ✅ vacío si no hay clases ese día
       setSelectedGroup(null);
       setSelectedSessionId(null);
       return;
@@ -799,6 +842,12 @@ const BookingCalendar: React.FC = () => {
                 selectedGroup={selectedGroup}
                 selectedSessionIso={selectedSessionIso}
                 onDayClick={handleCalendarDayClick}
+                mode={miniCalendarMode}
+                onToggleMode={() =>
+                  setMiniCalendarMode((prev) =>
+                    prev === "all" ? "selected" : "all",
+                  )
+                }
               />
 
               {!selectedGroup ? null : (

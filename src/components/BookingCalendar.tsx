@@ -32,9 +32,6 @@ const getAudienceLabel = (aud: Audience | null | undefined, lang: Lang) => {
   if (!found) return lang === "en" ? "All Employees" : "Todos los empleados";
   return lang === "en" ? found.label_en : found.label_es;
 };
-const [miniCalendarMode, setMiniCalendarMode] = useState<"selected" | "all">(
-  "selected",
-);
 
 type AvailableSession = {
   id: number;
@@ -408,6 +405,9 @@ const BookingCalendar: React.FC = () => {
   const [audienceFilter, setAudienceFilter] = useState<AudienceFilter>("all");
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  const [miniCalendarMode, setMiniCalendarMode] = useState<"selected" | "all">("selected");
+
 
   /** ✅ tick para recalcular el filtro por hora (y que desaparezcan al terminar) */
   const [nowTick, setNowTick] = useState<number>(() => Date.now());

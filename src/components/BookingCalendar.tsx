@@ -5,13 +5,8 @@ import "./BookingCalendar.css";
 
 type Lang = "en" | "es";
 
-type Audience =
-  | "sales"
-  | "all_employees"
-  | "new_hires"
-  | "hr"
-  | "it"
-  | "legal";
+type Audience = "sales" | "all_employees" | "new_hires" | "hr" | "it" | "legal";
+type AudienceFilter = "all" | Audience;
 
 const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "sales", label_en: "Sales", label_es: "Ventas" },
@@ -22,6 +17,12 @@ const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "legal", label_en: "Legal", label_es: "Legal" },
 ];
 
+const AUDIENCE_FILTERS: {
+  value: AudienceFilter;
+  label_en: string;
+  label_es: string;
+}[] = [{ value: "all", label_en: "All", label_es: "Todas" }, ...AUDIENCES];
+
 const getAudienceLabel = (aud: Audience | null | undefined, lang: Lang) => {
   const found = AUDIENCES.find((a) => a.value === aud);
   if (!found) return lang === "en" ? "All Employees" : "Todos los empleados";
@@ -31,7 +32,7 @@ const getAudienceLabel = (aud: Audience | null | undefined, lang: Lang) => {
 type AvailableSession = {
   id: number;
   date_iso: string; // YYYY-MM-DD
-  time_range: string;
+  time_range: string; // "3:00 PM - 4:00 PM" o "15:00 - 16:00"
   spots_left: number;
 };
 
@@ -170,6 +171,66 @@ const getMonthAnchor = (
   return first ? parseLocalDate(first) : new Date();
 };
 
+/** ---------------------------
+ * ✅ AUTO-HIDE PAST SESSIONS
+ * --------------------------- */
+
+const parseTimeToMinutes = (t: string) => {
+  // soporta "15:30" o "3:30 PM" / "3:30PM"
+  const raw = (t ?? "").trim().toUpperCase();
+  if (!raw) return null;
+
+  // 24h
+  const m24 = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (m24) {
+    const hh = Number(m24[1]);
+    const mm = Number(m24[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    return hh * 60 + mm;
+  }
+
+  // 12h AM/PM
+  const m12 = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (m12) {
+    let hh = Number(m12[1]);
+    const mm = Number(m12[2]);
+    const ap = m12[3];
+
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+
+    if (ap === "AM" && hh === 12) hh = 0;
+    if (ap === "PM" && hh !== 12) hh += 12;
+
+    return hh * 60 + mm;
+  }
+
+  return null;
+};
+
+const getSessionEndDateTime = (dateIso: string, timeRange: string) => {
+  // timeRange: "3:00 PM - 4:00 PM" o "15:00 - 16:00"
+  const parts = (timeRange ?? "").split("-").map((p) => p.trim());
+  if (parts.length < 2) return null;
+
+  const endMin = parseTimeToMinutes(parts[1]);
+  if (endMin == null) return null;
+
+  const dt = parseLocalDate(dateIso);
+  dt.setHours(0, 0, 0, 0);
+  dt.setMinutes(endMin);
+  return dt;
+};
+
+const isGroupStillActive = (g: AvailableClassGroup, now: Date) => {
+  // Si tiene al menos 1 sesión cuyo END > now => se muestra.
+  // Si no puedo parsear, NO lo oculto (para no desaparecer cosas por error de formato).
+  return (g.sessions ?? []).some((s) => {
+    const end = getSessionEndDateTime(s.date_iso, s.time_range);
+    if (!end) return true;
+    return end.getTime() > now.getTime();
+  });
+};
+
 const MiniCalendar: React.FC<{
   groups: AvailableClassGroup[];
   lang: Lang;
@@ -283,7 +344,16 @@ const BookingCalendar: React.FC = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [selectedSessionIso, setSelectedSessionIso] = useState<string | null>(null);
 
+  const [audienceFilter, setAudienceFilter] = useState<AudienceFilter>("all");
+
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  /** ✅ tick para recalcular el filtro por hora (y que desaparezcan al terminar) */
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60 * 1000); // cada 1 min
+    return () => window.clearInterval(id);
+  }, []);
 
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const scrollCarousel = (dir: -1 | 1) => {
@@ -329,10 +399,36 @@ const BookingCalendar: React.FC = () => {
     setIsAdmin(true);
   }, []);
 
+  /** ✅ 1) Filtra cursos ya finalizados (por tiempo) */
+  const timeFilteredGroups = useMemo(() => {
+    const now = new Date(nowTick);
+    return availableGroups.filter((g) => isGroupStillActive(g, now));
+  }, [availableGroups, nowTick]);
+
+  /** ✅ 2) Filtra por audiencia (y "All") */
+  const filteredGroups = useMemo(() => {
+    const base = timeFilteredGroups;
+    if (audienceFilter === "all") return base;
+
+    return base.filter((g) => (g.audience ?? "all_employees") === audienceFilter);
+  }, [timeFilteredGroups, audienceFilter]);
+
+  /** ✅ si selectedGroup ya no existe en filteredGroups, limpia selección */
+  useEffect(() => {
+    if (!selectedGroup) return;
+
+    const exists = filteredGroups.some((g) => g.group_code === selectedGroup.group_code);
+    if (!exists) {
+      setSelectedGroup(null);
+      setSelectedSessionId(null);
+      setSelectedSessionIso(null);
+    }
+  }, [filteredGroups, selectedGroup]);
+
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, { group: AvailableClassGroup; session: AvailableSession }[]>();
 
-    for (const g of availableGroups) {
+    for (const g of filteredGroups) {
       for (const s of g.sessions ?? []) {
         if (!s?.date_iso) continue;
         const key = s.date_iso; // YYYY-MM-DD
@@ -346,7 +442,7 @@ const BookingCalendar: React.FC = () => {
     );
 
     return map;
-  }, [availableGroups]);
+  }, [filteredGroups]);
 
   const otherClassesForSelectedDay = useMemo(() => {
     if (!selectedSessionIso) return [];
@@ -411,6 +507,24 @@ const BookingCalendar: React.FC = () => {
             <img src="/logo.png" alt="Alonso & Alonso Academy" className="booking-logo" />
           </div>
 
+          {/* ✅ Audience filters debajo del logo (o donde prefieras) */}
+          <div className="audience-filters">
+            {AUDIENCE_FILTERS.map((a) => {
+              const active = audienceFilter === a.value;
+
+              return (
+                <button
+                  key={a.value}
+                  type="button"
+                  className={"audience-pill" + (active ? " audience-pill--active" : "")}
+                  onClick={() => setAudienceFilter(a.value)}
+                >
+                  {lang === "en" ? a.label_en : a.label_es}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="booking-header-right">
             <div className="booking-header-tag">
               <span className="dot" />
@@ -451,13 +565,17 @@ const BookingCalendar: React.FC = () => {
             {!loadingClasses && !classesError && (
               <>
                 <div className="class-carousel">
-                  <button type="button" className="carousel-btn carousel-btn--left" onClick={() => scrollCarousel(-1)}>
+                  <button
+                    type="button"
+                    className="carousel-btn carousel-btn--left"
+                    onClick={() => scrollCarousel(-1)}
+                  >
                     ‹
                   </button>
 
                   <div className="class-carousel-viewport" ref={carouselRef}>
                     <div className="class-carousel-track">
-                      {availableGroups.map((g) => {
+                      {filteredGroups.map((g) => {
                         const isSelected = selectedGroup?.group_code === g.group_code;
                         const modalityDotClass = g.modality === "Online" ? "online" : "presencial";
                         const nextDate = getNextSessionDate(g.sessions, lang);
@@ -507,7 +625,6 @@ const BookingCalendar: React.FC = () => {
                             <div className="class-footer">
                               <span className="class-trainer">👤 {g.trainer_name}</span>
 
-                              {/* ✅ Audience displayed instead of "General" */}
                               <span className="class-level">
                                 {getAudienceLabel(g.audience ?? "all_employees", lang)}
                               </span>
@@ -522,7 +639,11 @@ const BookingCalendar: React.FC = () => {
                     </div>
                   </div>
 
-                  <button type="button" className="carousel-btn carousel-btn--right" onClick={() => scrollCarousel(1)}>
+                  <button
+                    type="button"
+                    className="carousel-btn carousel-btn--right"
+                    onClick={() => scrollCarousel(1)}
+                  >
                     ›
                   </button>
                 </div>
@@ -591,7 +712,7 @@ const BookingCalendar: React.FC = () => {
               <div className="calendar-instruction">{t("calendarInstruction")}</div>
 
               <MiniCalendar
-                groups={availableGroups}
+                groups={filteredGroups}
                 lang={lang}
                 selectedGroup={selectedGroup}
                 selectedSessionIso={selectedSessionIso}
@@ -626,9 +747,7 @@ const BookingCalendar: React.FC = () => {
                           <button
                             key={s.id}
                             type="button"
-                            className={
-                              "session-pill session-pill--detail" + (active ? " session-pill--active" : "")
-                            }
+                            className={"session-pill session-pill--detail" + (active ? " session-pill--active" : "")}
                             onClick={() => handleSelectSession(selectedGroup, s)}
                           >
                             <span className="mini-pill">{formatDayMonth(s.date_iso, lang)}</span>

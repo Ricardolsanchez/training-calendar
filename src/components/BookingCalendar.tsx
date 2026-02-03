@@ -5,6 +5,29 @@ import "./BookingCalendar.css";
 
 type Lang = "en" | "es";
 
+type Audience =
+  | "sales"
+  | "all_employees"
+  | "new_hires"
+  | "hr"
+  | "it"
+  | "legal";
+
+const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
+  { value: "sales", label_en: "Sales", label_es: "Ventas" },
+  { value: "all_employees", label_en: "All Employees", label_es: "Todos los empleados" },
+  { value: "new_hires", label_en: "New Hires", label_es: "Nuevos ingresos" },
+  { value: "hr", label_en: "HR", label_es: "RR. HH." },
+  { value: "it", label_en: "IT", label_es: "TI" },
+  { value: "legal", label_en: "Legal", label_es: "Legal" },
+];
+
+const getAudienceLabel = (aud: Audience | null | undefined, lang: Lang) => {
+  const found = AUDIENCES.find((a) => a.value === aud);
+  if (!found) return lang === "en" ? "All Employees" : "Todos los empleados";
+  return lang === "en" ? found.label_en : found.label_es;
+};
+
 type AvailableSession = {
   id: number;
   date_iso: string; // YYYY-MM-DD
@@ -17,7 +40,10 @@ type AvailableClassGroup = {
   title: string;
   trainer_name: string;
   modality: "Online" | "Presencial";
-  level: string;
+  audience?: Audience | null;
+  // legacy (si aún llega)
+  level?: string | null;
+
   description?: string | null;
   sessions_count: number;
   sessions: AvailableSession[];
@@ -26,7 +52,8 @@ type AvailableClassGroup = {
   workday_url?: string | null;
 };
 
-const SUGGESTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfQtnvDXIs6Iwo6XDIZ_73K9oJrNxSEYoaJUZKRwMQyaUj_RA/viewform?usp=publish-editor"; // <-- reemplaza con tu link real
+const SUGGESTION_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSfQtnvDXIs6Iwo6XDIZ_73K9oJrNxSEYoaJUZKRwMQyaUj_RA/viewform?usp=publish-editor";
 
 const translations: Record<Lang, Record<string, string>> = {
   en: {
@@ -47,12 +74,10 @@ const translations: Record<Lang, Record<string, string>> = {
     sessionsTitle: "SESSIONS",
     calendarInstruction: "Select a day this month to join a class.",
 
-    // ✅ Other classes header base label
     otherClassesForDay: "OTHER CLASSES",
     noOtherClassesForDay: "No other classes for this day.",
     pickDayHint: "Select a day on the calendar to see more classes.",
 
-    // ✅ Footer
     footerSuggestPrefix: "Don’t see the class you’re looking for?",
     footerSuggestCta: "Suggest it here.",
   },
@@ -65,23 +90,19 @@ const translations: Record<Lang, Record<string, string>> = {
     loadingClasses: "Cargando clases...",
     noClassesError: "No se pudieron cargar las clases. Intenta más tarde.",
     clickOnClassTitle: "Selecciona una clase",
-    clickOnClassText:
-      "Haz click en una clase a la izquierda para ver su link de Workday.",
+    clickOnClassText: "Haz click en una clase a la izquierda para ver su link de Workday.",
     selectedClassLabel: "CLASE SELECCIONADA",
     highlightedHint: "Marcado: días de la clase seleccionada",
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Aún no hay link de Workday disponible.",
     availableSeats: "Cupos disponibles",
     sessionsTitle: "SESIONES",
-    calendarInstruction:
-      "Selecciona un día del mes para participar en una clase.",
+    calendarInstruction: "Selecciona un día del mes para participar en una clase.",
 
-    // ✅ Other classes header base label
     otherClassesForDay: "OTRAS CLASES",
     noOtherClassesForDay: "No hay otras clases para ese día.",
     pickDayHint: "Selecciona un día en el calendario para ver más clases.",
 
-    // ✅ Footer
     footerSuggestPrefix: "¿No encuentras la clase que buscas?",
     footerSuggestCta: "Sugiere una aquí.",
   },
@@ -417,7 +438,7 @@ const BookingCalendar: React.FC = () => {
         </header>
 
         <div className="booking-layout">
-          {/* ===================== LEFT ===================== */}
+          {/* LEFT */}
           <section className="class-list-section">
             <div className="class-list-header">
               <h2>{t("availableClassesTitle")}</h2>
@@ -430,11 +451,7 @@ const BookingCalendar: React.FC = () => {
             {!loadingClasses && !classesError && (
               <>
                 <div className="class-carousel">
-                  <button
-                    type="button"
-                    className="carousel-btn carousel-btn--left"
-                    onClick={() => scrollCarousel(-1)}
-                  >
+                  <button type="button" className="carousel-btn carousel-btn--left" onClick={() => scrollCarousel(-1)}>
                     ‹
                   </button>
 
@@ -450,8 +467,7 @@ const BookingCalendar: React.FC = () => {
                             key={g.group_code}
                             type="button"
                             className={
-                              "class-card class-card--carousel" +
-                              (isSelected ? " class-card--selected" : "")
+                              "class-card class-card--carousel" + (isSelected ? " class-card--selected" : "")
                             }
                             onClick={() => handleSelectGroup(g)}
                           >
@@ -490,7 +506,12 @@ const BookingCalendar: React.FC = () => {
 
                             <div className="class-footer">
                               <span className="class-trainer">👤 {g.trainer_name}</span>
-                              <span className="class-level">{g.level}</span>
+
+                              {/* ✅ Audience displayed instead of "General" */}
+                              <span className="class-level">
+                                {getAudienceLabel(g.audience ?? "all_employees", lang)}
+                              </span>
+
                               <span className="class-spots">
                                 {t("availableSeats")}: {getGroupSeats(g)}
                               </span>
@@ -501,11 +522,7 @@ const BookingCalendar: React.FC = () => {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    className="carousel-btn carousel-btn--right"
-                    onClick={() => scrollCarousel(1)}
-                  >
+                  <button type="button" className="carousel-btn carousel-btn--right" onClick={() => scrollCarousel(1)}>
                     ›
                   </button>
                 </div>
@@ -529,7 +546,8 @@ const BookingCalendar: React.FC = () => {
                           <div className="other-class-row-left">
                             <div className="other-class-title">{group.title}</div>
                             <div className="other-class-meta">
-                              👤 {group.trainer_name} · {group.level} · {group.modality}
+                              👤 {group.trainer_name} ·{" "}
+                              {getAudienceLabel(group.audience ?? "all_employees", lang)} · {group.modality}
                             </div>
                           </div>
 
@@ -567,7 +585,7 @@ const BookingCalendar: React.FC = () => {
             )}
           </section>
 
-          {/* ===================== RIGHT ===================== */}
+          {/* RIGHT */}
           <section className="booking-detail-section">
             <div className="booking-detail-card">
               <div className="calendar-instruction">{t("calendarInstruction")}</div>
@@ -587,7 +605,8 @@ const BookingCalendar: React.FC = () => {
                     <h3>{selectedGroup.title}</h3>
 
                     <p className="booking-detail-meta">
-                      Trainer: {selectedGroup.trainer_name} · {selectedGroup.level} ·{" "}
+                      Trainer: {selectedGroup.trainer_name} ·{" "}
+                      {getAudienceLabel(selectedGroup.audience ?? "all_employees", lang)} ·{" "}
                       {selectedGroup.modality}
                     </p>
 
@@ -608,8 +627,7 @@ const BookingCalendar: React.FC = () => {
                             key={s.id}
                             type="button"
                             className={
-                              "session-pill session-pill--detail" +
-                              (active ? " session-pill--active" : "")
+                              "session-pill session-pill--detail" + (active ? " session-pill--active" : "")
                             }
                             onClick={() => handleSelectSession(selectedGroup, s)}
                           >
@@ -628,15 +646,9 @@ const BookingCalendar: React.FC = () => {
           </section>
         </div>
 
-        {/* ✅ Footer centrado */}
         <footer className="booking-footer">
           <span className="booking-footer-text">{t("footerSuggestPrefix")}</span>{" "}
-          <a
-            className="booking-footer-link"
-            href={SUGGESTION_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a className="booking-footer-link" href={SUGGESTION_URL} target="_blank" rel="noopener noreferrer">
             {t("footerSuggestCta")}
           </a>
         </footer>

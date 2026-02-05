@@ -16,11 +16,7 @@ type Audience =
 
 const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "sales", label_en: "Sales", label_es: "Ventas" },
-  {
-    value: "all_employees",
-    label_en: "All Employees",
-    label_es: "Todos los empleados",
-  },
+  { value: "all_employees", label_en: "All Employees", label_es: "Todos los empleados" },
   { value: "new_hires", label_en: "New Hires", label_es: "Nuevos ingresos" },
   { value: "hr", label_en: "HR", label_es: "RR. HH." },
   { value: "it", label_en: "IT", label_es: "TI" },
@@ -41,8 +37,8 @@ type AvailableClass = {
   trainer_name: string | null;
   start_date: string;
   end_date: string;
-  start_time: string;
-  end_time: string;
+  start_time: string | null;
+  end_time: string | null;
   modality: "Online" | "Presencial";
   spots_left: number;
   description: string | null;
@@ -54,7 +50,7 @@ type AvailableClass = {
 type GroupedSession = {
   id: number;
   date_iso: string;
-  time_range: string;
+  time_range: string | null;
   spots_left: number;
   workday_url?: string | null;
 };
@@ -65,8 +61,7 @@ type GroupedClass = {
   trainer_name: string | null;
   modality: "Online" | "Presencial";
   audience?: Audience | null;
-  // legacy
-  level?: string | null;
+  level?: string | null; // legacy
   description: string | null;
   sessions_count: number;
   sessions: GroupedSession[];
@@ -96,15 +91,11 @@ const translations: Record<Lang, Record<string, string>> = {
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabClasses: "Available Classes",
-
     addNewClass: "+ New Class",
     noClasses: "No Classes at this time.",
-
     columnTrainer: "Trainer",
-
     btnDeleteClass: "Delete",
     confirmDeleteClassGroup: "Delete this class group and all its sessions?",
-
     classesTitle: "Available Classes",
     sessionsCount: "Sessions",
     expand: "Expand",
@@ -112,7 +103,6 @@ const translations: Record<Lang, Record<string, string>> = {
     carouselPrev: "Previous",
     carouselNext: "Next",
     sessionsPanelTitle: "Sessions for",
-
     modalNewClass: "New class",
     modalEditClass: "Edit class",
     labelClassTitle: "Class title",
@@ -128,7 +118,6 @@ const translations: Record<Lang, Record<string, string>> = {
     modalCancelDark: "Cancel",
     modalSaveDark: "Save",
     errorSaveClass: "Could not save class.",
-
     addSessionsTitle: "Sessions (edit dates & hours)",
     addSessionsHint:
       "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
@@ -145,16 +134,11 @@ const translations: Record<Lang, Record<string, string>> = {
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabClasses: "Clases disponibles",
-
     addNewClass: "+ Nueva clase",
     noClasses: "No hay clases por el momento.",
-
     columnTrainer: "Trainer",
-
     btnDeleteClass: "Eliminar",
-    confirmDeleteClassGroup:
-      "¿Eliminar este grupo de clases y todas sus sesiones?",
-
+    confirmDeleteClassGroup: "¿Eliminar este grupo de clases y todas sus sesiones?",
     classesTitle: "Clases disponibles",
     sessionsCount: "Sesiones",
     expand: "Ver",
@@ -178,13 +162,11 @@ const translations: Record<Lang, Record<string, string>> = {
     modalCancelDark: "Cancelar",
     modalSaveDark: "Guardar",
     errorSaveClass: "No se pudo guardar la clase.",
-
     addSessionsTitle: "Sesiones (editar fechas y horas)",
     addSessionsHint:
       "Define la fecha y hora inicio/fin por sesión. Sube/baja la cantidad de sesiones y guarda.",
     sessionsCountLabel: "Número de sesiones",
     sessionDateLabel: "Fecha de la sesión",
-
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Link de Workday pendiente",
   },
@@ -201,7 +183,7 @@ type SessionDraft = {
   end_time: string;
 };
 
-const parseTimeRange = (tr: string) => {
+const parseTimeRange = (tr: string | null | undefined) => {
   const [a, b] = (tr || "").split("-").map((x) => x.trim());
   return { start_time: a || "", end_time: b || "" };
 };
@@ -210,23 +192,14 @@ const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang>("en");
-  const t = useCallback(
-    (key: string) => translations[lang][key] ?? key,
-    [lang],
-  );
+  const t = useCallback((key: string) => translations[lang][key] ?? key, [lang]);
 
-  // ✅ solo classes
   const [activeTab, setActiveTab] = useState<"classes">("classes");
 
-  /** CLASSES (grouped) */
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
-  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(
-    null,
-  );
-  const toggleGroup = (code: string) =>
-    setExpandedGroupCode((prev) => (prev === code ? null : code));
+  const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
+  const toggleGroup = (code: string) => setExpandedGroupCode((prev) => (prev === code ? null : code));
 
-  /** Carousel */
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const scrollCarousel = (dir: -1 | 1) => {
     const el = carouselRef.current;
@@ -239,36 +212,33 @@ const AdminPanel: React.FC = () => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  /** New/Edit class modal */
   const [showClassModal, setShowClassModal] = useState(false);
   const [isNewClass, setIsNewClass] = useState(false);
   const [editClass, setEditClass] = useState<AvailableClass | null>(null);
 
-  /** Sessions Draft */
+  // ✅ ahora permite 0
   const [sessionsCount, setSessionsCount] = useState<number>(1);
   const [sessions, setSessions] = useState<SessionDraft[]>([
     { date_iso: "", start_time: "", end_time: "" },
   ]);
 
   const setCount = (n: number) => {
-    const safe = Math.max(1, Math.min(20, Number.isFinite(n) ? n : 1));
+    const safe = Math.max(0, Math.min(20, Number.isFinite(n) ? n : 0));
     setSessionsCount(safe);
+
     setSessions((prev) => {
+      if (safe === 0) return []; // ✅ sin sesiones
       const next = [...prev];
-      while (next.length < safe)
-        next.push({ date_iso: "", start_time: "", end_time: "" });
+      while (next.length < safe) next.push({ date_iso: "", start_time: "", end_time: "" });
       return next.slice(0, safe);
     });
   };
 
   const selectedGroup = useMemo(() => {
     if (!expandedGroupCode) return null;
-    return (
-      groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null
-    );
+    return groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null;
   }, [expandedGroupCode, groupedClasses]);
 
-  /** Fetch grouped classes */
   const fetchGrouped = useCallback(async () => {
     try {
       const res = await api.get("/api/classes-grouped");
@@ -280,13 +250,11 @@ const AdminPanel: React.FC = () => {
     }
   }, []);
 
-  /** Mount + when entering classes tab */
   useEffect(() => {
     if (activeTab !== "classes") return;
     fetchGrouped();
   }, [activeTab, fetchGrouped]);
 
-  /** Helpers */
   const formatDate = (value: string) => {
     if (!value) return "—";
     const [y, m, d] = value.split("-");
@@ -295,15 +263,11 @@ const AdminPanel: React.FC = () => {
   };
 
   const getSessionsCountText = (g: GroupedClass) => {
-    const count = Number.isFinite(g.sessions_count)
-      ? g.sessions_count
-      : (g.sessions?.length ?? 0);
-
+    const count = Number.isFinite(g.sessions_count) ? g.sessions_count : (g.sessions?.length ?? 0);
     if (!count) return t("noOfferingsScheduledYet");
     return `${t("sessionsCount")}: ${count}`;
   };
 
-  /** DELETE group (all sessions) */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
     if (!ok) return;
@@ -330,8 +294,8 @@ const AdminPanel: React.FC = () => {
       trainer_name: null,
       start_date: "",
       end_date: "",
-      start_time: "",
-      end_time: "",
+      start_time: null,
+      end_time: null,
       modality: "Online",
       spots_left: 0,
       workday_url: "",
@@ -341,6 +305,7 @@ const AdminPanel: React.FC = () => {
     });
     setShowClassModal(true);
 
+    // ✅ por defecto 1 (como lo tenías). Ya puedes bajarlo a 0.
     setCount(1);
     setSessions([{ date_iso: "", start_time: "", end_time: "" }]);
   };
@@ -349,7 +314,7 @@ const AdminPanel: React.FC = () => {
     setIsNewClass(false);
 
     const first = group.sessions?.[0];
-    const times = parseTimeRange(first?.time_range || "");
+    const times = parseTimeRange(first?.time_range);
 
     setEditClass({
       id: first?.id ?? 0,
@@ -358,8 +323,8 @@ const AdminPanel: React.FC = () => {
       trainer_name: group.trainer_name ?? null,
       start_date: "",
       end_date: "",
-      start_time: times.start_time,
-      end_time: times.end_time,
+      start_time: times.start_time || null,
+      end_time: times.end_time || null,
       modality: group.modality,
       spots_left: first?.spots_left ?? 0,
       description: group.description ?? null,
@@ -368,7 +333,8 @@ const AdminPanel: React.FC = () => {
       audience: group.audience ?? "all_employees",
     });
 
-    setCount(group.sessions.length || 1);
+    const len = group.sessions?.length ?? 0;
+    setCount(len); // ✅ si el grupo tiene 0, lo respetamos
     setSessions(
       (group.sessions || []).map((s) => ({
         id: s.id,
@@ -380,26 +346,22 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
-  /** ✅ SAVE class (permite guardar sin sesiones fechadas) */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
-    const cleanSessions = sessions
+    const cleanSessions = (sessions || [])
       .map((s) => ({
         ...s,
         date_iso: (s.date_iso || "").trim(),
         start_time: (s.start_time || "").trim(),
         end_time: (s.end_time || "").trim(),
       }))
-      // ✅ si el usuario no llenó nada en una fila, la ignoramos
       .filter((s) => !!s.date_iso || !!s.start_time || !!s.end_time);
 
     const hasAnySession = cleanSessions.length > 0;
 
-    // ✅ solo valida si hay al menos 1 sesión “intentada”
     const missing =
-      hasAnySession &&
-      cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
+      hasAnySession && cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
 
     if (missing) {
       alert("Please set date + start + end time for every session.");
@@ -409,22 +371,18 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      // ✅ payload de clase (sin obligar sesiones)
       const payload = {
         title: editClass.title,
         trainer_name: editClass.trainer_name,
-        // si no hay sesiones, mandamos lo que haya en el form (puede estar vacío y el backend lo tolera)
-        start_time: hasAnySession
-          ? cleanSessions[0].start_time
-          : editClass.start_time,
-        end_time: hasAnySession
-          ? cleanSessions[0].end_time
-          : editClass.end_time,
         modality: editClass.modality,
         spots_left: editClass.spots_left,
         description: editClass.description ?? null,
         workday_url: editClass.workday_url ?? null,
         audience: editClass.audience ?? "all_employees",
+
+        // ✅ si NO hay sesiones, mandamos null (backend ya lo acepta)
+        start_time: hasAnySession ? cleanSessions[0].start_time : null,
+        end_time: hasAnySession ? cleanSessions[0].end_time : null,
       };
 
       if (isNewClass) {
@@ -454,6 +412,13 @@ const AdminPanel: React.FC = () => {
               start_time: s.start_time,
               end_time: s.end_time,
             })),
+            workday_url: editClass.workday_url ?? null,
+            audience: editClass.audience ?? "all_employees",
+          });
+        } else {
+          // ✅ opcional: si quieres que al dejar 0 sesiones igual propague audience/workday al grupo
+          await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
+            sessions: [],
             workday_url: editClass.workday_url ?? null,
             audience: editClass.audience ?? "all_employees",
           });
@@ -500,19 +465,11 @@ const AdminPanel: React.FC = () => {
               {lang === "en" ? "ES" : "EN"}
             </button>
 
-            <button
-              type="button"
-              className="admin-back-button"
-              onClick={() => navigate("/")}
-            >
+            <button type="button" className="admin-back-button" onClick={() => navigate("/")}>
               {t("backToCalendar")}
             </button>
 
-            <button
-              type="button"
-              className="admin-logout-button"
-              onClick={handleLogout}
-            >
+            <button type="button" className="admin-logout-button" onClick={handleLogout}>
               {t("logout")}
             </button>
           </div>
@@ -521,10 +478,7 @@ const AdminPanel: React.FC = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "classes" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
@@ -536,34 +490,20 @@ const AdminPanel: React.FC = () => {
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("classesTitle")}</h2>
 
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={openNewClassModal}
-              >
+              <button type="button" className="btn btn-primary" onClick={openNewClassModal}>
                 {t("addNewClass")}
               </button>
             </div>
 
-            {groupedClasses.length === 0 && (
-              <p className="admin-message">{t("noClasses")}</p>
-            )}
+            {groupedClasses.length === 0 && <p className="admin-message">{t("noClasses")}</p>}
 
             {groupedClasses.length > 0 && (
               <div className="admin-carousel-wrap">
                 <div className="admin-carousel-controls">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => scrollCarousel(-1)}
-                  >
+                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(-1)}>
                     ◀ {t("carouselPrev")}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => scrollCarousel(1)}
-                  >
+                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(1)}>
                     {t("carouselNext")} ▶
                   </button>
                 </div>
@@ -575,10 +515,7 @@ const AdminPanel: React.FC = () => {
                     return (
                       <div
                         key={g.group_code}
-                        className={
-                          "admin-class-card" +
-                          (expanded ? " admin-class-card--active" : "")
-                        }
+                        className={"admin-class-card" + (expanded ? " admin-class-card--active" : "")}
                       >
                         <div className="admin-class-card-head">
                           <div>
@@ -586,37 +523,23 @@ const AdminPanel: React.FC = () => {
                             <div className="admin-class-sub">
                               <span className="mini-pill">{g.modality}</span>
 
-                              <span
-                                className="mini-pill"
-                                style={{ marginLeft: 8 }}
-                              >
+                              <span className="mini-pill" style={{ marginLeft: 8 }}>
                                 {getSessionsCountText(g)}
                               </span>
-                              <span
-                                className="mini-pill"
-                                style={{ marginLeft: 8 }}
-                              >
-                                {getAudienceLabel(
-                                  g.audience ?? "all_employees",
-                                  lang,
-                                )}
+                              <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                {getAudienceLabel(g.audience ?? "all_employees", lang)}
                               </span>
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => toggleGroup(g.group_code)}
-                          >
+                          <button type="button" className="btn btn-secondary" onClick={() => toggleGroup(g.group_code)}>
                             {expanded ? t("collapse") : t("expand")}
                           </button>
                         </div>
 
                         <div className="admin-class-meta">
                           <div className="admin-class-meta-row">
-                            <strong>{t("columnTrainer")}:</strong>{" "}
-                            {g.trainer_name || "—"}
+                            <strong>{t("columnTrainer")}:</strong> {g.trainer_name || "—"}
                           </div>
 
                           {g.workday_url ? (
@@ -632,19 +555,12 @@ const AdminPanel: React.FC = () => {
                               {t("viewDetails")}
                             </button>
                           ) : (
-                            <span
-                              className="mini-pill"
-                              style={{ opacity: 0.8 }}
-                            >
+                            <span className="mini-pill" style={{ opacity: 0.8 }}>
                               {t("workdayLinkMissing")}
                             </span>
                           )}
 
-                          {g.description && (
-                            <div className="admin-class-desc">
-                              {g.description}
-                            </div>
-                          )}
+                          {g.description && <div className="admin-class-desc">{g.description}</div>}
                         </div>
 
                         {expanded && <div className="admin-divider" />}
@@ -654,30 +570,18 @@ const AdminPanel: React.FC = () => {
                             {g.sessions.map((s) => (
                               <div key={s.id} className="admin-session-pill">
                                 <span className="mini-pill">{s.date_iso}</span>
-                                <span
-                                  className="mini-pill"
-                                  style={{ marginLeft: 8 }}
-                                >
-                                  {s.time_range}
+                                <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                  {s.time_range || "—"}
                                 </span>
                               </div>
                             ))}
 
-                            <div
-                              className="admin-actions"
-                              style={{ marginTop: 12 }}
-                            >
-                              <button
-                                className="btn btn-mini"
-                                onClick={() => openEditClassModal(g)}
-                              >
+                            <div className="admin-actions" style={{ marginTop: 12 }}>
+                              <button className="btn btn-mini" onClick={() => openEditClassModal(g)}>
                                 {t("modalEditClass")}
                               </button>
 
-                              <button
-                                className="btn btn-mini btn-danger"
-                                onClick={() => deleteClassGroup(g)}
-                              >
+                              <button className="btn btn-mini btn-danger" onClick={() => deleteClassGroup(g)}>
                                 {t("btnDeleteClass")}
                               </button>
                             </div>
@@ -690,10 +594,7 @@ const AdminPanel: React.FC = () => {
 
                 {selectedGroup && (
                   <div style={{ marginTop: 18 }}>
-                    <h3
-                      className="admin-table-title"
-                      style={{ marginBottom: 10 }}
-                    >
+                    <h3 className="admin-table-title" style={{ marginBottom: 10 }}>
                       {t("sessionsPanelTitle")} {selectedGroup.title}
                     </h3>
 
@@ -712,7 +613,7 @@ const AdminPanel: React.FC = () => {
                             <tr key={s.id}>
                               <td>{idx + 1}</td>
                               <td>{formatDate(s.date_iso)}</td>
-                              <td>{s.time_range}</td>
+                              <td>{s.time_range || "—"}</td>
                               <td>{s.spots_left}</td>
                             </tr>
                           ))}
@@ -727,9 +628,7 @@ const AdminPanel: React.FC = () => {
             {showClassModal && editClass && (
               <div className="admin-modal-backdrop">
                 <div className="admin-modal admin-modal-wide">
-                  <h3>
-                    {isNewClass ? t("modalNewClass") : t("modalEditClass")}
-                  </h3>
+                  <h3>{isNewClass ? t("modalNewClass") : t("modalEditClass")}</h3>
 
                   <div className="admin-form-grid">
                     <div className="full">
@@ -740,16 +639,11 @@ const AdminPanel: React.FC = () => {
                         placeholder="https://wd5.myworkday.com/..."
                         value={editClass.workday_url || ""}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev
-                              ? { ...prev, workday_url: e.target.value }
-                              : prev,
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, workday_url: e.target.value } : prev))
                         }
                       />
                       <small className="muted">
-                        This link redirects employees to the Workday enrollment
-                        page
+                        This link redirects employees to the Workday enrollment page
                       </small>
                     </div>
 
@@ -758,11 +652,7 @@ const AdminPanel: React.FC = () => {
                       <input
                         className="form-input"
                         value={editClass.title}
-                        onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, title: e.target.value } : prev,
-                          )
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))}
                       />
                     </div>
 
@@ -773,12 +663,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.trainer_name || ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  trainer_name: e.target.value || null,
-                                }
-                              : prev,
+                            prev ? { ...prev, trainer_name: e.target.value || null } : prev,
                           )
                         }
                       >
@@ -798,14 +683,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.modality}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  modality: e.target.value as
-                                    | "Online"
-                                    | "Presencial",
-                                }
-                              : prev,
+                            prev ? { ...prev, modality: e.target.value as "Online" | "Presencial" } : prev,
                           )
                         }
                       >
@@ -821,11 +699,7 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.spots_left}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev
-                              ? { ...prev, spots_left: Number(e.target.value) }
-                              : prev,
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, spots_left: Number(e.target.value) } : prev))
                         }
                       />
                     </div>
@@ -834,18 +708,9 @@ const AdminPanel: React.FC = () => {
                       <label>{t("labelAudience")}</label>
                       <select
                         className="form-input"
-                        value={
-                          (editClass.audience ?? "all_employees") as string
-                        }
+                        value={(editClass.audience ?? "all_employees") as string}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  audience: e.target.value as Audience,
-                                }
-                              : prev,
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, audience: e.target.value as Audience } : prev))
                         }
                       >
                         <option value="">{t("optionSelectAudience")}</option>
@@ -864,11 +729,7 @@ const AdminPanel: React.FC = () => {
                         rows={3}
                         value={editClass.description ?? ""}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev
-                              ? { ...prev, description: e.target.value || null }
-                              : prev,
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, description: e.target.value || null } : prev))
                         }
                       />
                     </div>
@@ -876,20 +737,14 @@ const AdminPanel: React.FC = () => {
 
                   <div className="admin-divider" />
 
-                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>
-                    {t("addSessionsTitle")}
-                  </h4>
+                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>{t("addSessionsTitle")}</h4>
                   <p className="admin-message" style={{ marginTop: 0 }}>
                     {t("addSessionsHint")}
                   </p>
 
                   <label>{t("sessionsCountLabel")}</label>
                   <div className="admin-inline-controls">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setCount(sessionsCount - 1)}
-                    >
+                    <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount - 1)}>
                       −
                     </button>
                     <input
@@ -898,92 +753,72 @@ const AdminPanel: React.FC = () => {
                       style={{ width: 90, textAlign: "center" }}
                       value={sessionsCount}
                       onChange={(e) => setCount(Number(e.target.value))}
+                      min={0}
+                      max={20}
                     />
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setCount(sessionsCount + 1)}
-                    >
+                    <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount + 1)}>
                       +
                     </button>
                   </div>
 
-                  <div
-                    className="admin-sessions-grid"
-                    style={{ marginTop: 12 }}
-                  >
-                    {sessions.map((s, idx) => (
-                      <div key={idx} className="admin-session-row">
-                        <div>
-                          <label>
-                            {t("sessionDateLabel")} {idx + 1}
-                          </label>
-                          <input
-                            type="date"
-                            className="form-input"
-                            value={s.date_iso}
-                            onChange={(e) => {
-                              const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                date_iso: e.target.value,
-                              };
-                              setSessions(next);
-                            }}
-                          />
-                        </div>
+                  {sessionsCount === 0 ? null : (
+                    <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
+                      {sessions.map((s, idx) => (
+                        <div key={idx} className="admin-session-row">
+                          <div>
+                            <label>
+                              {t("sessionDateLabel")} {idx + 1}
+                            </label>
+                            <input
+                              type="date"
+                              className="form-input"
+                              value={s.date_iso}
+                              onChange={(e) => {
+                                const next = [...sessions];
+                                next[idx] = { ...next[idx], date_iso: e.target.value };
+                                setSessions(next);
+                              }}
+                            />
+                          </div>
 
-                        <div>
-                          <label>Session {idx + 1} Start</label>
-                          <input
-                            type="time"
-                            className="form-input"
-                            value={s.start_time}
-                            onChange={(e) => {
-                              const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                start_time: e.target.value,
-                              };
-                              setSessions(next);
-                            }}
-                          />
-                        </div>
+                          <div>
+                            <label>Session {idx + 1} Start</label>
+                            <input
+                              type="time"
+                              className="form-input"
+                              value={s.start_time}
+                              onChange={(e) => {
+                                const next = [...sessions];
+                                next[idx] = { ...next[idx], start_time: e.target.value };
+                                setSessions(next);
+                              }}
+                            />
+                          </div>
 
-                        <div>
-                          <label>Session {idx + 1} End</label>
-                          <input
-                            type="time"
-                            className="form-input"
-                            value={s.end_time}
-                            onChange={(e) => {
-                              const next = [...sessions];
-                              next[idx] = {
-                                ...next[idx],
-                                end_time: e.target.value,
-                              };
-                              setSessions(next);
-                            }}
-                          />
+                          <div>
+                            <label>Session {idx + 1} End</label>
+                            <input
+                              type="time"
+                              className="form-input"
+                              value={s.end_time}
+                              onChange={(e) => {
+                                const next = [...sessions];
+                                next[idx] = { ...next[idx], end_time: e.target.value };
+                                setSessions(next);
+                              }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="admin-modal-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setShowClassModal(false)}
-                    >
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowClassModal(false)}>
                       {t("modalCancelDark")}
                     </button>
 
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={saveClassChanges}
-                    >
+                    <button type="button" className="btn btn-primary" onClick={saveClassChanges}>
                       {t("modalSaveDark")}
                     </button>
                   </div>

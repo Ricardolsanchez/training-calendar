@@ -134,7 +134,7 @@ const translations: Record<Lang, Record<string, string>> = {
       "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
     sessionsCountLabel: "Number of sessions",
     sessionDateLabel: "Session date",
-
+    noOfferingsScheduledYet: "No offerings scheduled yet",
     viewDetails: "View Workday link here",
     workdayLinkMissing: "Workday link missing",
   },
@@ -162,7 +162,7 @@ const translations: Record<Lang, Record<string, string>> = {
     carouselPrev: "Anterior",
     carouselNext: "Siguiente",
     sessionsPanelTitle: "Sesiones de",
-
+    noOfferingsScheduledYet: "Aún no hay sesiones programadas",
     modalNewClass: "Nueva clase",
     modalEditClass: "Editar clase",
     labelClassTitle: "Título de la clase",
@@ -294,6 +294,15 @@ const AdminPanel: React.FC = () => {
     return value;
   };
 
+  const getSessionsCountText = (g: GroupedClass) => {
+    const count = Number.isFinite(g.sessions_count)
+      ? g.sessions_count
+      : (g.sessions?.length ?? 0);
+
+    if (!count) return t("noOfferingsScheduledYet");
+    return `${t("sessionsCount")}: ${count}`;
+  };
+
   /** DELETE group (all sessions) */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
@@ -405,8 +414,12 @@ const AdminPanel: React.FC = () => {
         title: editClass.title,
         trainer_name: editClass.trainer_name,
         // si no hay sesiones, mandamos lo que haya en el form (puede estar vacío y el backend lo tolera)
-        start_time: hasAnySession ? cleanSessions[0].start_time : editClass.start_time,
-        end_time: hasAnySession ? cleanSessions[0].end_time : editClass.end_time,
+        start_time: hasAnySession
+          ? cleanSessions[0].start_time
+          : editClass.start_time,
+        end_time: hasAnySession
+          ? cleanSessions[0].end_time
+          : editClass.end_time,
         modality: editClass.modality,
         spots_left: editClass.spots_left,
         description: editClass.description ?? null,
@@ -577,9 +590,8 @@ const AdminPanel: React.FC = () => {
                                 className="mini-pill"
                                 style={{ marginLeft: 8 }}
                               >
-                                {t("sessionsCount")}: {g.sessions_count}
+                                {getSessionsCountText(g)}
                               </span>
-
                               <span
                                 className="mini-pill"
                                 style={{ marginLeft: 8 }}
@@ -620,7 +632,10 @@ const AdminPanel: React.FC = () => {
                               {t("viewDetails")}
                             </button>
                           ) : (
-                            <span className="mini-pill" style={{ opacity: 0.8 }}>
+                            <span
+                              className="mini-pill"
+                              style={{ opacity: 0.8 }}
+                            >
                               {t("workdayLinkMissing")}
                             </span>
                           )}
@@ -819,7 +834,9 @@ const AdminPanel: React.FC = () => {
                       <label>{t("labelAudience")}</label>
                       <select
                         className="form-input"
-                        value={(editClass.audience ?? "all_employees") as string}
+                        value={
+                          (editClass.audience ?? "all_employees") as string
+                        }
                         onChange={(e) =>
                           setEditClass((prev) =>
                             prev
@@ -891,7 +908,10 @@ const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
+                  <div
+                    className="admin-sessions-grid"
+                    style={{ marginTop: 12 }}
+                  >
                     {sessions.map((s, idx) => (
                       <div key={idx} className="admin-session-row">
                         <div>

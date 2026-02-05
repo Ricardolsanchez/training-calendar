@@ -50,22 +50,30 @@ type AvailableClass = {
 type GroupedSession = {
   id: number;
   date_iso: string;
-  time_range: string | null;
+  time_range: string;
   spots_left: number;
-  workday_url?: string | null;
 };
 
 type GroupedClass = {
   group_code: string;
+
+  // ✅ NUEVO para soportar draft sin sesiones
+  base_id: number;
+  all_session_ids: number[];
+  is_draft: boolean;
+
   title: string;
   trainer_name: string | null;
   modality: "Online" | "Presencial";
   audience?: Audience | null;
-  level?: string | null; // legacy
+  level?: string | null;
   description: string | null;
   sessions_count: number;
   sessions: GroupedSession[];
   workday_url?: string | null;
+
+  start_date_iso?: string | null;
+  end_date_iso?: string | null;
 };
 
 type Trainer = { id: number; name: string };
@@ -91,11 +99,15 @@ const translations: Record<Lang, Record<string, string>> = {
     backToCalendar: "← Calendar",
     logout: "Log out",
     tabClasses: "Available Classes",
+
     addNewClass: "+ New Class",
     noClasses: "No Classes at this time.",
+
     columnTrainer: "Trainer",
+
     btnDeleteClass: "Delete",
     confirmDeleteClassGroup: "Delete this class group and all its sessions?",
+
     classesTitle: "Available Classes",
     sessionsCount: "Sessions",
     expand: "Expand",
@@ -103,6 +115,7 @@ const translations: Record<Lang, Record<string, string>> = {
     carouselPrev: "Previous",
     carouselNext: "Next",
     sessionsPanelTitle: "Sessions for",
+
     modalNewClass: "New class",
     modalEditClass: "Edit class",
     labelClassTitle: "Class title",
@@ -118,6 +131,7 @@ const translations: Record<Lang, Record<string, string>> = {
     modalCancelDark: "Cancel",
     modalSaveDark: "Save",
     errorSaveClass: "Could not save class.",
+
     addSessionsTitle: "Sessions (edit dates & hours)",
     addSessionsHint:
       "Set the date and start/end time for each session. Increase/decrease the number of sessions and save.",
@@ -126,6 +140,7 @@ const translations: Record<Lang, Record<string, string>> = {
     noOfferingsScheduledYet: "No offerings scheduled yet",
     viewDetails: "View Workday link here",
     workdayLinkMissing: "Workday link missing",
+    draftTag: "DRAFT",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -134,11 +149,15 @@ const translations: Record<Lang, Record<string, string>> = {
     backToCalendar: "← Calendario",
     logout: "Cerrar sesión",
     tabClasses: "Clases disponibles",
+
     addNewClass: "+ Nueva clase",
     noClasses: "No hay clases por el momento.",
+
     columnTrainer: "Trainer",
+
     btnDeleteClass: "Eliminar",
     confirmDeleteClassGroup: "¿Eliminar este grupo de clases y todas sus sesiones?",
+
     classesTitle: "Clases disponibles",
     sessionsCount: "Sesiones",
     expand: "Ver",
@@ -162,13 +181,16 @@ const translations: Record<Lang, Record<string, string>> = {
     modalCancelDark: "Cancelar",
     modalSaveDark: "Guardar",
     errorSaveClass: "No se pudo guardar la clase.",
+
     addSessionsTitle: "Sesiones (editar fechas y horas)",
     addSessionsHint:
       "Define la fecha y hora inicio/fin por sesión. Sube/baja la cantidad de sesiones y guarda.",
     sessionsCountLabel: "Número de sesiones",
     sessionDateLabel: "Fecha de la sesión",
+
     viewDetails: "Ver detalles aquí",
     workdayLinkMissing: "Link de Workday pendiente",
+    draftTag: "BORRADOR",
   },
 };
 
@@ -183,7 +205,7 @@ type SessionDraft = {
   end_time: string;
 };
 
-const parseTimeRange = (tr: string | null | undefined) => {
+const parseTimeRange = (tr: string) => {
   const [a, b] = (tr || "").split("-").map((x) => x.trim());
   return { start_time: a || "", end_time: b || "" };
 };
@@ -198,7 +220,8 @@ const AdminPanel: React.FC = () => {
 
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
   const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
-  const toggleGroup = (code: string) => setExpandedGroupCode((prev) => (prev === code ? null : code));
+  const toggleGroup = (code: string) =>
+    setExpandedGroupCode((prev) => (prev === code ? null : code));
 
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const scrollCarousel = (dir: -1 | 1) => {
@@ -216,7 +239,6 @@ const AdminPanel: React.FC = () => {
   const [isNewClass, setIsNewClass] = useState(false);
   const [editClass, setEditClass] = useState<AvailableClass | null>(null);
 
-  // ✅ ahora permite 0
   const [sessionsCount, setSessionsCount] = useState<number>(1);
   const [sessions, setSessions] = useState<SessionDraft[]>([
     { date_iso: "", start_time: "", end_time: "" },
@@ -227,7 +249,7 @@ const AdminPanel: React.FC = () => {
     setSessionsCount(safe);
 
     setSessions((prev) => {
-      if (safe === 0) return []; // ✅ sin sesiones
+      if (safe === 0) return [];
       const next = [...prev];
       while (next.length < safe) next.push({ date_iso: "", start_time: "", end_time: "" });
       return next.slice(0, safe);
@@ -239,13 +261,14 @@ const AdminPanel: React.FC = () => {
     return groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null;
   }, [expandedGroupCode, groupedClasses]);
 
+  /** ✅ ahora admin usa endpoint admin */
   const fetchGrouped = useCallback(async () => {
     try {
-      const res = await api.get("/api/classes-grouped");
+      const res = await api.get("/api/admin/classes-grouped");
       const list: GroupedClass[] = res.data?.classes ?? res.data ?? [];
       setGroupedClasses(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.error("Error cargando clases agrupadas:", err);
+      console.error("Error cargando clases agrupadas (admin):", err);
       setGroupedClasses([]);
     }
   }, []);
@@ -268,15 +291,23 @@ const AdminPanel: React.FC = () => {
     return `${t("sessionsCount")}: ${count}`;
   };
 
+  /** ✅ DELETE group: borra incluso drafts sin sesiones */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
     if (!ok) return;
 
     try {
       await ensureCsrf();
-      for (const s of g.sessions) {
-        await api.delete(`/api/admin/classes/${s.id}`);
+
+      const ids = (g.all_session_ids && g.all_session_ids.length > 0)
+        ? g.all_session_ids
+        : [g.base_id];
+
+      // borra todos (incluye base)
+      for (const id of ids) {
+        await api.delete(`/api/admin/classes/${id}`);
       }
+
       await fetchGrouped();
       setExpandedGroupCode((prev) => (prev === g.group_code ? null : prev));
     } catch (err) {
@@ -305,8 +336,7 @@ const AdminPanel: React.FC = () => {
     });
     setShowClassModal(true);
 
-    // ✅ por defecto 1 (como lo tenías). Ya puedes bajarlo a 0.
-    setCount(1);
+    setCount(1); // default 1, pero ya puedes bajarlo a 0
     setSessions([{ date_iso: "", start_time: "", end_time: "" }]);
   };
 
@@ -314,17 +344,17 @@ const AdminPanel: React.FC = () => {
     setIsNewClass(false);
 
     const first = group.sessions?.[0];
-    const times = parseTimeRange(first?.time_range);
+    const times = parseTimeRange(first?.time_range || "");
 
     setEditClass({
-      id: first?.id ?? 0,
+      id: group.base_id, // ✅ base_id para update/sync
       title: group.title,
       trainer_id: null,
       trainer_name: group.trainer_name ?? null,
-      start_date: "",
-      end_date: "",
-      start_time: times.start_time || null,
-      end_time: times.end_time || null,
+      start_date: group.start_date_iso ?? "",
+      end_date: group.end_date_iso ?? "",
+      start_time: first ? times.start_time : null,
+      end_time: first ? times.end_time : null,
       modality: group.modality,
       spots_left: first?.spots_left ?? 0,
       description: group.description ?? null,
@@ -333,8 +363,8 @@ const AdminPanel: React.FC = () => {
       audience: group.audience ?? "all_employees",
     });
 
-    const len = group.sessions?.length ?? 0;
-    setCount(len); // ✅ si el grupo tiene 0, lo respetamos
+    const count = group.sessions?.length ?? 0;
+    setCount(count);
     setSessions(
       (group.sessions || []).map((s) => ({
         id: s.id,
@@ -346,10 +376,15 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
+  /**
+   * ✅ SAVE:
+   * - si sessionsCount = 0 => crea/actualiza draft sin sesiones (start_time/end_time null)
+   * - si hay sesiones => valida completas y hace syncSessions
+   */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
-    const cleanSessions = (sessions || [])
+    const cleanSessions = sessions
       .map((s) => ({
         ...s,
         date_iso: (s.date_iso || "").trim(),
@@ -361,7 +396,8 @@ const AdminPanel: React.FC = () => {
     const hasAnySession = cleanSessions.length > 0;
 
     const missing =
-      hasAnySession && cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
+      hasAnySession &&
+      cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
 
     if (missing) {
       alert("Please set date + start + end time for every session.");
@@ -380,9 +416,13 @@ const AdminPanel: React.FC = () => {
         workday_url: editClass.workday_url ?? null,
         audience: editClass.audience ?? "all_employees",
 
-        // ✅ si NO hay sesiones, mandamos null (backend ya lo acepta)
+        // ✅ draft: null
         start_time: hasAnySession ? cleanSessions[0].start_time : null,
         end_time: hasAnySession ? cleanSessions[0].end_time : null,
+
+        // opcional: si mandas fechas generales (backend las acepta nullable)
+        start_date: editClass.start_date || null,
+        end_date: editClass.end_date || null,
       };
 
       if (isNewClass) {
@@ -412,13 +452,6 @@ const AdminPanel: React.FC = () => {
               start_time: s.start_time,
               end_time: s.end_time,
             })),
-            workday_url: editClass.workday_url ?? null,
-            audience: editClass.audience ?? "all_employees",
-          });
-        } else {
-          // ✅ opcional: si quieres que al dejar 0 sesiones igual propague audience/workday al grupo
-          await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
-            sessions: [],
             workday_url: editClass.workday_url ?? null,
             audience: editClass.audience ?? "all_employees",
           });
@@ -519,13 +552,21 @@ const AdminPanel: React.FC = () => {
                       >
                         <div className="admin-class-card-head">
                           <div>
-                            <div className="admin-class-title">{g.title}</div>
+                            <div className="admin-class-title">
+                              {g.title}{" "}
+                              {g.is_draft ? (
+                                <span className="mini-pill" style={{ marginLeft: 8, opacity: 0.85 }}>
+                                  {t("draftTag")}
+                                </span>
+                              ) : null}
+                            </div>
                             <div className="admin-class-sub">
                               <span className="mini-pill">{g.modality}</span>
 
                               <span className="mini-pill" style={{ marginLeft: 8 }}>
                                 {getSessionsCountText(g)}
                               </span>
+
                               <span className="mini-pill" style={{ marginLeft: 8 }}>
                                 {getAudienceLabel(g.audience ?? "all_employees", lang)}
                               </span>
@@ -567,14 +608,20 @@ const AdminPanel: React.FC = () => {
 
                         {expanded && (
                           <div className="admin-class-sessions">
-                            {g.sessions.map((s) => (
-                              <div key={s.id} className="admin-session-pill">
-                                <span className="mini-pill">{s.date_iso}</span>
-                                <span className="mini-pill" style={{ marginLeft: 8 }}>
-                                  {s.time_range || "—"}
-                                </span>
-                              </div>
-                            ))}
+                            {g.sessions.length === 0 ? (
+                              <p className="admin-message" style={{ marginTop: 0 }}>
+                                {t("noOfferingsScheduledYet")}
+                              </p>
+                            ) : (
+                              g.sessions.map((s) => (
+                                <div key={s.id} className="admin-session-pill">
+                                  <span className="mini-pill">{s.date_iso}</span>
+                                  <span className="mini-pill" style={{ marginLeft: 8 }}>
+                                    {s.time_range}
+                                  </span>
+                                </div>
+                              ))
+                            )}
 
                             <div className="admin-actions" style={{ marginTop: 12 }}>
                               <button className="btn btn-mini" onClick={() => openEditClassModal(g)}>
@@ -592,7 +639,7 @@ const AdminPanel: React.FC = () => {
                   })}
                 </div>
 
-                {selectedGroup && (
+                {selectedGroup && selectedGroup.sessions.length > 0 && (
                   <div style={{ marginTop: 18 }}>
                     <h3 className="admin-table-title" style={{ marginBottom: 10 }}>
                       {t("sessionsPanelTitle")} {selectedGroup.title}
@@ -613,7 +660,7 @@ const AdminPanel: React.FC = () => {
                             <tr key={s.id}>
                               <td>{idx + 1}</td>
                               <td>{formatDate(s.date_iso)}</td>
-                              <td>{s.time_range || "—"}</td>
+                              <td>{s.time_range}</td>
                               <td>{s.spots_left}</td>
                             </tr>
                           ))}
@@ -729,7 +776,9 @@ const AdminPanel: React.FC = () => {
                         rows={3}
                         value={editClass.description ?? ""}
                         onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, description: e.target.value || null } : prev))
+                          setEditClass((prev) =>
+                            prev ? { ...prev, description: e.target.value || null } : prev,
+                          )
                         }
                       />
                     </div>
@@ -761,7 +810,13 @@ const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  {sessionsCount === 0 ? null : (
+                  {sessionsCount === 0 ? (
+                    <p className="admin-message" style={{ marginTop: 10 }}>
+                      {lang === "en"
+                        ? "This class will be saved as a draft (no sessions)."
+                        : "Esta clase se guardará como borrador (sin sesiones)."}
+                    </p>
+                  ) : (
                     <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
                       {sessions.map((s, idx) => (
                         <div key={idx} className="admin-session-row">

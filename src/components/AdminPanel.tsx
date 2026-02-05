@@ -251,7 +251,7 @@ const AdminPanel: React.FC = () => {
   ]);
 
   const setCount = (n: number) => {
-    const safe = Math.max(0, Math.min(20, Number.isFinite(n) ? n : 0));
+    const safe = Math.max(1, Math.min(20, Number.isFinite(n) ? n : 1));
     setSessionsCount(safe);
     setSessions((prev) => {
       const next = [...prev];
@@ -332,8 +332,8 @@ const AdminPanel: React.FC = () => {
     });
     setShowClassModal(true);
 
-    setCount(0);
-    setSessions([]);
+    setCount(1);
+    setSessions([{ date_iso: "", start_time: "", end_time: "" }]);
   };
 
   const openEditClassModal = (group: GroupedClass) => {
@@ -371,59 +371,56 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
-  /** SAVE class */
+  /** ✅ SAVE class (permite guardar sin sesiones fechadas) */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
-    // sesiones "limpias"
-    const cleanSessions = sessions.map((s) => ({
-      ...s,
-      date_iso: (s.date_iso || "").trim(),
-      start_time: (s.start_time || "").trim(),
-      end_time: (s.end_time || "").trim(),
-    }));
+    const cleanSessions = sessions
+      .map((s) => ({
+        ...s,
+        date_iso: (s.date_iso || "").trim(),
+        start_time: (s.start_time || "").trim(),
+        end_time: (s.end_time || "").trim(),
+      }))
+      // ✅ si el usuario no llenó nada en una fila, la ignoramos
+      .filter((s) => !!s.date_iso || !!s.start_time || !!s.end_time);
 
-    // ✅ sesiones realmente completas
-    const providedSessions = cleanSessions.filter(
-      (s) => s.date_iso && s.start_time && s.end_time,
-    );
+    const hasAnySession = cleanSessions.length > 0;
 
-    // ✅ si el usuario escribió algo a medias, sí bloqueamos (para evitar basura)
-    const hasPartial = cleanSessions.some(
-      (s) =>
-        (s.date_iso || s.start_time || s.end_time) &&
-        !(s.date_iso && s.start_time && s.end_time),
-    );
-    if (hasPartial) {
-      alert("If you add a session, please complete date + start + end time.");
+    // ✅ solo valida si hay al menos 1 sesión “intentada”
+    const missing =
+      hasAnySession &&
+      cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
+
+    if (missing) {
+      alert("Please set date + start + end time for every session.");
       return;
     }
 
     try {
       await ensureCsrf();
 
-      // ✅ payload ya NO depende de sessions[0]
-      // Si no hay sesiones: start_time/end_time pueden ir null (backend debe aceptarlo)
+      // ✅ payload de clase (sin obligar sesiones)
       const payload = {
         title: editClass.title,
         trainer_name: editClass.trainer_name,
+        // si no hay sesiones, mandamos lo que haya en el form (puede estar vacío y el backend lo tolera)
+        start_time: hasAnySession ? cleanSessions[0].start_time : editClass.start_time,
+        end_time: hasAnySession ? cleanSessions[0].end_time : editClass.end_time,
         modality: editClass.modality,
         spots_left: editClass.spots_left,
         description: editClass.description ?? null,
         workday_url: editClass.workday_url ?? null,
         audience: editClass.audience ?? "all_employees",
-        start_time: providedSessions[0]?.start_time ?? null,
-        end_time: providedSessions[0]?.end_time ?? null,
       };
 
       if (isNewClass) {
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        // ✅ solo si hay sesiones, llamo el endpoint de sesiones
-        if (providedSessions.length > 0) {
+        if (hasAnySession) {
           await api.put(`/api/admin/classes/${saved.id}/sessions`, {
-            sessions: providedSessions.map((s, idx) => ({
+            sessions: cleanSessions.map((s, idx) => ({
               ...(idx === 0 ? { id: saved.id } : {}),
               date_iso: s.date_iso,
               start_time: s.start_time,
@@ -436,9 +433,9 @@ const AdminPanel: React.FC = () => {
       } else {
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
-        if (providedSessions.length > 0) {
+        if (hasAnySession) {
           await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
-            sessions: providedSessions.map((s) => ({
+            sessions: cleanSessions.map((s) => ({
               id: s.id,
               date_iso: s.date_iso,
               start_time: s.start_time,
@@ -521,7 +518,6 @@ const AdminPanel: React.FC = () => {
           </button>
         </div>
 
-        {/* CLASSES */}
         {activeTab === "classes" && (
           <section className="admin-table-section">
             <div className="admin-table-header-row">
@@ -624,10 +620,7 @@ const AdminPanel: React.FC = () => {
                               {t("viewDetails")}
                             </button>
                           ) : (
-                            <span
-                              className="mini-pill"
-                              style={{ opacity: 0.8 }}
-                            >
+                            <span className="mini-pill" style={{ opacity: 0.8 }}>
                               {t("workdayLinkMissing")}
                             </span>
                           )}
@@ -716,7 +709,6 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {/* MODAL */}
             {showClassModal && editClass && (
               <div className="admin-modal-backdrop">
                 <div className="admin-modal admin-modal-wide">
@@ -827,9 +819,7 @@ const AdminPanel: React.FC = () => {
                       <label>{t("labelAudience")}</label>
                       <select
                         className="form-input"
-                        value={
-                          (editClass.audience ?? "all_employees") as string
-                        }
+                        value={(editClass.audience ?? "all_employees") as string}
                         onChange={(e) =>
                           setEditClass((prev) =>
                             prev
@@ -901,10 +891,7 @@ const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  <div
-                    className="admin-sessions-grid"
-                    style={{ marginTop: 12 }}
-                  >
+                  <div className="admin-sessions-grid" style={{ marginTop: 12 }}>
                     {sessions.map((s, idx) => (
                       <div key={idx} className="admin-session-row">
                         <div>

@@ -277,7 +277,7 @@ const AdminPanel: React.FC = () => {
   /** ✅ ahora admin usa endpoint admin */
   const fetchGrouped = useCallback(async () => {
     try {
-      const res = await api.get("/api/admin/classes-grouped");
+      const res = await api.get("/api/classes-grouped");
       const list: GroupedClass[] = res.data?.classes ?? res.data ?? [];
       setGroupedClasses(Array.isArray(list) ? list : []);
     } catch (err) {

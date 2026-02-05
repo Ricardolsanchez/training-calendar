@@ -5,7 +5,7 @@ import "./BookingCalendar.css";
 
 type Lang = "en" | "es";
 
-type Audience = "sales" | "all_employees" | "new_hires" | "hr" | "it" | "legal";
+type Audience = "sales" | "all_employees" | "new_hires" | "hr" | "it" | "legal" | "records";
 type AudienceFilter = "all" | Audience;
 
 const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
@@ -15,6 +15,7 @@ const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "hr", label_en: "HR", label_es: "RR. HH." },
   { value: "it", label_en: "IT", label_es: "TI" },
   { value: "legal", label_en: "Legal", label_es: "Legal" },
+  { value: 'records', label_en: "Records", label_es: "Records"}
 ];
 
 const AUDIENCE_FILTERS: { value: AudienceFilter; label_en: string; label_es: string }[] = [

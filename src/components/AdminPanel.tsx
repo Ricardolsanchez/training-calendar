@@ -5,7 +5,14 @@ import "./AdminPanel.css";
 
 type Lang = "en" | "es";
 
-type Audience = "sales" | "all_employees" | "new_hires" | "hr" | "it" | "legal";
+type Audience =
+  | "sales"
+  | "all_employees"
+  | "new_hires"
+  | "hr"
+  | "it"
+  | "legal"
+  | "records";
 
 const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "sales", label_en: "Sales", label_es: "Ventas" },
@@ -18,6 +25,7 @@ const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "hr", label_en: "HR", label_es: "RR. HH." },
   { value: "it", label_en: "IT", label_es: "TI" },
   { value: "legal", label_en: "Legal", label_es: "Legal" },
+  { value: "records", label_en: "Records", label_es: "Records" },
 ];
 
 const getAudienceLabel = (aud: Audience | null | undefined, lang: Lang) => {
@@ -243,7 +251,7 @@ const AdminPanel: React.FC = () => {
   ]);
 
   const setCount = (n: number) => {
-    const safe = Math.max(1, Math.min(20, Number.isFinite(n) ? n : 1));
+    const safe = Math.max(0, Math.min(20, Number.isFinite(n) ? n : 0));
     setSessionsCount(safe);
     setSessions((prev) => {
       const next = [...prev];
@@ -324,8 +332,8 @@ const AdminPanel: React.FC = () => {
     });
     setShowClassModal(true);
 
-    setCount(1);
-    setSessions([{ date_iso: "", start_time: "", end_time: "" }]);
+    setCount(0);
+    setSessions([]);
   };
 
   const openEditClassModal = (group: GroupedClass) => {
@@ -367,6 +375,7 @@ const AdminPanel: React.FC = () => {
   const saveClassChanges = async () => {
     if (!editClass) return;
 
+    // sesiones "limpias"
     const cleanSessions = sessions.map((s) => ({
       ...s,
       date_iso: (s.date_iso || "").trim(),
@@ -374,55 +383,71 @@ const AdminPanel: React.FC = () => {
       end_time: (s.end_time || "").trim(),
     }));
 
-    const missing = cleanSessions.some(
-      (s) => !s.date_iso || !s.start_time || !s.end_time,
+    // ✅ sesiones realmente completas
+    const providedSessions = cleanSessions.filter(
+      (s) => s.date_iso && s.start_time && s.end_time,
     );
-    if (missing) {
-      alert("Please set date + start + end time for every session.");
+
+    // ✅ si el usuario escribió algo a medias, sí bloqueamos (para evitar basura)
+    const hasPartial = cleanSessions.some(
+      (s) =>
+        (s.date_iso || s.start_time || s.end_time) &&
+        !(s.date_iso && s.start_time && s.end_time),
+    );
+    if (hasPartial) {
+      alert("If you add a session, please complete date + start + end time.");
       return;
     }
 
     try {
       await ensureCsrf();
 
+      // ✅ payload ya NO depende de sessions[0]
+      // Si no hay sesiones: start_time/end_time pueden ir null (backend debe aceptarlo)
       const payload = {
         title: editClass.title,
         trainer_name: editClass.trainer_name,
-        start_time: cleanSessions[0].start_time,
-        end_time: cleanSessions[0].end_time,
         modality: editClass.modality,
         spots_left: editClass.spots_left,
         description: editClass.description ?? null,
         workday_url: editClass.workday_url ?? null,
         audience: editClass.audience ?? "all_employees",
+        start_time: providedSessions[0]?.start_time ?? null,
+        end_time: providedSessions[0]?.end_time ?? null,
       };
 
       if (isNewClass) {
         const res = await api.post("/api/admin/classes", payload);
         const saved = res.data?.class ?? res.data;
 
-        await api.put(`/api/admin/classes/${saved.id}/sessions`, {
-          sessions: cleanSessions.map((s, idx) => ({
-            ...(idx === 0 ? { id: saved.id } : {}),
-            date_iso: s.date_iso,
-            start_time: s.start_time,
-            end_time: s.end_time,
-          })),
-          workday_url: editClass.workday_url ?? null,
-        });
+        // ✅ solo si hay sesiones, llamo el endpoint de sesiones
+        if (providedSessions.length > 0) {
+          await api.put(`/api/admin/classes/${saved.id}/sessions`, {
+            sessions: providedSessions.map((s, idx) => ({
+              ...(idx === 0 ? { id: saved.id } : {}),
+              date_iso: s.date_iso,
+              start_time: s.start_time,
+              end_time: s.end_time,
+            })),
+            workday_url: editClass.workday_url ?? null,
+            audience: editClass.audience ?? "all_employees",
+          });
+        }
       } else {
         await api.put(`/api/admin/classes/${editClass.id}`, payload);
 
-        await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
-          sessions: cleanSessions.map((s) => ({
-            id: s.id,
-            date_iso: s.date_iso,
-            start_time: s.start_time,
-            end_time: s.end_time,
-          })),
-          workday_url: editClass.workday_url ?? null,
-          audience: editClass.audience ?? "all_employees",
-        });
+        if (providedSessions.length > 0) {
+          await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
+            sessions: providedSessions.map((s) => ({
+              id: s.id,
+              date_iso: s.date_iso,
+              start_time: s.start_time,
+              end_time: s.end_time,
+            })),
+            workday_url: editClass.workday_url ?? null,
+            audience: editClass.audience ?? "all_employees",
+          });
+        }
       }
 
       await fetchGrouped();
@@ -599,7 +624,10 @@ const AdminPanel: React.FC = () => {
                               {t("viewDetails")}
                             </button>
                           ) : (
-                            <span className="mini-pill" style={{ opacity: 0.8 }}>
+                            <span
+                              className="mini-pill"
+                              style={{ opacity: 0.8 }}
+                            >
                               {t("workdayLinkMissing")}
                             </span>
                           )}

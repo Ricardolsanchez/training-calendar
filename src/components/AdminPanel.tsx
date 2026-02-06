@@ -16,11 +16,7 @@ type Audience =
 
 const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "sales", label_en: "Sales", label_es: "Ventas" },
-  {
-    value: "all_employees",
-    label_en: "All Employees",
-    label_es: "Todos los empleados",
-  },
+  { value: "all_employees", label_en: "All Employees", label_es: "Todos los empleados" },
   { value: "new_hires", label_en: "New Hires", label_es: "Nuevos ingresos" },
   { value: "hr", label_en: "HR", label_es: "RR. HH." },
   { value: "it", label_en: "IT", label_es: "TI" },
@@ -40,7 +36,11 @@ type AvailableClass = {
   id: number;
   title: string;
   trainer_id: number | null;
-  trainer_name: string | null;
+
+  // ✅ compat + multi
+  trainer_name: string | null;     // backend legacy (single)
+  trainer_names: string[];         // ✅ multi
+
   start_date: string;
   end_date: string;
   start_time: string | null;
@@ -63,13 +63,17 @@ type GroupedSession = {
 type GroupedClass = {
   group_code: string;
 
-  // draft support
+  // ✅ draft support
   base_id: number;
   all_session_ids: number[];
   is_draft: boolean;
 
   title: string;
+
+  // ✅ compat + multi (si backend aún manda solo trainer_name, igual funciona)
   trainer_name: string | null;
+  trainer_names?: string[] | null;
+
   modality: "Online" | "Presencial";
   audience?: Audience | null;
   level?: string | null;
@@ -148,6 +152,7 @@ const translations: Record<Lang, Record<string, string>> = {
     workdayLinkMissing: "Workday link missing",
     draftTag: "DRAFT",
     unlimited: "Unlimited",
+    trainersHelp: "Hold Ctrl/Cmd to select multiple.",
   },
   es: {
     adminBadge: "Panel Admin",
@@ -163,8 +168,7 @@ const translations: Record<Lang, Record<string, string>> = {
     columnTrainer: "Trainer",
 
     btnDeleteClass: "Eliminar",
-    confirmDeleteClassGroup:
-      "¿Eliminar este grupo de clases y todas sus sesiones?",
+    confirmDeleteClassGroup: "¿Eliminar este grupo de clases y todas sus sesiones?",
 
     classesTitle: "Clases disponibles",
     sessionsCount: "Sesiones",
@@ -174,6 +178,7 @@ const translations: Record<Lang, Record<string, string>> = {
     carouselNext: "Siguiente",
     sessionsPanelTitle: "Sesiones de",
     noOfferingsScheduledYet: "Aún no hay sesiones programadas",
+
     modalNewClass: "Nueva clase",
     modalEditClass: "Editar clase",
     labelClassTitle: "Título de la clase",
@@ -200,6 +205,7 @@ const translations: Record<Lang, Record<string, string>> = {
     workdayLinkMissing: "Link de Workday pendiente",
     draftTag: "BORRADOR",
     unlimited: "Ilimitado",
+    trainersHelp: "Mantén Ctrl/Cmd para seleccionar varios.",
   },
 };
 
@@ -263,8 +269,7 @@ const AdminPanel: React.FC = () => {
     setSessions((prev) => {
       if (safe === 0) return [];
       const next = [...prev];
-      while (next.length < safe)
-        next.push({ date_iso: "", start_time: "", end_time: "" });
+      while (next.length < safe) next.push({ date_iso: "", start_time: "", end_time: "" });
       return next.slice(0, safe);
     });
   };
@@ -274,6 +279,7 @@ const AdminPanel: React.FC = () => {
     return groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null;
   }, [expandedGroupCode, groupedClasses]);
 
+  /** ✅ ahora admin usa endpoint admin */
   const fetchGrouped = useCallback(async () => {
     try {
       const res = await api.get("/api/classes-grouped");
@@ -305,13 +311,12 @@ const AdminPanel: React.FC = () => {
   };
 
   const getSessionsCountText = (g: GroupedClass) => {
-    const count = Number.isFinite(g.sessions_count)
-      ? g.sessions_count
-      : (g.sessions?.length ?? 0);
+    const count = Number.isFinite(g.sessions_count) ? g.sessions_count : (g.sessions?.length ?? 0);
     if (!count) return t("noOfferingsScheduledYet");
     return `${t("sessionsCount")}: ${count}`;
   };
 
+  /** ✅ DELETE group: borra incluso drafts sin sesiones */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
     if (!ok) return;
@@ -320,9 +325,7 @@ const AdminPanel: React.FC = () => {
       await ensureCsrf();
 
       const ids =
-        g.all_session_ids && g.all_session_ids.length > 0
-          ? g.all_session_ids
-          : [g.base_id];
+        g.all_session_ids && g.all_session_ids.length > 0 ? g.all_session_ids : [g.base_id];
 
       for (const id of ids) {
         await api.delete(`/api/admin/classes/${id}`);
@@ -338,12 +341,14 @@ const AdminPanel: React.FC = () => {
 
   const openNewClassModal = () => {
     setIsNewClass(true);
-    setUnlimitedSeats(false); // ✅ reset
+    setUnlimitedSeats(false);
+
     setEditClass({
       id: 0,
       title: "",
       trainer_id: null,
       trainer_name: null,
+      trainer_names: [],
       start_date: "",
       end_date: "",
       start_time: null,
@@ -355,6 +360,7 @@ const AdminPanel: React.FC = () => {
       group_code: null,
       audience: "all_employees",
     });
+
     setShowClassModal(true);
 
     setCount(1);
@@ -368,13 +374,22 @@ const AdminPanel: React.FC = () => {
     const times = parseTimeRange(first?.time_range || "");
     const firstSpots = first?.spots_left ?? 0;
 
-    setUnlimitedSeats(firstSpots >= UNLIMITED_SEATS); // ✅ NO lo apagues luego
+    // ✅ estado unlimited real (NO lo apagues luego)
+    setUnlimitedSeats(firstSpots >= UNLIMITED_SEATS);
+
+    const names =
+      (group.trainer_names && group.trainer_names.length > 0)
+        ? group.trainer_names
+        : group.trainer_name
+          ? [group.trainer_name]
+          : [];
 
     setEditClass({
       id: group.base_id,
       title: group.title,
       trainer_id: null,
       trainer_name: group.trainer_name ?? null,
+      trainer_names: names,
       start_date: group.start_date_iso ?? "",
       end_date: group.end_date_iso ?? "",
       start_time: first ? times.start_time : null,
@@ -400,6 +415,12 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
+  /**
+   * ✅ SAVE:
+   * - seats ilimitados persisten
+   * - spots_left se manda al base y a cada sesión en sync
+   * - trainer_names se manda (y trainer_name = primer seleccionado para compat)
+   */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
@@ -415,8 +436,7 @@ const AdminPanel: React.FC = () => {
     const hasAnySession = cleanSessions.length > 0;
 
     const missing =
-      hasAnySession &&
-      cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
+      hasAnySession && cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
 
     if (missing) {
       alert("Please set date + start + end time for every session.");
@@ -426,19 +446,22 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      const finalSeats = unlimitedSeats
-        ? UNLIMITED_SEATS
-        : Number(editClass.spots_left || 0);
+      const finalSeats = unlimitedSeats ? UNLIMITED_SEATS : Number(editClass.spots_left || 0);
+
+      const trainerNames = Array.isArray(editClass.trainer_names) ? editClass.trainer_names : [];
+      const trainerNameCompat = trainerNames[0] ?? editClass.trainer_name ?? null;
 
       const payload = {
         title: editClass.title,
-        trainer_name: editClass.trainer_name,
+        trainer_name: trainerNameCompat, // compat legacy
+        trainer_names: trainerNames,     // ✅ nuevo multi
         modality: editClass.modality,
-        spots_left: finalSeats, // ✅ base también
+        spots_left: finalSeats,
         description: editClass.description ?? null,
         workday_url: editClass.workday_url ?? null,
         audience: editClass.audience ?? "all_employees",
 
+        // ✅ draft: null
         start_time: hasAnySession ? cleanSessions[0].start_time : null,
         end_time: hasAnySession ? cleanSessions[0].end_time : null,
 
@@ -502,6 +525,16 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const renderTrainerText = (g: GroupedClass) => {
+    const names =
+      (g.trainer_names && g.trainer_names.length > 0)
+        ? g.trainer_names
+        : g.trainer_name
+          ? [g.trainer_name]
+          : [];
+    return names.length ? names.join(", ") : "—";
+  };
+
   return (
     <div className="admin-page">
       <div className="admin-card">
@@ -521,19 +554,11 @@ const AdminPanel: React.FC = () => {
               {lang === "en" ? "ES" : "EN"}
             </button>
 
-            <button
-              type="button"
-              className="admin-back-button"
-              onClick={() => navigate("/")}
-            >
+            <button type="button" className="admin-back-button" onClick={() => navigate("/")}>
               {t("backToCalendar")}
             </button>
 
-            <button
-              type="button"
-              className="admin-logout-button"
-              onClick={handleLogout}
-            >
+            <button type="button" className="admin-logout-button" onClick={handleLogout}>
               {t("logout")}
             </button>
           </div>
@@ -542,10 +567,7 @@ const AdminPanel: React.FC = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={
-              "admin-tab-button" +
-              (activeTab === "classes" ? " admin-tab-button--active" : "")
-            }
+            className={"admin-tab-button" + (activeTab === "classes" ? " admin-tab-button--active" : "")}
             onClick={() => setActiveTab("classes")}
           >
             {t("tabClasses")}
@@ -557,34 +579,20 @@ const AdminPanel: React.FC = () => {
             <div className="admin-table-header-row">
               <h2 className="admin-table-title">{t("classesTitle")}</h2>
 
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={openNewClassModal}
-              >
+              <button type="button" className="btn btn-primary" onClick={openNewClassModal}>
                 {t("addNewClass")}
               </button>
             </div>
 
-            {groupedClasses.length === 0 && (
-              <p className="admin-message">{t("noClasses")}</p>
-            )}
+            {groupedClasses.length === 0 && <p className="admin-message">{t("noClasses")}</p>}
 
             {groupedClasses.length > 0 && (
               <div className="admin-carousel-wrap">
                 <div className="admin-carousel-controls">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => scrollCarousel(-1)}
-                  >
+                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(-1)}>
                     ◀ {t("carouselPrev")}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => scrollCarousel(1)}
-                  >
+                  <button type="button" className="btn btn-secondary" onClick={() => scrollCarousel(1)}>
                     {t("carouselNext")} ▶
                   </button>
                 </div>
@@ -596,20 +604,14 @@ const AdminPanel: React.FC = () => {
                     return (
                       <div
                         key={g.group_code}
-                        className={
-                          "admin-class-card" +
-                          (expanded ? " admin-class-card--active" : "")
-                        }
+                        className={"admin-class-card" + (expanded ? " admin-class-card--active" : "")}
                       >
                         <div className="admin-class-card-head">
                           <div>
                             <div className="admin-class-title">
                               {g.title}{" "}
                               {g.is_draft ? (
-                                <span
-                                  className="mini-pill"
-                                  style={{ marginLeft: 8, opacity: 0.85 }}
-                                >
+                                <span className="mini-pill" style={{ marginLeft: 8, opacity: 0.85 }}>
                                   {t("draftTag")}
                                 </span>
                               ) : null}
@@ -623,10 +625,7 @@ const AdminPanel: React.FC = () => {
                               </span>
 
                               <span className="mini-pill" style={{ marginLeft: 8 }}>
-                                {getAudienceLabel(
-                                  g.audience ?? "all_employees",
-                                  lang,
-                                )}
+                                {getAudienceLabel(g.audience ?? "all_employees", lang)}
                               </span>
                             </div>
                           </div>
@@ -642,8 +641,7 @@ const AdminPanel: React.FC = () => {
 
                         <div className="admin-class-meta">
                           <div className="admin-class-meta-row">
-                            <strong>{t("columnTrainer")}:</strong>{" "}
-                            {g.trainer_name || "—"}
+                            <strong>{t("columnTrainer")}:</strong> {renderTrainerText(g)}
                           </div>
 
                           {g.workday_url ? (
@@ -664,9 +662,7 @@ const AdminPanel: React.FC = () => {
                             </span>
                           )}
 
-                          {g.description && (
-                            <div className="admin-class-desc">{g.description}</div>
-                          )}
+                          {g.description && <div className="admin-class-desc">{g.description}</div>}
                         </div>
 
                         {expanded && <div className="admin-divider" />}
@@ -689,17 +685,11 @@ const AdminPanel: React.FC = () => {
                             )}
 
                             <div className="admin-actions" style={{ marginTop: 12 }}>
-                              <button
-                                className="btn btn-mini"
-                                onClick={() => openEditClassModal(g)}
-                              >
+                              <button className="btn btn-mini" onClick={() => openEditClassModal(g)}>
                                 {t("modalEditClass")}
                               </button>
 
-                              <button
-                                className="btn btn-mini btn-danger"
-                                onClick={() => deleteClassGroup(g)}
-                              >
+                              <button className="btn btn-mini btn-danger" onClick={() => deleteClassGroup(g)}>
                                 {t("btnDeleteClass")}
                               </button>
                             </div>
@@ -732,7 +722,7 @@ const AdminPanel: React.FC = () => {
                               <td>{idx + 1}</td>
                               <td>{formatDate(s.date_iso)}</td>
                               <td>{s.time_range}</td>
-                              <td>{s.spots_left}</td>
+                              <td>{s.spots_left >= UNLIMITED_SEATS ? t("unlimited") : s.spots_left}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -757,9 +747,7 @@ const AdminPanel: React.FC = () => {
                         placeholder="https://wd5.myworkday.com/..."
                         value={editClass.workday_url || ""}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, workday_url: e.target.value } : prev,
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, workday_url: e.target.value } : prev))
                         }
                       />
                       <small className="muted">
@@ -773,33 +761,41 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         value={editClass.title}
                         onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, title: e.target.value } : prev,
-                          )
+                          setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))
                         }
                       />
                     </div>
 
+                    {/* ✅ MULTI TRAINERS */}
                     <div>
                       <label>{t("labelTrainer")}</label>
+
                       <select
                         className="form-input"
-                        value={editClass.trainer_name || ""}
-                        onChange={(e) =>
+                        multiple
+                        value={editClass.trainer_names ?? []}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions).map((o) => o.value);
                           setEditClass((prev) =>
                             prev
-                              ? { ...prev, trainer_name: e.target.value || null }
+                              ? {
+                                  ...prev,
+                                  trainer_names: values,
+                                  trainer_name: values[0] ?? null, // compat
+                                }
                               : prev,
-                          )
-                        }
+                          );
+                        }}
+                        style={{ height: 140 }}
                       >
-                        <option value="">{t("optionSelectTrainer")}</option>
                         {TRAINERS.map((tr) => (
                           <option key={tr.id} value={tr.name}>
                             {tr.name}
                           </option>
                         ))}
                       </select>
+
+                      <small className="muted">{t("trainersHelp")}</small>
                     </div>
 
                     <div>
@@ -810,10 +806,7 @@ const AdminPanel: React.FC = () => {
                         onChange={(e) =>
                           setEditClass((prev) =>
                             prev
-                              ? {
-                                  ...prev,
-                                  modality: e.target.value as "Online" | "Presencial",
-                                }
+                              ? { ...prev, modality: e.target.value as "Online" | "Presencial" }
                               : prev,
                           )
                         }
@@ -844,12 +837,7 @@ const AdminPanel: React.FC = () => {
                             setUnlimitedSeats(checked);
 
                             setEditClass((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    spots_left: checked ? UNLIMITED_SEATS : 0,
-                                  }
-                                : prev,
+                              prev ? { ...prev, spots_left: checked ? UNLIMITED_SEATS : 0 } : prev,
                             );
                           }}
                         />
@@ -864,9 +852,7 @@ const AdminPanel: React.FC = () => {
                         placeholder={unlimitedSeats ? t("unlimited") : ""}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, spots_left: Number(e.target.value) }
-                              : prev,
+                            prev ? { ...prev, spots_left: Number(e.target.value) } : prev,
                           )
                         }
                         min={0}
@@ -880,9 +866,7 @@ const AdminPanel: React.FC = () => {
                         value={(editClass.audience ?? "all_employees") as string}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, audience: e.target.value as Audience }
-                              : prev,
+                            prev ? { ...prev, audience: e.target.value as Audience } : prev,
                           )
                         }
                       >
@@ -912,20 +896,14 @@ const AdminPanel: React.FC = () => {
 
                   <div className="admin-divider" />
 
-                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>
-                    {t("addSessionsTitle")}
-                  </h4>
+                  <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>{t("addSessionsTitle")}</h4>
                   <p className="admin-message" style={{ marginTop: 0 }}>
                     {t("addSessionsHint")}
                   </p>
 
                   <label>{t("sessionsCountLabel")}</label>
                   <div className="admin-inline-controls">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setCount(sessionsCount - 1)}
-                    >
+                    <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount - 1)}>
                       −
                     </button>
                     <input
@@ -937,11 +915,7 @@ const AdminPanel: React.FC = () => {
                       min={0}
                       max={20}
                     />
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setCount(sessionsCount + 1)}
-                    >
+                    <button type="button" className="btn btn-secondary" onClick={() => setCount(sessionsCount + 1)}>
                       +
                     </button>
                   </div>
@@ -1005,19 +979,11 @@ const AdminPanel: React.FC = () => {
                   )}
 
                   <div className="admin-modal-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setShowClassModal(false)}
-                    >
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowClassModal(false)}>
                       {t("modalCancelDark")}
                     </button>
 
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={saveClassChanges}
-                    >
+                    <button type="button" className="btn btn-primary" onClick={saveClassChanges}>
                       {t("modalSaveDark")}
                     </button>
                   </div>

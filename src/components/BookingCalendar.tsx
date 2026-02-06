@@ -12,7 +12,7 @@ type Audience =
   | "hr"
   | "it"
   | "legal"
-  | "managers_leaders"   // ✅ nuevo
+  | "manager_leaders"   // ✅ nuevo
   | "records";
 
 type AudienceFilter = "all" | Audience;
@@ -28,7 +28,7 @@ const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "hr", label_en: "HR", label_es: "RR. HH." },
   { value: "it", label_en: "IT", label_es: "TI" },
   { value: "legal", label_en: "Legal", label_es: "Legal" },
-  { value: "managers_leaders", label_en: "Managers/Leaders", label_es: "Managers/Líderes" },
+  { value: "manager_leaders", label_en: "Managers/Leaders", label_es: "Managers/Líderes" },
   { value: "records", label_en: "Records", label_es: "Records" },
 ];
 

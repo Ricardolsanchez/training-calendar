@@ -12,7 +12,7 @@ type Audience =
   | "hr"
   | "it"
   | "legal"
-  | "manager_leaders"   // ✅ nuevo
+  | "manager_leaders" // ✅ nuevo
   | "records";
 
 type AudienceFilter = "all" | Audience;
@@ -28,7 +28,11 @@ const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
   { value: "hr", label_en: "HR", label_es: "RR. HH." },
   { value: "it", label_en: "IT", label_es: "TI" },
   { value: "legal", label_en: "Legal", label_es: "Legal" },
-  { value: "manager_leaders", label_en: "Managers/Leaders", label_es: "Managers/Líderes" },
+  {
+    value: "manager_leaders",
+    label_en: "Managers/Leaders",
+    label_es: "Managers/Líderes",
+  },
   { value: "records", label_en: "Records", label_es: "Records" },
 ];
 
@@ -799,6 +803,20 @@ const BookingCalendar: React.FC = () => {
                                   </p>
                                 )}
 
+                                {g.workday_url && (
+                                  <button
+                                    type="button"
+                                    className="btn-workday-gradient"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openWorkday(g.workday_url!);
+                                    }}
+                                  >
+                                    View Details Here
+                                  </button>
+                                )}
+
                                 <div className="class-footer">
                                   <span className="class-trainer">
                                     👤 {renderTrainerText(g)}
@@ -964,6 +982,20 @@ const BookingCalendar: React.FC = () => {
                       </p>
                     ) : null}
                   </div>
+
+                  {selectedGroup.workday_url ? (
+                    <button
+                      type="button"
+                      className="btn-workday-gradient"
+                      onClick={() => openWorkday(selectedGroup.workday_url)}
+                    >
+                      {t("viewDetails")}
+                    </button>
+                  ) : (
+                    <span className="mini-pill" style={{ opacity: 0.8 }}>
+                      {t("workdayLinkMissing")}
+                    </span>
+                  )}
 
                   <div className="booking-detail-sessions">
                     <div className="class-sessions-title">

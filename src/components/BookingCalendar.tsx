@@ -802,21 +802,6 @@ const BookingCalendar: React.FC = () => {
                                     {g.description}
                                   </p>
                                 )}
-
-                                {g.workday_url && (
-                                  <button
-                                    type="button"
-                                    className="btn-workday-gradient btn-workday-gradient--small"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      openWorkday(g.workday_url!);
-                                    }}
-                                  >
-                                    View Details Here
-                                  </button>
-                                )}
-
                                 <div className="class-footer">
                                   <span className="class-trainer">
                                     👤 {renderTrainerText(g)}

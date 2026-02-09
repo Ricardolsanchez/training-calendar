@@ -806,7 +806,7 @@ const BookingCalendar: React.FC = () => {
                                 {g.workday_url && (
                                   <button
                                     type="button"
-                                    className="btn-workday-gradient"
+                                    className="btn-workday-gradient btn-workday-gradient--small"
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -986,7 +986,7 @@ const BookingCalendar: React.FC = () => {
                   {selectedGroup.workday_url ? (
                     <button
                       type="button"
-                      className="btn-workday-gradient"
+                      className="btn-workday-gradient btn-workday-gradient--small"
                       onClick={() => openWorkday(selectedGroup.workday_url)}
                     >
                       {t("viewDetails")}
@@ -996,7 +996,6 @@ const BookingCalendar: React.FC = () => {
                       {t("workdayLinkMissing")}
                     </span>
                   )}
-
                   <div className="booking-detail-sessions">
                     <div className="class-sessions-title">
                       {t("sessionsTitle")}

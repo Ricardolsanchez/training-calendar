@@ -493,6 +493,7 @@ const AdminPanel: React.FC = () => {
 
         if (hasAnySession) {
           await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
+            spots_left: finalSeats,
             sessions: cleanSessions.map((s) => ({
               id: s.id,
               date_iso: s.date_iso,

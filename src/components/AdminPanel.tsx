@@ -12,7 +12,7 @@ type Audience =
   | "hr"
   | "it"
   | "legal"
-  | "manager_leaders"   // ✅ nuevo
+  | "manager_leaders" // ✅ nuevo
   | "records";
 
 const AUDIENCES: { value: Audience; label_en: string; label_es: string }[] = [
@@ -39,9 +39,8 @@ type AvailableClass = {
   title: string;
   trainer_id: number | null;
 
-  // ✅ compat + multi
-  trainer_name: string | null;     // backend legacy (single)
-  trainer_names: string[];         // ✅ multi
+  trainer_name: string | null; // backend legacy (single)
+  trainer_names: string[]; // ✅ multi
 
   start_date: string;
   end_date: string;
@@ -64,15 +63,15 @@ type GroupedSession = {
 
 type GroupedClass = {
   group_code: string;
+  spots_left?: number;
+  sessions: GroupedSession[];
 
-  // ✅ draft support
   base_id: number;
   all_session_ids: number[];
   is_draft: boolean;
 
   title: string;
 
-  // ✅ compat + multi (si backend aún manda solo trainer_name, igual funciona)
   trainer_name: string | null;
   trainer_names?: string[] | null;
 
@@ -81,7 +80,6 @@ type GroupedClass = {
   level?: string | null;
   description: string | null;
   sessions_count: number;
-  sessions: GroupedSession[];
   workday_url?: string | null;
 
   start_date_iso?: string | null;
@@ -237,8 +235,7 @@ const AdminPanel: React.FC = () => {
 
   const [groupedClasses, setGroupedClasses] = useState<GroupedClass[]>([]);
   const [expandedGroupCode, setExpandedGroupCode] = useState<string | null>(null);
-  const toggleGroup = (code: string) =>
-    setExpandedGroupCode((prev) => (prev === code ? null : code));
+  const toggleGroup = (code: string) => setExpandedGroupCode((prev) => (prev === code ? null : code));
 
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const scrollCarousel = (dir: -1 | 1) => {
@@ -256,13 +253,10 @@ const AdminPanel: React.FC = () => {
   const [isNewClass, setIsNewClass] = useState(false);
   const [editClass, setEditClass] = useState<AvailableClass | null>(null);
 
-  // ✅ Unlimited toggle state (DENTRO del componente)
   const [unlimitedSeats, setUnlimitedSeats] = useState<boolean>(false);
 
   const [sessionsCount, setSessionsCount] = useState<number>(1);
-  const [sessions, setSessions] = useState<SessionDraft[]>([
-    { date_iso: "", start_time: "", end_time: "" },
-  ]);
+  const [sessions, setSessions] = useState<SessionDraft[]>([{ date_iso: "", start_time: "", end_time: "" }]);
 
   const setCount = (n: number) => {
     const safe = Math.max(0, Math.min(20, Number.isFinite(n) ? n : 0));
@@ -281,10 +275,9 @@ const AdminPanel: React.FC = () => {
     return groupedClasses.find((g) => g.group_code === expandedGroupCode) ?? null;
   }, [expandedGroupCode, groupedClasses]);
 
-  /** ✅ ahora admin usa endpoint admin */
   const fetchGrouped = useCallback(async () => {
     try {
-      const res = await api.get("/api/classes-grouped");
+      const res = await api.get("/api/admin/classes-grouped");
       const list: GroupedClass[] = res.data?.classes ?? res.data ?? [];
       setGroupedClasses(Array.isArray(list) ? list : []);
     } catch (err) {
@@ -318,7 +311,6 @@ const AdminPanel: React.FC = () => {
     return `${t("sessionsCount")}: ${count}`;
   };
 
-  /** ✅ DELETE group: borra incluso drafts sin sesiones */
   const deleteClassGroup = async (g: GroupedClass) => {
     const ok = window.confirm(t("confirmDeleteClassGroup"));
     if (!ok) return;
@@ -326,8 +318,7 @@ const AdminPanel: React.FC = () => {
     try {
       await ensureCsrf();
 
-      const ids =
-        g.all_session_ids && g.all_session_ids.length > 0 ? g.all_session_ids : [g.base_id];
+      const ids = g.all_session_ids && g.all_session_ids.length > 0 ? g.all_session_ids : [g.base_id];
 
       for (const id of ids) {
         await api.delete(`/api/admin/classes/${id}`);
@@ -374,13 +365,12 @@ const AdminPanel: React.FC = () => {
 
     const first = group.sessions?.[0];
     const times = parseTimeRange(first?.time_range || "");
-    const firstSpots = first?.spots_left ?? 0;
+    const firstSpots = first?.spots_left ?? group.spots_left ?? 0;
 
-    // ✅ estado unlimited real (NO lo apagues luego)
     setUnlimitedSeats(firstSpots >= UNLIMITED_SEATS);
 
     const names =
-      (group.trainer_names && group.trainer_names.length > 0)
+      group.trainer_names && group.trainer_names.length > 0
         ? group.trainer_names
         : group.trainer_name
           ? [group.trainer_name]
@@ -417,12 +407,6 @@ const AdminPanel: React.FC = () => {
     setShowClassModal(true);
   };
 
-  /**
-   * ✅ SAVE:
-   * - seats ilimitados persisten
-   * - spots_left se manda al base y a cada sesión en sync
-   * - trainer_names se manda (y trainer_name = primer seleccionado para compat)
-   */
   const saveClassChanges = async () => {
     if (!editClass) return;
 
@@ -437,8 +421,7 @@ const AdminPanel: React.FC = () => {
 
     const hasAnySession = cleanSessions.length > 0;
 
-    const missing =
-      hasAnySession && cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
+    const missing = hasAnySession && cleanSessions.some((s) => !s.date_iso || !s.start_time || !s.end_time);
 
     if (missing) {
       alert("Please set date + start + end time for every session.");
@@ -455,15 +438,14 @@ const AdminPanel: React.FC = () => {
 
       const payload = {
         title: editClass.title,
-        trainer_name: trainerNameCompat, // compat legacy
-        trainer_names: trainerNames,     // ✅ nuevo multi
+        trainer_name: trainerNameCompat,
+        trainer_names: trainerNames,
         modality: editClass.modality,
         spots_left: finalSeats,
         description: editClass.description ?? null,
         workday_url: editClass.workday_url ?? null,
         audience: editClass.audience ?? "all_employees",
 
-        // ✅ draft: null
         start_time: hasAnySession ? cleanSessions[0].start_time : null,
         end_time: hasAnySession ? cleanSessions[0].end_time : null,
 
@@ -476,13 +458,14 @@ const AdminPanel: React.FC = () => {
         const saved = res.data?.class ?? res.data;
 
         if (hasAnySession) {
+          // ✅ FIX CLAVE: spots_left EN RAÍZ
           await api.put(`/api/admin/classes/${saved.id}/sessions`, {
+            spots_left: finalSeats,
             sessions: cleanSessions.map((s, idx) => ({
               ...(idx === 0 ? { id: saved.id } : {}),
               date_iso: s.date_iso,
               start_time: s.start_time,
               end_time: s.end_time,
-              spots_left: finalSeats, // ✅ CLAVE: persiste en cada sesión
             })),
             workday_url: editClass.workday_url ?? null,
             audience: editClass.audience ?? "all_employees",
@@ -495,11 +478,10 @@ const AdminPanel: React.FC = () => {
           await api.put(`/api/admin/classes/${editClass.id}/sessions`, {
             spots_left: finalSeats,
             sessions: cleanSessions.map((s) => ({
-              id: s.id,
+              id: s.id, // ✅ NO saved aquí
               date_iso: s.date_iso,
               start_time: s.start_time,
               end_time: s.end_time,
-              spots_left: finalSeats, // ✅ CLAVE: persiste en cada sesión
             })),
             workday_url: editClass.workday_url ?? null,
             audience: editClass.audience ?? "all_employees",
@@ -530,7 +512,7 @@ const AdminPanel: React.FC = () => {
 
   const renderTrainerText = (g: GroupedClass) => {
     const names =
-      (g.trainer_names && g.trainer_names.length > 0)
+      g.trainer_names && g.trainer_names.length > 0
         ? g.trainer_names
         : g.trainer_name
           ? [g.trainer_name]
@@ -549,11 +531,7 @@ const AdminPanel: React.FC = () => {
           </div>
 
           <div className="admin-header-actions">
-            <button
-              type="button"
-              className="admin-lang-toggle"
-              onClick={() => setLang(lang === "en" ? "es" : "en")}
-            >
+            <button type="button" className="admin-lang-toggle" onClick={() => setLang(lang === "en" ? "es" : "en")}>
               {lang === "en" ? "ES" : "EN"}
             </button>
 
@@ -605,10 +583,7 @@ const AdminPanel: React.FC = () => {
                     const expanded = expandedGroupCode === g.group_code;
 
                     return (
-                      <div
-                        key={g.group_code}
-                        className={"admin-class-card" + (expanded ? " admin-class-card--active" : "")}
-                      >
+                      <div key={g.group_code} className={"admin-class-card" + (expanded ? " admin-class-card--active" : "")}>
                         <div className="admin-class-card-head">
                           <div>
                             <div className="admin-class-title">
@@ -633,11 +608,7 @@ const AdminPanel: React.FC = () => {
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => toggleGroup(g.group_code)}
-                          >
+                          <button type="button" className="btn btn-secondary" onClick={() => toggleGroup(g.group_code)}>
                             {expanded ? t("collapse") : t("expand")}
                           </button>
                         </div>
@@ -749,13 +720,9 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         placeholder="https://wd5.myworkday.com/..."
                         value={editClass.workday_url || ""}
-                        onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, workday_url: e.target.value } : prev))
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, workday_url: e.target.value } : prev))}
                       />
-                      <small className="muted">
-                        This link redirects employees to the Workday enrollment page
-                      </small>
+                      <small className="muted">This link redirects employees to the Workday enrollment page</small>
                     </div>
 
                     <div className="full">
@@ -763,13 +730,10 @@ const AdminPanel: React.FC = () => {
                       <input
                         className="form-input"
                         value={editClass.title}
-                        onChange={(e) =>
-                          setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, title: e.target.value } : prev))}
                       />
                     </div>
 
-                    {/* ✅ MULTI TRAINERS */}
                     <div>
                       <label>{t("labelTrainer")}</label>
 
@@ -784,7 +748,7 @@ const AdminPanel: React.FC = () => {
                               ? {
                                   ...prev,
                                   trainer_names: values,
-                                  trainer_name: values[0] ?? null, // compat
+                                  trainer_name: values[0] ?? null,
                                 }
                               : prev,
                           );
@@ -808,9 +772,7 @@ const AdminPanel: React.FC = () => {
                         value={editClass.modality}
                         onChange={(e) =>
                           setEditClass((prev) =>
-                            prev
-                              ? { ...prev, modality: e.target.value as "Online" | "Presencial" }
-                              : prev,
+                            prev ? { ...prev, modality: e.target.value as "Online" | "Presencial" } : prev,
                           )
                         }
                       >
@@ -819,19 +781,10 @@ const AdminPanel: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* ✅ Seats + Unlimited */}
                     <div>
                       <label>{t("labelSeats")}</label>
 
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 8,
-                          marginTop: 6,
-                        }}
-                      >
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 6 }}>
                         <input
                           type="checkbox"
                           checked={unlimitedSeats}
@@ -839,9 +792,7 @@ const AdminPanel: React.FC = () => {
                             const checked = e.target.checked;
                             setUnlimitedSeats(checked);
 
-                            setEditClass((prev) =>
-                              prev ? { ...prev, spots_left: checked ? UNLIMITED_SEATS : 0 } : prev,
-                            );
+                            setEditClass((prev) => (prev ? { ...prev, spots_left: checked ? UNLIMITED_SEATS : 0 } : prev));
                           }}
                         />
                         {t("unlimited")}
@@ -853,11 +804,7 @@ const AdminPanel: React.FC = () => {
                         value={unlimitedSeats ? "" : editClass.spots_left}
                         disabled={unlimitedSeats}
                         placeholder={unlimitedSeats ? t("unlimited") : ""}
-                        onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, spots_left: Number(e.target.value) } : prev,
-                          )
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, spots_left: Number(e.target.value) } : prev))}
                         min={0}
                       />
                     </div>
@@ -867,11 +814,7 @@ const AdminPanel: React.FC = () => {
                       <select
                         className="form-input"
                         value={(editClass.audience ?? "all_employees") as string}
-                        onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, audience: e.target.value as Audience } : prev,
-                          )
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, audience: e.target.value as Audience } : prev))}
                       >
                         <option value="">{t("optionSelectAudience")}</option>
                         {AUDIENCES.map((a) => (
@@ -888,11 +831,7 @@ const AdminPanel: React.FC = () => {
                         className="form-input"
                         rows={3}
                         value={editClass.description ?? ""}
-                        onChange={(e) =>
-                          setEditClass((prev) =>
-                            prev ? { ...prev, description: e.target.value || null } : prev,
-                          )
-                        }
+                        onChange={(e) => setEditClass((prev) => (prev ? { ...prev, description: e.target.value || null } : prev))}
                       />
                     </div>
                   </div>
@@ -900,9 +839,7 @@ const AdminPanel: React.FC = () => {
                   <div className="admin-divider" />
 
                   <h4 style={{ margin: "0 0 6px", fontWeight: 900 }}>{t("addSessionsTitle")}</h4>
-                  <p className="admin-message" style={{ marginTop: 0 }}>
-                    {t("addSessionsHint")}
-                  </p>
+                  <p className="admin-message" style={{ marginTop: 0 }}>{t("addSessionsHint")}</p>
 
                   <label>{t("sessionsCountLabel")}</label>
                   <div className="admin-inline-controls">

@@ -100,13 +100,14 @@ const TRAINERS: Trainer[] = [
   { id: 1, name: "Sergio Osorio" },
   { id: 2, name: "Monica Mendoza" },
   { id: 3, name: "Kelvin Hodgson" },
-  { id: 4, name: "Edma Murillo" },
-  { id: 5, name: "Dora Ramirez" },
-  { id: 6, name: "Ada Perez" },
-  { id: 7, name: "Josias Mendez" },
-  { id: 8, name: "Ricardo Sanchez" },
-  { id: 9, name: "Giselle Cárdenas" },
-  { id: 10, name: "Alexandria Yorkman" },
+  { id: 4, name: "Rachel Rodriguez" },
+  { id: 5, name: "Edma Murillo" },
+  { id: 6, name: "Dora Ramirez" },
+  { id: 7, name: "Ada Perez" },
+  { id: 8, name: "Josias Mendez" },
+  { id: 9, name: "Ricardo Sanchez" },
+  { id: 10, name: "Giselle Cárdenas" },
+  { id: 11, name: "Alexandria Yorkman" },
 ];
 
 const translations: Record<Lang, Record<string, string>> = {

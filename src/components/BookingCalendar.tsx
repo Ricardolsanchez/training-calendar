@@ -1017,7 +1017,7 @@ const BookingCalendar: React.FC = () => {
                                 className="mini-pill"
                                 style={{ marginLeft: 8 }}
                               >
-                                {s.time_range}
+                                {s.time_range} Texas Time
                               </span>
                             </button>
                           );

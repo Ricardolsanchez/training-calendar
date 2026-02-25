@@ -899,7 +899,7 @@ const BookingCalendar: React.FC = () => {
                                     )}
 
                                     <span className="mini-pill">
-                                      {session.time_range}
+                                      {session.time_range} Texas Time
                                     </span>
 
                                     <span

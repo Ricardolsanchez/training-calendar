@@ -899,7 +899,7 @@ const BookingCalendar: React.FC = () => {
                                     )}
 
                                     <span className="mini-pill">
-                                      {session.time_range} Texas Time
+                                      {session.time_range} TX
                                     </span>
 
                                     <span
@@ -1017,7 +1017,7 @@ const BookingCalendar: React.FC = () => {
                                 className="mini-pill"
                                 style={{ marginLeft: 8 }}
                               >
-                                {s.time_range} Texas Time
+                                {s.time_range} TX
                               </span>
                             </button>
                           );
